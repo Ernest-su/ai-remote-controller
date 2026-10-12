@@ -1,0 +1,13 @@
+.gradle/
+**/build/
+runtime/target/
+local.properties
+.idea/
+*.iml
+androidApp/src/main/assets/runtime/
+runtime/target/debug/state/
+__pycache__/
+dist/
+site/
+.venv-docs/
+.venv-test/

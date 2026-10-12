@@ -1,0 +1,84 @@
+site_name: AI 遥控 · AIRC
+site_description: Android AI 遥控器、目标设备 runtime 与开发文档
+site_url: !ENV [AIRC_DOCS_SITE_URL, ""]
+repo_url: !ENV [AIRC_DOCS_REPO_URL, ""]
+repo_name: !ENV [AIRC_DOCS_REPO_NAME, ""]
+edit_uri: !ENV [AIRC_DOCS_EDIT_URI, ""]
+strict: true
+theme:
+  name: material
+  language: zh
+  palette:
+    - scheme: default
+      primary: blue grey
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: 切换深色模式
+    - scheme: slate
+      primary: blue grey
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: 切换浅色模式
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+plugins:
+  - search:
+      lang: [zh, en]
+markdown_extensions:
+  - admonition
+  - tables
+  - attr_list
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - toc:
+      permalink: true
+nav:
+  - 首页: index.md
+  - 快速开始: getting-started.md
+  - 使用指南:
+      - 连接设备: guide/connections.md
+      - 桌面测试工具: guide/desktop.md
+      - 遥控与文字: guide/remote.md
+      - 设备截图: guide/screenshots.md
+      - 目标文件: guide/files.md
+      - 媒体投送: guide/media.md
+      - 游戏手柄: guide/gamepad.md
+      - 应用缓存: guide/cache.md
+      - 模型配置: guide/models.md
+      - 服务与更新: guide/services.md
+      - 系统管理: guide/system.md
+  - 故障排查: troubleshooting.md
+  - 参考:
+      - 设备端协议: protocol.md
+      - 工具: reference/tools.md
+      - CLI: reference/cli.md
+  - 开发与贡献:
+      - 参与贡献: development/contributing.md
+      - 架构: development/architecture.md
+      - 视觉与交互约束: development/visual-guidelines.md
+      - 构建: development/build.md
+      - 测试: development/testing.md
+      - 设备验证方法: device-validation.md
+      - 准备发布: development/releasing.md
+      - 文档维护: development/documentation.md
+  - 项目:
+      - 实现概览: implementation.md
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    unrecognized_links: warn
+    anchors: warn

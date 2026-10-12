@@ -1,0 +1,98 @@
+name: Build and test
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  ANDROID_NDK_VERSION: 28.2.13676358
+
+jobs:
+  runtime:
+    name: Runtime tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            runtime/target
+          key: host-runtime-${{ runner.os }}-${{ hashFiles('runtime/Cargo.lock') }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install websockets zeroconf
+      - run: cargo test --locked --manifest-path runtime/Cargo.toml
+      - run: cargo clippy --locked --manifest-path runtime/Cargo.toml --all-targets -- -D warnings
+      - run: cargo build --locked --manifest-path runtime/Cargo.toml
+      - run: python runtime/smoke_test.py
+      - run: python runtime/e2e_test.py
+
+  android:
+    name: Android APK and runtime assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK and NDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;$ANDROID_NDK_VERSION"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            runtime/target
+          key: android-runtime-${{ runner.os }}-${{ hashFiles('runtime/Cargo.lock') }}
+      - name: Install desktop UI test display
+        run: sudo apt-get update && sudo apt-get install -y xvfb xauth
+      - name: Test JVM clients and build Android APKs
+        run: xvfb-run -a env SKIKO_RENDER_API=SOFTWARE ./gradlew :shared:jvmTest :client:test :desktopApp:jvmTest :androidApp:testDebugUnitTest :androidApp:assembleDebug :androidApp:assembleDebugAndroidTest --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: androidApp/build/outputs/apk/debug/androidApp-debug.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumentation-apk
+          path: androidApp/build/outputs/apk/androidTest/debug/androidApp-debug-androidTest.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-runtime-assets
+          path: androidApp/src/main/assets/runtime/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-test-reports
+          path: |
+            shared/build/reports/tests/
+            client/build/reports/tests/
+            desktopApp/build/reports/tests/
+            androidApp/build/reports/tests/
+          if-no-files-found: ignore

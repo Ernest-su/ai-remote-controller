@@ -1,0 +1,3 @@
+# Keep versions aligned with the reference nl2sh documentation toolchain.
+mkdocs==1.6.1
+mkdocs-material==9.7.7

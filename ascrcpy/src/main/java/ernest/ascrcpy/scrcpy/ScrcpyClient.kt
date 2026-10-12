@@ -1,0 +1,166 @@
+package ernest.ascrcpy.scrcpy
+
+import android.view.Surface
+import ernest.ascrcpy.adb.AdbChannel
+import ernest.ascrcpy.adb.AdbClient
+import java.io.Closeable
+import java.io.InputStream
+import kotlin.random.Random
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.isActive
+
+class ScrcpyClient(private val adb: AdbClient) : Closeable {
+    internal val serverPath = "/data/local/tmp/airc-scrcpy-${java.util.UUID.randomUUID()}.jar"
+    private val mutableState = MutableStateFlow<ScrcpyState>(ScrcpyState.Idle)
+    val state: StateFlow<ScrcpyState> = mutableState.asStateFlow()
+
+    private var scope: CoroutineScope? = null
+    private var videoChannel: AdbChannel? = null
+    private var controlChannel: AdbChannel? = null
+    private var videoJob: Job? = null
+    private var serverJob: Job? = null
+    @Volatile private var serverChannel: AdbChannel? = null
+    private var controller: ControlMessageWriter? = null
+    @Volatile private var sessionGeneration = 0L
+
+    suspend fun start(server: InputStream, surface: Surface, config: ScrcpyConfig = ScrcpyConfig()) {
+        stop()
+        val generation = ++sessionGeneration
+        try {
+            mutableState.value = ScrcpyState.InstallingServer
+            adb.push(server, serverPath, 0x1A4)
+            val scid = Random.nextInt(1, Int.MAX_VALUE)
+            mutableState.value = ScrcpyState.StartingServer
+            val command = buildString {
+                append("CLASSPATH=$serverPath app_process / com.genymobile.scrcpy.Server $SERVER_VERSION ")
+                append("scid=${scid.toString(16).padStart(8, '0')} tunnel_forward=true ")
+                append("audio=false video_codec=h264 max_size=${config.maxSize} ")
+                append("video_bit_rate=${config.videoBitRate} max_fps=${config.maxFps} ")
+                append("send_device_meta=false send_dummy_byte=false cleanup=false")
+            }
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            serverJob = scope!!.launch {
+                var channel: AdbChannel? = null
+                try {
+                    // A long-lived shell() holds the facade's operation mutex, preventing
+                    // diagnostics and device-management shell commands during mirroring.
+                    // Own a raw public channel instead, and drain output without logging it.
+                    channel = adb.open("shell:$command")
+                    if (generation != sessionGeneration) return@launch
+                    serverChannel = channel
+                    drainServerOutput(channel)
+                    if (generation == sessionGeneration && currentCoroutineContext().isActive) {
+                        mutableState.value = ScrcpyState.Failed(IllegalStateException("scrcpy server exited"))
+                    }
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    if (generation == sessionGeneration) mutableState.value = ScrcpyState.Failed(error)
+                } finally {
+                    channel?.close()
+                    if (serverChannel === channel) serverChannel = null
+                }
+            }
+            mutableState.value = ScrcpyState.ConnectingStreams
+            val socketName = "scrcpy_${scid.toString(16).padStart(8, '0')}"
+            videoChannel = openWithRetry("localabstract:$socketName")
+            controlChannel = openWithRetry("localabstract:$socketName")
+            controller = ControlMessageWriter(checkNotNull(controlChannel))
+            mutableState.value = ScrcpyState.WaitingForVideo
+            videoJob = scope!!.launch {
+                runCatching {
+                    VideoStreamDecoder(checkNotNull(videoChannel), surface, { videoSize ->
+                        if (generation == sessionGeneration) {
+                            mutableState.value = ScrcpyState.Streaming(videoSize)
+                        }
+                    }, { frames ->
+                        if(generation == sessionGeneration) {
+                            mutableState.update{if(it is ScrcpyState.Streaming)it.copy(renderedFrames=frames)else it}
+                        }
+                    }, {
+                        if(generation==sessionGeneration)mutableState.update{if(it is ScrcpyState.Streaming)it.copy(queuedPackets=it.queuedPackets+1)else it}
+                    }, { error ->
+                        if(generation==sessionGeneration)mutableState.value=ScrcpyState.Failed(error)
+                    }).run()
+                }.onFailure {
+                    if (generation == sessionGeneration && it !is kotlinx.coroutines.CancellationException) {
+                        mutableState.value = ScrcpyState.Failed(it)
+                    }
+                }
+            }
+        } catch (error: Throwable) {
+            if (generation == sessionGeneration) {
+                stopChannels()
+                if (error !is CancellationException) {
+                    mutableState.value = ScrcpyState.Failed(error)
+                }
+            }
+            throw error
+        }
+    }
+
+    suspend fun injectTouch(action: Int, pointerId: Long, x: Int, y: Int, pressure: Float) {
+        val videoSize = (state.value as? ScrcpyState.Streaming)?.videoSize ?: return
+        controller?.injectTouch(action, pointerId, x, y, videoSize, pressure)
+    }
+
+    suspend fun injectKey(action: Int, keyCode: Int) {
+        controller?.injectKey(action, keyCode)
+    }
+
+    fun stop() {
+        sessionGeneration++
+        stopChannels()
+        mutableState.value = ScrcpyState.Idle
+    }
+
+    private fun stopChannels() {
+        videoJob?.cancel()
+        videoJob = null
+        serverJob?.cancel()
+        serverJob = null
+        serverChannel?.close()
+        serverChannel = null
+        scope?.cancel()
+        scope = null
+        videoChannel?.close()
+        videoChannel = null
+        controlChannel?.close()
+        controlChannel = null
+        controller = null
+    }
+
+    private suspend fun openWithRetry(service: String): AdbChannel {
+        var lastError: Throwable? = null
+        repeat(40) {
+            try {
+                return adb.open(service)
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                lastError = error
+                delay(100)
+            }
+        }
+        throw IllegalStateException("Timed out opening $service", lastError)
+    }
+
+    override fun close() = stop()
+
+    suspend fun removeServer() { adb.shell("rm -f -- $serverPath") }
+
+    private companion object {
+        const val SERVER_VERSION = "4.0"
+    }
+}
