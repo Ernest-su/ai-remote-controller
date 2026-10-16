@@ -11,3 +11,14 @@ dist/
 site/
 .venv-docs/
 .venv-test/
+
+# Signing keys must be provisioned outside this checkout.
+*.jks
+*.keystore
+*.p12
+*.pfx
+*-private.pem
+android-keystore.base64
+android-store-password.txt
+android-key-password.txt
+runtime-key-password.txt

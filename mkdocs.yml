@@ -70,7 +70,7 @@ nav:
       - 构建: development/build.md
       - 测试: development/testing.md
       - 设备验证方法: device-validation.md
-      - 准备发布: development/releasing.md
+      - 签名与发布: development/releasing.md
       - 文档维护: development/documentation.md
   - 项目:
       - 实现概览: implementation.md

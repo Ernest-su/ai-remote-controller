@@ -22,4 +22,4 @@ AIRC 将 Android 手机变成既能按键操作、也能执行自然语言任务
 | AI | 兼容 chat completions 工具调用的服务 |
 | 未来平台 | KMP 共享协议；iOS、鸿蒙尚未实现 |
 
-当前需从源码构建，步骤见[快速开始](getting-started.md)；功能与使用限制见对应使用指南。
+生产签名 APK 从 [GitHub Releases](https://github.com/Ernest-su/ai-remote-controller/releases) 获取；尚无公开版本时可按[快速开始](getting-started.md)从源码构建。功能与使用限制见对应使用指南。项目原创代码使用 MIT License，第三方组件保留原许可证。

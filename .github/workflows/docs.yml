@@ -3,7 +3,7 @@ name: Documentation
 on:
   pull_request:
   push:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -29,7 +29,7 @@ jobs:
           AIRC_DOCS_SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
           AIRC_DOCS_REPO_URL: https://github.com/${{ github.repository }}
           AIRC_DOCS_REPO_NAME: ${{ github.repository }}
-          AIRC_DOCS_EDIT_URI: edit/master/docs/
+          AIRC_DOCS_EDIT_URI: edit/main/docs/
         run: python -m mkdocs build --strict
       - uses: actions/upload-artifact@v4
         with:
@@ -39,7 +39,7 @@ jobs:
 
   deploy:
     needs: build
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     concurrency:
       group: gh-pages-publication

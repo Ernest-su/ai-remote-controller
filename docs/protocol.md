@@ -1,5 +1,7 @@
 # 设备端协议 v1
 
+App 与 runtime 按同一版本配套分发。目标文件与待部署版本不一致时升级目标程序，不以历史二进制兼容作为继续保留旧文件的依据。
+
 ## 发现
 
 目标端发布 `_airc._tcp.local.`，Android NSD 发现类型 `_airc._tcp.`。TXT 包含：
@@ -18,7 +20,7 @@
 
 ## HTTP
 
-`GET /status` 返回 version、protocol、deviceId、name、tools、modelConfigured、uid（进程有效用户 ID，`0` 为 root，`2000` 为 Android shell）；旧版本可不含 uid，不返回模型密钥。
+`GET /status` 返回 version、protocol、deviceId、name、tools、modelConfigured、uid（进程有效用户 ID，`0` 为 root，`2000` 为 Android shell）；不返回模型密钥。
 
 ## WebSocket
 
@@ -46,9 +48,9 @@
 {"id":"request-1","protocol":1,"type":"assistant.state","phase":"thinking","text":""}
 ```
 
-tool 阶段可附带可选 `tool` 字段，例如 `"tool":"files.mkdir"`，表示准备尝试的已注册工具，不表示执行成功。该事件不包含工具参数、结果或 API Key；tool 阶段的 text 保持为空。旧服务可不发送此字段，新客户端按空值处理。
+tool 阶段可附带可选 `tool` 字段，例如 `"tool":"files.mkdir"`，表示准备尝试的已注册工具，不表示执行成功。该事件不包含工具参数、结果或 API Key；tool 阶段的 text 保持为空。该字段未提供时按空值处理。
 
-phase 为 thinking 或 tool，text 可为空。最终仍返回原有 ok/result/error 响应。事件不是最终响应，不能完成 pending request；未知事件应忽略。进度事件为尽力发送，不代替最终响应。未请求 progress 的客户端只收到原有响应；旧版服务忽略新增请求字段，因此新版客户端保留仅最终结果的回退行为。
+phase 为 thinking 或 tool，text 可为空。最终仍返回原有 ok/result/error 响应。事件不是最终响应，不能完成 pending request；未知事件应忽略。进度事件为尽力发送，不代替最终响应。未请求 progress 的客户端只收到最终响应。中间事件缺失时继续等待最终响应，不伪造思考或工具执行阶段。
 
 当前版本仅支持文字与工具请求，不再接受 audio.start / audio.stop / audio.cancel 或二进制音频。旧模型配置中的 transcriptionModel 字段读取时忽略，保存时移除；文字配置与现有设备记录保持兼容。
 
@@ -70,7 +72,7 @@ airc-runtime service stop --state-dir /data/local/tmp/airc/state
 
 安装器按照目标 ABI 列表选择资产，验证文件的大小与 SHA-256，并比较目标文件摘要。摘要和运行权限均相同时不推送或重启；摘要或 root/shell 权限变化时推送到 `.next`，核验后停止原服务并原子替换。
 
-候选先执行 `--version`，与清单不一致时保留原服务。提交脚本备份旧程序、记住原服务端口及实际运行用户，替换后启动候选并等待 ready；失败时恢复旧文件，原服务此前运行则以原权限在原端口重新启动。成功后移除备份。提交阶段暂缓协程取消，避免停掉旧程序后手机直接退出；脚本也对 EXIT/HUP/INT/TERM 注册恢复处理。主机 HUP 与 Android 候选启动失败已验证；实际 ADB 断链、SIGKILL 或断电不能据此视为已验证。
+候选先执行 `--version`，与清单不一致时保留原服务。提交脚本备份旧程序、记住原服务端口及实际运行用户，替换后启动候选并等待 ready；失败时恢复旧文件，原服务此前运行则以原权限在原端口重新启动。成功后移除备份。提交阶段暂缓协程取消，避免停掉旧程序后手机直接退出；脚本也对 EXIT/HUP/INT/TERM 注册恢复处理。ADB 断链、SIGKILL 或断电可能中断恢复处理，需要重新核对目标文件与服务状态。
 
 App 的 root 开关默认关闭；开启后优先检测当前 root adbd，其次验证 `su`，不可用时回退 shell。部署和管理命令按已验证权限执行；root 服务通过 `.root-mode` 标记供后续提权管理，关闭时停止旧服务后恢复 shell 所有权，不放宽状态文件权限。详细设置与切换限制见[连接设备](guide/connections.md)。
 
@@ -82,7 +84,7 @@ App 的 root 开关默认关闭；开启后优先检测当前 root adbd，其次
 
 `device.info` 使用空参数对象，成功时 `result` 包含 JSON 编码的只读设备信息。字段及缺失值规则见[工具参考](reference/tools.md#device-info)。原有响应 envelope 和协议版本保持兼容。
 
-`apps.list` 成功响应的 `result` 现在包含 JSON 编码的 `apps` 数组，字段与旧服务兼容读取见[应用列表](reference/tools.md#apps-list)。旧调用方应按新字段解码；响应 envelope 保持不变。
+`apps.list` 成功响应的 `result` 现在包含 JSON 编码的 `apps` 数组，字段见[应用列表](reference/tools.md#apps-list)。调用方按结构化 JSON 字段解码；响应 envelope 保持不变。
 
 坐标工具 `remote.tap`、`remote.swipe`、`remote.long_press` 采用归一化坐标，直接调用和模型函数共用校验与注入层，详见[坐标输入](reference/tools.md#gestures)。`remote.key` 增加数字、频道和删除键枚举，旧按键语义不变。
 
@@ -206,7 +208,7 @@ body销毁会中止生产者并释放编码器/捕获许可。背压取消可能
 
 `device.info.screen`增加可选`source`：优先使用`active_viewport`，尺寸来自当前活动默认显示器的逻辑frame，
 与触控坐标换算一致；无法读取时回退`wm_size`，该值是自然/覆盖尺寸，不能据此保证当前旋转方向。
-旧服务不返回source时客户端保留null，宽高字段不变。
+source 未提供时客户端保留 null，宽高字段按响应读取。
 
 ## 系统管理能力探测
 
@@ -229,7 +231,7 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 
 ## 文本任务的工具范围
 
-新版 `/status` 返回 `textToolScope: true`。该字段缺失时客户端按 false 处理；需要强制工具范围的调用方不得把旧服务当作已支持。
+新版 `/status` 返回 `textToolScope: true`。该字段缺失时客户端按 false 处理；需要强制工具范围的调用方不得把未显式声明此能力的目标当作已支持。
 
 `type: "text"` 请求可在 `arguments.allowedTools` 中传入非空的规范工具名数组，例如 `["device.info"]`。省略时保持原有注册工具集合；显式 null、空数组、非字符串、未知名称、模型下划线别名或重复项均拒绝。范围只能缩小现有白名单，不增加工具或人工确认 API。服务先过滤发给提供商的 schema，再检查每次返回的规范工具名，越界调用返回工具错误且不执行、不产生执行进度事件。
 

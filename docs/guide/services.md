@@ -12,13 +12,13 @@
 
 在线源固定为项目 [GitHub 仓库](https://github.com/Ernest-su/ai-remote-controller)，界面不再要求填写清单地址或保存更新源。点击“检查 / 安装在线版本”获取仓库最新 Release 的 `manifest.json` 和 `manifest.json.sig`，验签后下载清单中对应 ABI 的程序。GitHub 最新资产下载入口采用官方的 [`releases/latest/download/文件名`](https://docs.github.com/en/repositories/releasing-projects-on-github/linking-to-releases) 约定。
 
-Release 必须提供完整的签名资产；缺少 Release、清单或有效签名时明确报错，不回退到未签名文件。应用保留固定公钥、协议、应用版本范围和大小/摘要核对。发布准备见[准备发布](../development/releasing.md)。本次仅接入下载入口，不会自动向 GitHub 发布资产。
+Release 必须提供完整的签名资产；缺少 Release、清单或有效签名时明确报错，不回退到未签名文件。应用保留固定公钥、协议、应用版本范围和大小/摘要核对。发布准备见[准备发布](../development/releasing.md)。发布 workflow 生成草稿 Release；维护者公开后才进入在线更新入口，草稿不能用于在线更新。
 
 ## 取消与恢复
 
 下载可以取消，未完成文件会清理。开始替换目标程序后，安装器先完成候选就绪检查或旧版本恢复，再结束取消操作。候选启动失败时恢复旧文件及原服务端口。
 
-启动失败回滚、主机 HUP 和 Android 回归已验证；实际 ADB 提交中断、SIGKILL 和断电恢复尚未验证，不能由这些测试推断。详情见[协议与后台管理](../protocol.md)。
+ADB 提交中断、SIGKILL 或断电后应重新核对目标服务与文件状态，不能仅凭断线判断更新或回滚已完成。详情见[协议与后台管理](../protocol.md)。
 
 服务权限检测同时支持 `su -c` 与目标常见的 `su 0 sh -c`；只有实际 UID=0 的探测结果才选择 root 管理。关闭优先 root 时，已有 root 服务仍由已验证管理权限处理，然后明确以 UID2000 启动；没有可靠降权路径时在停止原服务之前拒绝。切换 root 时只调整私有 framework 适配目录所有者，切回 shell 沿用状态权限归一化，保留设备身份和配置。
 

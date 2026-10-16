@@ -19,6 +19,20 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    signingConfigs {
+        create("release") {
+            storeType = "PKCS12"
+            storeFile = providers.environmentVariable("AIRC_ANDROID_KEYSTORE").orNull?.let { file(it) }
+            storePassword = providers.environmentVariable("AIRC_ANDROID_STORE_PASSWORD").orNull
+            keyAlias = providers.environmentVariable("AIRC_ANDROID_KEY_ALIAS").orNull
+            keyPassword = providers.environmentVariable("AIRC_ANDROID_KEY_PASSWORD").orNull
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
     buildFeatures { compose = true; buildConfig = true }
 }
 kotlin { jvmToolchain(17) }
@@ -92,3 +106,25 @@ dependencies {
     androidTestImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     androidTestImplementation("com.squareup.okhttp3:okhttp-tls:4.12.0")
 }
+
+// Carry the project's license and retained third-party notices in distributed APKs.
+val legalAssets = layout.buildDirectory.dir("generated/legalAssets")
+val prepareLegalAssets by tasks.registering(Copy::class) {
+    into(legalAssets.map { it.dir("licenses") })
+    from(rootProject.file("LICENSE"))
+    from(rootProject.file("THIRD_PARTY_NOTICES.md"))
+    from(rootProject.file("ascrcpy/LICENSE")) { rename { "LICENSE-Apache-2.0.txt" } }
+}
+android.sourceSets.getByName("main").assets.directories.add(legalAssets.get().asFile.absolutePath)
+tasks.named("preBuild") { dependsOn(prepareLegalAssets) }
+
+// AGP can otherwise omit its signing task and emit an unsigned release APK.
+val validateProductionSigning by tasks.registering {
+    doLast {
+        val required = listOf("AIRC_ANDROID_KEYSTORE", "AIRC_ANDROID_STORE_PASSWORD", "AIRC_ANDROID_KEY_ALIAS", "AIRC_ANDROID_KEY_PASSWORD")
+        val missing = required.filter { providers.environmentVariable(it).orNull.isNullOrBlank() }
+        check(missing.isEmpty()) { "Production release signing requires: ${missing.joinToString()}" }
+        check(file(providers.environmentVariable("AIRC_ANDROID_KEYSTORE").get()).isFile) { "Production signing keystore is missing" }
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(validateProductionSigning) }

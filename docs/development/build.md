@@ -2,10 +2,10 @@
 
 ## 环境
 
-- JDK 17，Android SDK 36；应用最低 API 26，当前 target SDK 35。
+- JDK 17 用于应用与模块编译；Gradle daemon 使用仓库 `gradle/gradle-daemon-jvm.properties` 固定的 JetBrains JDK 25，首次由 Gradle 自动获取。Android SDK 36；应用最低 API 26，当前 target SDK 35。
 - Android NDK，已验证 `28.2.13676358`。
 - SDK build-tools 36.0.0（D8）与 javac 用于构建嵌入的短时媒体桥接；工具链内容仍在宿主机安装，编译只读 SDK。
-- Rust 1.88 或更高版本、Cargo/rustup、Python 3；首次构建需要网络。APK 只读解析使用固定 zip 9.0.2，其 Rust 要求见[官方文档](https://docs.rs/zip/9.0.2/zip/#msrv)。
+- Rust 1.88 或更高版本、Cargo/rustup、Python 3.11+；首次构建需要网络。APK 只读解析使用固定 zip 9.0.2，其 Rust 要求见[官方文档](https://docs.rs/zip/9.0.2/zip/#msrv)。
 - 已验证 Linux x86_64。构建脚本包含 macOS 工具链路径选择，其他主机尚未完整验收。
 
 从仓库根目录执行：
@@ -20,6 +20,7 @@ export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
 
 | 产物 | 路径 |
 | --- | --- |
+| release APK（需生产签名配置） | `androidApp/build/outputs/apk/release/androidApp-release.apk` |
 | debug APK | `androidApp/build/outputs/apk/debug/androidApp-debug.apk` |
 | instrumentation APK | `androidApp/build/outputs/apk/androidTest/debug/androidApp-debug-androidTest.apk` |
 | 生成的 runtime 资产 | `androidApp/src/main/assets/runtime/` |
@@ -69,3 +70,5 @@ adb -s DEVICE_SERIAL shell /data/local/tmp/airc/airc-runtime service stop --stat
 `./gradlew --no-daemon :desktopApp:run` 启动 Compose 图形窗口；`./gradlew --no-daemon :desktopApp:jvmJar` 构建 JVM 模块。使用 JDK 17，沿用仓库 Android/Gradle 配置；首次向目标构建/部署 runtime 仍需 Rust 与 NDK。运行和测试参数见[桌面指南](../guide/desktop.md)。Compose desktop application 配置参考 [JetBrains 原生分发文档](https://kotlinlang.org/docs/multiplatform/compose-native-distribution.html)。
 
 `android-build-run.sh` 与共享 KMP 权限检测支持 command 与 UID-shell 两种 su 风格。CLI 的 `--root`/`--no-root` 分别保持用户意图，管理旧 root 服务时仍验证 root，并在降权前确认 shell UID；不通过 adb root 改变全局 ADB 进程，除非用户显式传入该选项。
+
+生产签名、六项 GitHub Secrets 与自动生成草稿 Release 的步骤见[签名与发布](releasing.md)。本地可用 `scripts/release_signing.py run` 临时注入签名环境，未提供生产密钥时 release 构建会失败；debug 构建不需要生产密钥。

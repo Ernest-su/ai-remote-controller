@@ -12,7 +12,7 @@ Kotlin Multiplatform 遥控器，当前实现 Android 手机端（`ernest.airc`�
 
 ## 快速开始
 
-当前从源码构建，仓库尚未提供公开发布的下载地址。需要 JDK 17、Android SDK 36、NDK、Rust 和 Python 3：
+维护者公开的生产签名 APK 见 [GitHub Releases](https://github.com/Ernest-su/ai-remote-controller/releases)；若没有公开版本，可从源码构建。需要 JDK 17、Android SDK 36、NDK、Rust 和 Python 3.11+：
 
 ```sh
 export ANDROID_HOME=/path/to/android-sdk
@@ -44,7 +44,7 @@ APK 输出：`androidApp/build/outputs/apk/debug/androidApp-debug.apk`。安装�
 | 贡献者 | [贡献指南](CONTRIBUTING.md)、[文档维护](docs/development/documentation.md) |
 | 维护者 | [发布](docs/development/releasing.md) |
 
-推送 master 会自动构建 debug APK 与三 ABI runtime，并将文档站点发布到独立 `gh-pages` 分支；Actions artifacts 可用于开发测试。首次 Pages 配置见[文档维护](docs/development/documentation.md)。
+推送 main 会自动构建 debug APK 与三 ABI runtime，并将文档站点发布到独立 `gh-pages` 分支；Actions artifacts 可用于开发测试。首次 Pages 配置见[文档维护](docs/development/documentation.md)。
 
 本地预览：
 
@@ -56,8 +56,14 @@ python3 -m venv .venv-docs
 
 ## 当前范围
 
-Android 首期实现与 JVM 桌面测试工具，共享协议与设备记录位于 `shared/commonMain`。iOS、鸿蒙适配尚未实现。主机与 Android 模拟设备回归已通过，真机网络、实际摄像头扫码和部分真实模型接口与只读电视信息已验证，目标模型执行与实际输入效果仍待验收。设备端默认以 ADB shell 身份运行，可在功能网格的“运行权限”开启优先 root 并自动检测，当前无登录与交互确认机制，使用环境应为可信局域网。功能与使用限制见对应使用指南。
+Android 控制端与 JVM 桌面测试工具，共享协议与设备记录位于 `shared/commonMain`。iOS、鸿蒙适配尚未实现。实际摄像头配对、厂商输入行为、网络条件和模型提供商兼容性需按使用环境分别验证。设备端默认以 ADB shell 身份运行，可在功能网格的“运行权限”开启优先 root 并自动检测，协议不提供登录鉴权；高影响管理动作按各自流程确认，使用环境应为可信局域网。功能与使用限制见对应使用指南。
 
 视觉规范参考[微信官方 WeUI](https://github.com/Tencent/weui)，项目约束见[视觉与交互规范](docs/development/visual-guidelines.md)；ADB 依赖 [ernest-su/adb](https://github.com/ernest-su/adb)。
 
 设备截图支持手动捕获、预览、保存 PNG，手机可系统分享；参见[截图指南](docs/guide/screenshots.md)。
+
+## 许可证与正式发布
+
+项目原创代码采用 [MIT License](LICENSE)，第三方代码保留原许可证，见[第三方声明](THIRD_PARTY_NOTICES.md)。
+
+签名与 GitHub Actions 配置见[发布指南](docs/development/releasing.md)。`v*` 标签触发检查、生产签名 APK 与三 ABI runtime 清单签名，产物上传到草稿 Release；维护者核对后公开。公钥和 APK 证书指纹随源码提供，私钥仅存于仓库外及 GitHub Actions Secrets。

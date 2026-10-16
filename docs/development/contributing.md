@@ -14,4 +14,4 @@
 
 ## 授权状态
 
-仓库目前没有 LICENSE，项目维护者仍需决定公开分发许可证；贡献指南不构成额外授权协议。仓库根目录 CONTRIBUTING.md 是代码托管页面的贡献入口，本页提供文档站内入口。
+项目原创代码使用 MIT License，根目录 `LICENSE` 保留完整授权文本。第三方组件保留其原始许可证；`ascrcpy` 模块及匹配的 scrcpy server 使用 Apache-2.0，不因项目选择 MIT 而改变。仓库根目录 CONTRIBUTING.md 是代码托管页面的贡献入口，本页提供文档站内入口。

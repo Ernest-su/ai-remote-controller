@@ -43,9 +43,11 @@
 
 ## 应用列表 {#apps-list}
 
-`apps.list` 的 `result` 为 JSON 字符串，例如 `{"apps":[{"package":"com.android.settings","label":null,"system":true}]}`。应用按包名排序、去重；`system` 由 `pm list packages -s` 判断，查询失败返回错误而非虚构类型。工具整体限制 30 秒与 256 KiB；查询期间安装状态变化造成不一致时提示刷新。
+`apps.list` 的 `result` 为 JSON 字符串，例如 `{"apps":[{"package":"com.android.settings","label":"设置","system":true}],"source":"package_manager","userId":0,"labelErrors":0}`。应用按包名排序、去重；通过目标包管理器读取当前 Android 用户的应用名称与系统/用户类型。名称读取失败时 `label` 为 `null`，并计入 `labelErrors`，不阻塞其他应用。接口整体受 30 秒与 256 KiB 限制，查询期间安装状态变化时应刷新。
 
-当前二进制实现尚未解析 APK 应用名称，`label` 返回 `null`；此项仍待实现。Android 页面显示包名并支持搜索、刷新与点击启动；旧服务的 `package:` 文本仍可读取，但名称与类型为未知。此列表包含无启动入口的系统组件，点击启动失败时显示实际工具错误。
+目标包管理器桥接不可用时，使用 `pm list packages` 读取包名与系统类型；此时 `source` 为 `pm`、`labelsAvailable` 为 false、`label` 为 `null`，不返回 `userId` 与 `labelErrors`。
+
+Android 页面显示名称、包名、图标与类型，支持名称/包名搜索、分类筛选和点击启动；名称不可用时保留包名。此列表包含无启动入口的系统组件，点击启动失败时显示实际工具错误。
 
 ## 坐标输入 {#gestures}
 

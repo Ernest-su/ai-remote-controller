@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import base64
+import os
 from urllib.parse import urlparse
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -48,10 +49,11 @@ def main():
     pinned = re.search(r'PUBLIC_KEY_DER = "([A-Za-z0-9+/=]+)"', trust_source)
     if pinned is None or base64.b64decode(pinned.group(1)) != expected:
         parser.error("publication public key does not match the APK's compiled trust root")
-    actual = subprocess.check_output(["openssl", "pkey", "-in", str(args.signing_key), "-pubout", "-outform", "DER"])
+    passin = "env:AIRC_RUNTIME_SIGNING_KEY_PASSWORD" if os.environ.get("AIRC_RUNTIME_SIGNING_KEY_PASSWORD") else "pass:"
+    actual = subprocess.check_output(["openssl", "pkey", "-in", str(args.signing_key), "-passin", passin, "-pubout", "-outform", "DER"])
     if actual != expected:
         parser.error("signing key does not match the APK release trust root")
-    signature = subprocess.check_output(["openssl", "dgst", "-sha256", "-sign", str(args.signing_key)], input=payload)
+    signature = subprocess.check_output(["openssl", "dgst", "-sha256", "-sign", str(args.signing_key), "-passin", passin], input=payload)
     args.output.mkdir(parents=True, exist_ok=True)
     for asset, binary in verified:
         shutil.copyfile(binary, args.output / asset["file"])

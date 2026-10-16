@@ -19,4 +19,4 @@
 
 不提交构建输出、模型凭据、发布私钥、个人 `local.properties` 或临时测试环境。文档按[Docs as Code 约定](docs/development/documentation.md)维护。
 
-仓库许可证尚待维护者确定；本指南不替代许可证或贡献授权协议。
+项目原创代码使用 [MIT License](LICENSE)；第三方代码保留各自许可证，见 [第三方声明](THIRD_PARTY_NOTICES.md)。

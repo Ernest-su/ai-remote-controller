@@ -3,14 +3,21 @@ name: Build and test
 on:
   pull_request:
   push:
-    branches: [master]
+    branches: [main]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: Exact source ref to test
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
 concurrency:
-  group: build-${{ github.ref }}
+  group: build-${{ inputs.ref || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -23,6 +30,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -48,6 +57,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -69,6 +80,8 @@ jobs:
           key: android-runtime-${{ runner.os }}-${{ hashFiles('runtime/Cargo.lock') }}
       - name: Install desktop UI test display
         run: sudo apt-get update && sudo apt-get install -y xvfb xauth
+      - name: Test release signing tools without production secrets
+        run: python3 -m unittest discover -s scripts -p test_release_signing.py
       - name: Test JVM clients and build Android APKs
         run: xvfb-run -a env SKIKO_RENDER_API=SOFTWARE ./gradlew :shared:jvmTest :client:test :desktopApp:jvmTest :androidApp:testDebugUnitTest :androidApp:assembleDebug :androidApp:assembleDebugAndroidTest --no-daemon
       - uses: actions/upload-artifact@v4
