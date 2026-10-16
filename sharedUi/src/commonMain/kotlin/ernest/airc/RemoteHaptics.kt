@@ -26,34 +26,57 @@ class RemoteKeyInteractionSource(
     private val longPressMillis: Long,
 ) : MutableInteractionSource {
     private val delegate = MutableInteractionSource()
-    private val presses = mutableMapOf<PressInteraction.Press, Job>()
+    private class Press(val timer: Job, var producerCompletion: DisposableHandle? = null)
+    private val presses = mutableMapOf<PressInteraction.Press, Press>()
     private var disposed = false
     override val interactions = delegate.interactions
 
     override suspend fun emit(interaction: Interaction) {
-        feedback(interaction)
-        delegate.emit(interaction)
+        if (interaction is PressInteraction.Press) {
+            val context = currentCoroutineContext()
+            context.ensureActive()
+            delegate.emit(interaction)
+            context.ensureActive()
+            feedback(interaction, context[Job])
+        } else {
+            // Release/cancel must stop hardware before indication dispatch can suspend.
+            feedback(interaction)
+            delegate.emit(interaction)
+        }
     }
     override fun tryEmit(interaction: Interaction): Boolean {
-        feedback(interaction)
-        return delegate.tryEmit(interaction)
+        if (interaction !is PressInteraction.Press) feedback(interaction)
+        val accepted = delegate.tryEmit(interaction)
+        if (accepted && interaction is PressInteraction.Press) feedback(interaction)
+        return accepted
     }
-    private fun feedback(interaction: Interaction) {
+    private fun feedback(interaction: Interaction, producer: Job? = null) {
         if (disposed) return
         when (interaction) {
             is PressInteraction.Press -> {
+                if (interaction in presses) return
                 haptics.tap()
-                presses[interaction] = scope.launch {
+                val press = Press(scope.launch(start = CoroutineStart.LAZY) {
                     delay(longPressMillis)
                     haptics.startHold(interaction)
+                })
+                presses[interaction] = press
+                // Compose can cancel delayed press dispatch on a quick release before it
+                // records the token. That token may never receive a Release/Cancel event.
+                press.producerCompletion = producer?.invokeOnCompletion { error ->
+                    if (error != null) release(interaction)
                 }
+                if (presses[interaction] === press) press.timer.start()
             }
             is PressInteraction.Release -> release(interaction.press)
             is PressInteraction.Cancel -> release(interaction.press)
         }
     }
     private fun release(press: PressInteraction.Press) {
-        presses.remove(press)?.cancel()
+        presses.remove(press)?.let {
+            it.producerCompletion?.dispose()
+            it.timer.cancel()
+        }
         haptics.stopHold(press)
     }
     fun dispose() {

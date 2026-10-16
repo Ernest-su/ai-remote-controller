@@ -2,7 +2,7 @@ package ernest.airc
 
 import androidx.compose.foundation.interaction.*
 import androidx.compose.ui.geometry.Offset
-import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -15,6 +15,42 @@ class RemoteHapticsTest {
         override fun tap() { taps++ }
         override fun startHold(key: Any) { held += key }
         override fun stopHold(key: Any) { held -= key }
+    }
+    @Test fun cancelledPressDispatchCannotStartFeedbackLater() = runTest {
+        val feedback=Feedback()
+        val source=RemoteKeyInteractionSource(this,feedback,500)
+        val press=PressInteraction.Press(Offset.Zero)
+        val dispatch=launch { currentCoroutineContext().cancel();source.emit(press) }
+        dispatch.join()
+        advanceTimeBy(1000)
+        assertEquals(0,feedback.taps)
+        assertTrue(feedback.held.isEmpty())
+        source.dispose()
+    }
+    @Test fun cancellationAfterPressDispatchReleasesPendingAndActiveHold() = runTest {
+        val feedback=Feedback()
+        val source=RemoteKeyInteractionSource(this,feedback,500)
+        repeat(2) { index ->
+            val press=PressInteraction.Press(Offset.Zero)
+            val dispatch=launch {source.emit(press);awaitCancellation()}
+            runCurrent()
+            if(index==1) {advanceTimeBy(501);assertEquals(setOf(press),feedback.held)}
+            dispatch.cancelAndJoin()
+            advanceTimeBy(1000)
+            assertTrue("A cancelled press producer must not leave a hold",feedback.held.isEmpty())
+        }
+        source.dispose()
+    }
+    @Test fun duplicatePressDoesNotOrphanItsFirstTimer() = runTest {
+        val feedback=Feedback()
+        val source=RemoteKeyInteractionSource(this,feedback,500)
+        val press=PressInteraction.Press(Offset.Zero)
+        source.tryEmit(press);source.tryEmit(press)
+        source.tryEmit(PressInteraction.Release(press))
+        advanceTimeBy(1000)
+        assertEquals(1,feedback.taps)
+        assertTrue(feedback.held.isEmpty())
+        source.dispose()
     }
     @Test fun shortPressVibratesOnceAndDoesNotStartHold() = runTest {
         val feedback = Feedback()

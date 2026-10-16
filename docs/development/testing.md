@@ -49,6 +49,7 @@ python3 scripts/verify-local.py --scope runtime
 ./gradlew :androidApp:assembleDebug :androidApp:assembleDebugAndroidTest --no-daemon
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite product-pages
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite remote-haptics-ui
+python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite remote-haptics-input-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite lan-connection-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite appearance
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite controller-ui
@@ -63,6 +64,7 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite profil
 | 专项 | 主要验证内容 |
 | --- | --- |
 | `product-pages` | 320dp / 1.5 倍字体亮暗主题下逐页浏览、设备页返回来源、等高网格及离线截图；不操作外部目标 |
+| `remote-haptics-input-ui` | 标准遥控器下键快速短按、真实按下/松开与滑出取消；请求仅发往控制端本地模拟服务，不操作外部目标。真实振动器的停止与厂商日志需在指定手机补查 |
 | `remote-haptics-ui` | 遥控震动开关的切换、旋转与重新加载持久化；实际震感需有振动器的设备核对 |
 | `lan-connection-ui` | 仅访问控制端回环地址，验证服务连接失败后尝试 ADB 5555、失败展开并填入目标地址、草稿重建恢复 |
 | `appearance` | 三种外观模式、本地持久化、重建、设置返回、草稿、系统栏与未知值回退 |
