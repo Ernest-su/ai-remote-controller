@@ -81,7 +81,15 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     val diagnostics = NetworkDiagnostics(viewModelScope)
     internal val profiles = ModelProfileController(EncryptedModelProfileStore(application), ModelCatalogClient(), viewModelScope)
     private var adb: AdbSession? = null
+    private var automaticReconnectEnabled = true
     private var connectionJob: Job? = null
+    private val automaticConnection = AutomaticConnection(viewModelScope) { device ->
+        if (!state.value.busy && !state.value.connected) {
+            reconnectDevice(device, automatic = true)
+            connectionJob?.join()
+        }
+        state.value.connected
+    }
     private var adbScanJob: Job? = null
     private var adbScanGeneration = 0L
     private var deviceInfoJob: Job? = null
@@ -107,11 +115,18 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
         discovery.start()
         viewModelScope.launch {
             runtime.connected.collect { connected ->
+                val lostConnection = state.value.connected && !connected
                 if (!connected) { deviceInfoGeneration++; deviceInfoJob?.cancel(); appsGeneration++; appsJob?.cancel(); gestureGeneration++ }
                 mutable.update { if (connected) it.copy(connected = true)
                     else it.copy(connected = false, tools = emptyList(), touchBusy = false, deviceInfo = null, deviceInfoLoading = false, deviceInfoError = null, apps = emptyList(), appsLoading = false, appsError = null) }
+                if (lostConnection && automaticReconnectEnabled) {
+                    state.value.history.find { it.id == state.value.selected }?.let(automaticConnection::start)
+                }
             }
         }
+        val lastId = releasePreferences.getString("last-connected-device", null)
+        (state.value.history.find { it.id == lastId } ?: state.value.history.filter { it.runtimePort != null }.maxByOrNull { it.lastConnectedAt })
+            ?.let(automaticConnection::start)
     }
     // Prefer structured media snapshots; older runtimes retain shell compatibility.
     private val mediaMonitor = viewModelScope.launch {
@@ -184,8 +199,9 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     fun startDiscovery() = discovery.start()
     fun stopDiscovery() { cancelAdbScan(); discovery.close(); mutable.update { it.copy(discovered = emptyList()) } }
 
-    private fun connection(disconnectRuntime: Boolean = true, action: suspend () -> Unit) {
+    private fun connection(disconnectRuntime: Boolean = true, automatic: Boolean = false, action: suspend () -> Unit) {
         if (state.value.busy) return
+        if (!automatic && disconnectRuntime) { automaticReconnectEnabled = false; automaticConnection.stop() }
         connectionJob = viewModelScope.launch {
             mutable.update { it.copy(busy = true, status = "正在连接…") }
             try {
@@ -227,7 +243,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
         mutable.update { it.copy(qr = qr, status = "请用目标设备无线调试页面扫描二维码") }
         attach(connector.qr(qr), ConnectionMethod.WIRELESS_QR, runtimePort)
     }
-    fun cancelConnection() { connectionJob?.cancel() }
+    fun cancelConnection() { automaticReconnectEnabled = false; automaticConnection.stop(); connectionJob?.cancel() }
 
     private suspend fun attach(session: AdbSession, method: ConnectionMethod, runtimePort: Int, releaseUrl: String? = null) {
         if (adb !== session) adb?.close()
@@ -265,6 +281,8 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
             method ?: previous?.method ?: ConnectionMethod.TCP, host, adbPort ?: previous?.adbPort,
             guid ?: previous?.wirelessGuid, port, System.currentTimeMillis())
         val history = withContext(Dispatchers.IO) { store.remember(record, previousId) }
+        releasePreferences.edit().putString("last-connected-device", record.id).apply()
+        automaticReconnectEnabled = true
         mutable.update { it.copy(status = "已连接 ${history.first { it.id == record.id }.visibleName}", selected = record.id, version = status.version, tools = status.tools, runtimeUid = status.uid, modelConfigured = status.modelConfigured, history = history) }
     }
 
@@ -275,7 +293,9 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
             known?.method ?: ConnectionMethod.TCP, service.attributes["name"])
     }
 
-    fun reconnect(device: RememberedDevice) = connection {
+    fun reconnect(device: RememberedDevice) = reconnectDevice(device, automatic = false)
+
+    private fun reconnectDevice(device: RememberedDevice, automatic: Boolean) = connection(automatic = automatic) {
         adb?.close(); adb = null
         // Reuse LAN only after its running bytes match the bundled release.
         val live = state.value.discovered.find { it.attributes["id"] == device.id }
@@ -463,11 +483,16 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     }
     fun restartService() = connection { restartSelectedService() }
     fun stopService() = connection(disconnectRuntime = false) {
+        automaticReconnectEnabled = false
+        automaticConnection.stop()
         val result = installer.stop(selectedAdb().client, state.value.preferRoot)
         runtime.disconnect()
         mutable.update { it.copy(output = result, status = "目标服务已停止") }
     }
     fun disconnect() {
+        automaticReconnectEnabled = false
+        automaticConnection.stop()
+        connectionJob?.cancel()
         ascrcpyPreview.stop()
         viewModelScope.launch {
             runtime.disconnect(); adb?.close(); adb = null
@@ -476,6 +501,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     override fun onCleared() {
+        automaticConnection.stop()
         ascrcpyPreview.stop()
         discovery.close(); transfers.close(); runtime.close(); profiles.close(); adb?.close()
         super.onCleared()
