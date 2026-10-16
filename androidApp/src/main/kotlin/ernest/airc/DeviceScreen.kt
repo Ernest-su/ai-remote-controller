@@ -25,6 +25,18 @@ internal fun Devices(state: RemoteUiState, model: RemoteViewModel) {
     var runtimePort by rememberSaveable { mutableStateOf("9876") }
     var code by remember { mutableStateOf("") }
     var connectionPort by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(state.manualConnectionTarget) {
+        state.manualConnectionTarget?.let { target ->
+            method = ConnectionMethod.TCP
+            host = target.host
+            port = target.adbPort.toString()
+            runtimePort = target.runtimePort.toString()
+            code = ""
+            connectionPort = ""
+            connectionExpanded = true
+            model.consumeManualConnectionTarget(target)
+        }
+    }
     fun validPort(text: String) = text.toIntOrNull()?.takeIf { it in 1..65535 }
     val diagnostic by model.diagnostics.state.collectAsState()
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle

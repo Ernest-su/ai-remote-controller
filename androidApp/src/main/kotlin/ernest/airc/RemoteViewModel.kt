@@ -36,6 +36,7 @@ data class RemoteUiState(
     val adbDevices: List<String> = emptyList(),
     val adbScanning: Boolean = false,
     val adbScanStatus: String = "打开设备页后扫描同网段 ADB",
+    internal val manualConnectionTarget: ManualConnectionTarget? = null,
     val selected: String? = null,
     val version: String? = null,
     val modelConfigured: Boolean = false,
@@ -255,7 +256,9 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
 
     fun discovered(service: DiscoveredService, adbPort: Int? = null) = connection {
         adb?.close(); adb = null
-        attachRuntime(service.host, service.port, null, adbPort, null, service.attributes["name"])
+        val known = state.value.history.firstOrNull { it.id == service.attributes["id"] }
+        connectWithDeploymentFallback(service.host, service.port, adbPort ?: known?.adbPort, known?.wirelessGuid,
+            known?.method ?: ConnectionMethod.TCP, service.attributes["name"])
     }
 
     fun reconnect(device: RememberedDevice) = connection {
@@ -264,13 +267,25 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
         val live = state.value.discovered.find { it.attributes["id"] == device.id }
         val host = live?.host ?: device.host ?: error("没有保存目标地址")
         val port = live?.port ?: device.runtimePort ?: 9876
-        try { attachRuntime(host, port, device.method, device.adbPort, device.wirelessGuid, device.name); return@connection }
-        catch (e: CancellationException) { throw e }
-        catch (_: Exception) { }
-        val guid = device.wirelessGuid
-        val session = if (guid != null) connector.wireless(guid, device.host, device.adbPort)
-            else connector.tcp(device.host ?: host, device.adbPort ?: error("该设备由局域网发现，请先使用 ADB 连接部署"))
-        attach(session, device.method, port)
+        connectWithDeploymentFallback(host, port, device.adbPort, device.wirelessGuid, device.method, device.name)
+    }
+
+    private suspend fun connectWithDeploymentFallback(host: String, port: Int, adbPort: Int?, guid: String?, method: ConnectionMethod, name: String?) {
+        val target = ManualConnectionTarget(host, adbPort ?: 5555, port)
+        connectLanOrDeploy(target,
+            connectRuntime = { attachRuntime(host, port, method, adbPort, guid, name) },
+            deploy = {
+                val session = if (guid != null) connector.wireless(guid, host, adbPort)
+                    else connector.tcp(host, target.adbPort)
+                attach(session, if (guid == null) ConnectionMethod.TCP else method, port)
+            },
+            onDeploying = { message -> mutable.update { it.copy(status = message) } },
+            onDeploymentFailed = { failed -> mutable.update { it.copy(manualConnectionTarget = failed) } },
+        )
+    }
+
+    internal fun consumeManualConnectionTarget(target: ManualConnectionTarget) {
+        mutable.update { if (it.manualConnectionTarget == target) it.copy(manualConnectionTarget = null) else it }
     }
 
     fun rename(id: String, name: String) { viewModelScope.launch {

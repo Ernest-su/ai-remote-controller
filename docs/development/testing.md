@@ -48,6 +48,7 @@ python3 scripts/verify-local.py --scope runtime
 ```sh
 ./gradlew :androidApp:assembleDebug :androidApp:assembleDebugAndroidTest --no-daemon
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite product-pages
+python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite lan-connection-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite appearance
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite controller-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite management-ui
@@ -61,6 +62,7 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite profil
 | 专项 | 主要验证内容 |
 | --- | --- |
 | `product-pages` | 320dp / 1.5 倍字体亮暗主题下逐页浏览、设备页返回来源、等高网格及离线截图；不操作外部目标 |
+| `lan-connection-ui` | 仅访问控制端回环地址，验证服务连接失败后尝试 ADB 5555、失败展开并填入目标地址、草稿重建恢复 |
 | `appearance` | 三种外观模式、本地持久化、重建、设置返回、草稿、系统栏与未知值回退 |
 | `controller-ui` | 页面导航、提交与执行反馈、键盘间距、离线、大字体、旋转与输入工具 |
 | `management-ui` | 文件/应用列表、搜索筛选、按需面板、离线与草稿恢复 |
