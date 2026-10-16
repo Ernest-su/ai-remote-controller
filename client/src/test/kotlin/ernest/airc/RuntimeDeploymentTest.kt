@@ -45,7 +45,9 @@ class RuntimeDeploymentTest {
         return status
     }
     private fun candidate(directory: File, script: String): File = File(directory, "airc-runtime.next").apply {
-        writeText(script); check(setExecutable(true))
+        // Keep the real preflight while injecting a failure specifically at startup.
+        writeText(script.replaceFirst("#!/bin/sh\n", "#!/bin/sh\nif [ \"\${2}\" = check-port ]; then exec ${hostBinary().path} \"\${@}\"; fi\n"))
+        check(setExecutable(true))
     }
     private fun runTransaction(directory: File, port: Int, privilege: RuntimePrivilege = RuntimePrivilege(RuntimePrivilege.Mode.SHELL, false), fixtureTools: File? = null): Pair<Int, String> {
         val script = File(directory, "deploy.sh").apply { writeText(RuntimeDeployment.script(directory.path, port, privilege)) }
@@ -74,6 +76,67 @@ class RuntimeDeploymentTest {
             exec sh -c "${'$'}2"
         """.trimIndent() + "\n")
         return tools to trace
+    }
+    @Test fun occupiedPortRejectsFirstInstallWithoutReplacingFilesOrStoppingListener() {
+        val directory = temporary.newFolder()
+        hostBinary().copyTo(File(directory, "airc-runtime.next"))
+        val state = File(directory, "state").apply { mkdir() }
+        val identity = File(state, "device-id").apply { writeText("preserved-identity") }
+        ServerSocket(0).use { listener ->
+            val result = runTransaction(directory, listener.localPort)
+            assertNotEquals(0, result.first)
+            assertTrue(result.second, result.second.contains("airc-preflight-failed"))
+            assertTrue(result.second, result.second.contains(listener.localPort.toString()))
+            assertFalse(result.second.contains("airc-rolled-back"))
+            assertFalse(File(directory, "airc-runtime").exists())
+            assertEquals("preserved-identity", identity.readText())
+            assertFalse(listener.isClosed)
+        }
+    }
+    @Test fun occupiedNewPortLeavesExistingServiceAndBinaryUntouched() {
+        val directory = temporary.newFolder()
+        val binary = hostBinary().copyTo(File(directory, "airc-runtime")).apply { setExecutable(true) }
+        val port = freePort()
+        try {
+            control(binary, directory, "start", port)
+            val before = ready(binary, directory, port)
+            val original = hash(binary)
+            hostBinary().copyTo(File(directory, "airc-runtime.next"))
+            ServerSocket(0).use { listener ->
+                val result = runTransaction(directory, listener.localPort)
+                assertNotEquals(0, result.first)
+                assertTrue(result.second, result.second.contains("airc-preflight-failed"))
+                assertEquals(before, ready(binary, directory, port))
+                assertEquals(original, hash(binary))
+                assertFalse(File(directory, "airc-runtime.previous").exists())
+            }
+        } finally { control(binary, directory, "stop", port) }
+    }
+    @Test fun deletedBinaryAndStateDoNotHideOrphanedListener() {
+        val directory = temporary.newFolder()
+        val binary = hostBinary().copyTo(File(directory, "airc-runtime")).apply { setExecutable(true) }
+        val port = freePort()
+        var orphan: ProcessHandle? = null
+        try {
+            val started = Json.parseToJsonElement(control(binary, directory, "start", port)).jsonObject
+            orphan = ProcessHandle.of(started.getValue("pid").jsonPrimitive.content.toLong()).get()
+            assertTrue(binary.delete())
+            assertTrue(File(directory, "state").deleteRecursively())
+            hostBinary().copyTo(File(directory, "airc-runtime.next"))
+            val result = runTransaction(directory, port)
+            assertNotEquals(0, result.first)
+            assertTrue(result.second, result.second.contains("airc-preflight-failed"))
+            assertTrue(orphan.isAlive)
+            assertFalse(binary.exists())
+            assertFalse(File(directory, "state/service.json").exists())
+        } finally {
+            orphan?.let { process ->
+                process.destroy()
+                val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+                while (process.isAlive && System.nanoTime() < deadline) Thread.sleep(20)
+                if (process.isAlive) process.destroyForcibly()
+            }
+        }
     }
     @Test fun rootAdbdFirstInstallDoesNotRequireSuForShell() {
         val directory = temporary.newFolder()

@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="AIRC input fixture" android:theme="@android:style/Theme.Material.NoActionBar">
+        <activity android:name=".InputActivity" android:exported="true" />
+    </application>
+</manifest>

@@ -8,6 +8,7 @@ mod i18n;
 mod media_publications;
 mod media_resources;
 mod platform_bridge;
+mod remote_input;
 mod screen_capture;
 mod screen_mirror;
 mod screen_preview;
@@ -29,6 +30,7 @@ use axum::{
     http::HeaderMap,
     response::IntoResponse,
     routing::get,
+    serve::ListenerExt,
     Json, Router,
 };
 use config::ModelConfig;
@@ -154,6 +156,7 @@ async fn connection(socket: WebSocket, state: Arc<AppState>, language: i18n::Lan
     let (requests, incoming) = tokio::sync::mpsc::channel(16);
     let history = Arc::new(Mutex::new(Vec::new()));
     let (controls, control_incoming) = tokio::sync::mpsc::channel(16);
+    let (keys, key_incoming) = tokio::sync::mpsc::channel(16);
     let (output, mut responses) = tokio::sync::mpsc::channel(16);
     // Direct controls retain their own FIFO order and never wait for model execution.
     let control_worker = tokio::spawn(process_messages(
@@ -166,6 +169,14 @@ async fn connection(socket: WebSocket, state: Arc<AppState>, language: i18n::Lan
     ));
     let worker = tokio::spawn(process_messages(
         incoming,
+        output.clone(),
+        state.clone(),
+        history.clone(),
+        owner.clone(),
+        language,
+    ));
+    let key_worker = tokio::spawn(process_messages(
+        key_incoming,
         output,
         state,
         history,
@@ -184,14 +195,22 @@ async fn connection(socket: WebSocket, state: Arc<AppState>, language: i18n::Lan
                         if writer.send(Message::Pong(bytes)).await.is_err() { break; }
                     }
                     Some(Ok(frame @ Message::Text(_))) => {
-                        let kind = match &frame {
-                            Message::Text(text) => serde_json::from_str::<Request>(text).map(|request| request.kind).unwrap_or_default(),
-                            _ => String::new(),
+                        let (kind, id, tool) = match &frame {
+                            Message::Text(text) => serde_json::from_str::<Request>(text).map(|request| (request.kind, request.id, request.tool)).unwrap_or_default(),
+                            _ => (String::new(), String::new(), None),
                         };
-                        let queue = if kind == "tool" || kind == "approve" || kind == "approve_app" || kind == "approve_install" || kind == "approve_cache" || kind == "approve_system" { &controls } else { &requests };
-                        if queue.try_send(frame).is_err() {
-                            let _ = writer.send(Message::Close(Some(axum::extract::ws::CloseFrame { code: 1013, reason: "request queue full".into() }))).await;
-                            break;
+                        let queue = if kind == "tool" && tool.as_deref() == Some("remote.key") { &keys }
+                            else if kind == "tool" || kind == "approve" || kind == "approve_app" || kind == "approve_install" || kind == "approve_cache" || kind == "approve_system" { &controls } else { &requests };
+                        match queue.try_send(frame) {
+                            Ok(()) => {},
+                            Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                                // Keep the bounded FIFO and control-frame reader alive.
+                                // Reject only this request; never retry device actions automatically.
+                                let reply = Response { id, protocol: 1, ok: false, result: None,
+                                    error: Some(language.error("request queue full; wait for pending operations and retry")) };
+                                if writer.send(Message::Text(serde_json::to_string(&reply).unwrap().into())).await.is_err() { break; }
+                            },
+                            Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => break,
                         }
                     }
                     Some(Ok(Message::Pong(_))) => {},
@@ -202,8 +221,10 @@ async fn connection(socket: WebSocket, state: Arc<AppState>, language: i18n::Lan
     }
     worker.abort();
     control_worker.abort();
+    key_worker.abort();
     let _ = worker.await;
     let _ = control_worker.await;
+    let _ = key_worker.await;
     virtual_gamepad::disconnect(&owner);
     screen_mirror::disconnect(&owner);
     system_actions::disconnect(&owner);
@@ -295,6 +316,9 @@ async fn serve(directory: PathBuf, port: u16, enable_mdns: bool) -> Result<()> {
     if let Err(error) = platform_bridge::initialize(&directory) {
         eprintln!("Android framework bridge unavailable: {error}");
     }
+    if let Err(error) = remote_input::initialize().await {
+        eprintln!("persistent input bridge unavailable: {error:#}");
+    }
     if let Err(error) = media_publications::initialize(&directory) {
         eprintln!("media publication recovery unavailable: {error}");
     }
@@ -329,6 +353,11 @@ async fn serve(directory: PathBuf, port: u16, enable_mdns: bool) -> Result<()> {
         .route("/transfers/{id}", axum::routing::delete(transfers::cancel))
         .route("/ws", get(websocket))
         .with_state(state);
+    let listener = listener.tap_io(|stream| {
+        if let Err(error) = stream.set_nodelay(true) {
+            eprintln!("cannot disable input response coalescing: {error}");
+        }
+    });
     axum::serve(listener, app)
         .with_graceful_shutdown(async {
             let mut terminate =
@@ -336,6 +365,7 @@ async fn serve(directory: PathBuf, port: u16, enable_mdns: bool) -> Result<()> {
                     .expect("SIGTERM handler");
             tokio::select! { _ = tokio::signal::ctrl_c() => {}, _ = terminate.recv() => {} }
             virtual_gamepad::shutdown();
+            remote_input::shutdown().await;
         })
         .await?;
     tools::gamepad::drain().await;

@@ -6,6 +6,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.ViewModelProvider
+import android.os.SystemClock
+import android.view.InputDevice
+import android.view.MotionEvent
+import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import okhttp3.WebSocket
@@ -22,6 +26,7 @@ import org.junit.Test
 class RemoteHapticsInputUiTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private class ObservedHaptics(private val real: AndroidRemoteHaptics) : RemoteHaptics {
+        override fun trace(event: String) = real.trace(event)
         val held = mutableSetOf<Any>()
         var starts = 0
         override fun tap() = real.tap()
@@ -75,6 +80,40 @@ class RemoteHapticsInputUiTest {
         Thread.sleep(1000)
         compose.runOnIdle {
             assertEquals("Short taps must not turn into held feedback", 0, feedback.starts)
+            assertTrue(feedback.held.isEmpty())
+        }
+    }
+    @Test fun queuedPhysicalShortTapsNeverLeaveHeldFeedback() = withRemote { key, feedback ->
+        physicalTaps(key, List(100) { 0L })
+        assertNoLateHold(feedback)
+    }
+    @Test fun shortTapsAroundIndicationDelayDoNotLeaveDisplacedPressTokens() = withRemote { key, feedback ->
+        // The captured failure was a 107 ms tap, racing Android's delayed
+        // press indication (roughly 100 ms), rather than the long-press timeout.
+        physicalTaps(key, List(60) { listOf(94L, 98L, 102L, 106L, 110L)[it % 5] })
+        assertNoLateHold(feedback)
+    }
+    private fun physicalTaps(key: SemanticsNodeInteraction, durations: List<Long>) {
+        val bounds = key.fetchSemanticsNode().boundsInWindow
+        val location = IntArray(2)
+        compose.runOnUiThread { compose.activity.window.decorView.getLocationOnScreen(location) }
+        val x = bounds.center.x + location[0]
+        val y = bounds.center.y + location[1]
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        for (duration in durations) {
+            val down = SystemClock.uptimeMillis()
+            for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
+                if (action == MotionEvent.ACTION_UP && duration > 0) Thread.sleep(duration)
+                val event = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, y, 0)
+                event.source = InputDevice.SOURCE_TOUCHSCREEN
+                try { assertTrue(automation.injectInputEvent(event, false)) } finally { event.recycle() }
+            }
+        }
+    }
+    private fun assertNoLateHold(feedback: ObservedHaptics) {
+        Thread.sleep(1000)
+        compose.runOnIdle {
+            assertEquals("Queued short taps must not start held feedback", 0, feedback.starts)
             assertTrue(feedback.held.isEmpty())
         }
     }

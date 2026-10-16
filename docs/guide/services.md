@@ -8,6 +8,8 @@
 
 部署和重启先传输并校验临时脚本，再通过短命令执行，兼容 ADB 单包上限为 4096 字节的旧设备。脚本无输出时提示连接可能中断；重新连接后先查询服务状态，再决定是否重试。
 
+停止旧服务和替换程序前会检查目标端口。属于当前状态记录且进程身份有效的服务允许正常更新；其他占用会中止部署并显示端口检查错误，保留原服务与程序。若程序或状态目录曾被删除，旧进程仍可能运行并占用端口；切换 root 开关不能解除占用。通过 ADB 核实监听进程后，以该进程所需的权限停止它（root 进程需要 root），再重新部署。不要通过删除状态目录处理此问题，以免丢失设备身份和模型配置。
+
 ## 在线版本
 
 在线源固定为项目 [GitHub 仓库](https://github.com/Ernest-su/ai-remote-controller)，界面不再要求填写清单地址或保存更新源。点击“检查 / 安装在线版本”获取仓库最新 Release 的 `manifest.json` 和 `manifest.json.sig`，验签后下载清单中对应 ABI 的程序。GitHub 最新资产下载入口采用官方的 [`releases/latest/download/文件名`](https://docs.github.com/en/repositories/releasing-projects-on-github/linking-to-releases) 约定。

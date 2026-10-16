@@ -19,7 +19,7 @@ internal class AndroidRemoteHaptics(private val context: Context, scope: Corouti
     fun setActive(value: Boolean) { active = value; if (!value) playback.stop() }
     private fun available() = active && vibrator?.hasVibrator() == true &&
         Settings.System.getInt(context.contentResolver, Settings.System.HAPTIC_FEEDBACK_ENABLED, 1) != 0
-    private fun trace(event:String) { if(BuildConfig.DEBUG) android.util.Log.d("AircHaptics",event) }
+    override fun trace(event:String) { if(BuildConfig.DEBUG) android.util.Log.i("AircHaptics",event) }
     override fun tap() { trace("tap");playback.tap() }
     override fun startHold(key: Any) { trace("hold-start ${System.identityHashCode(key)}");playback.startHold(key) }
     override fun stopHold(key: Any) { trace("hold-stop ${System.identityHashCode(key)}");playback.stopHold(key) }

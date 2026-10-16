@@ -139,6 +139,44 @@ async def protocol(port, api_port):
         assert rejected["id"] == "removed-input" and not rejected["ok"], rejected
 
 
+async def queue_overload(port):
+    async with websockets.connect(f"ws://127.0.0.1:{port}/ws") as socket:
+        total = 40
+        for index in range(total):
+            await socket.send(json.dumps({"id": f"overload-{index}", "protocol": 1,
+                "type": "tool", "tool": "device.shell", "arguments": {
+                    "command": "sleep 0.1; printf queue-fixture"
+                }}))
+        replies = [json.loads(await asyncio.wait_for(socket.recv(), 10)) for _ in range(total)]
+        assert {reply["id"] for reply in replies} == {f"overload-{i}" for i in range(total)}, replies
+        rejected = [reply for reply in replies if not reply["ok"]]
+        assert rejected and all("request queue full" in reply["error"] for reply in rejected), replies
+        accepted = [reply for reply in replies if reply["ok"]]
+        assert accepted and all(reply["result"] == "queue-fixture" for reply in accepted), replies
+        indices = [int(reply["id"].split("-")[-1]) for reply in accepted]
+        assert indices == sorted(indices), "accepted controls lost FIFO order"
+        await asyncio.wait_for(await socket.ping(), 3)
+        await socket.send(json.dumps({"id": "after-overload", "protocol": 1,
+            "type": "tool", "tool": "device.shell", "arguments": {"command": "printf still-connected"}}))
+        reply = json.loads(await asyncio.wait_for(socket.recv(), 5))
+        assert reply["id"] == "after-overload" and reply["result"] == "still-connected", reply
+
+
+async def input_lane_isolation(port):
+    # Host builds have no Android bridge; their prompt rejection still proves
+    # that the input lane does not sit behind a slow ordinary control.
+    async with websockets.connect(f"ws://127.0.0.1:{port}/ws") as socket:
+        await socket.send(json.dumps({"id":"slow-control","protocol":1,"type":"tool",
+            "tool":"device.shell","arguments":{"command":"sleep 1; printf completed"}}))
+        await socket.send(json.dumps({"id":"independent-key","protocol":1,"type":"tool",
+            "tool":"remote.key","arguments":{"key":"down"}}))
+        reply = json.loads(await asyncio.wait_for(socket.recv(), .8))
+        assert reply["id"] == "independent-key" and not reply["ok"], reply
+        assert "persistent input bridge unavailable" in reply["error"], reply
+        reply = json.loads(await asyncio.wait_for(socket.recv(), 3))
+        assert reply["id"] == "slow-control" and reply["result"] == "completed", reply
+
+
 def main():
     api = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Api)
     thread = threading.Thread(target=api.serve_forever, daemon=True)
@@ -161,6 +199,8 @@ def main():
             info = discovery.found[device_id]
             assert info.port == current["port"] and info.properties[b"protocol"] == b"1"
             asyncio.run(protocol(current["port"], api.server_port))
+            asyncio.run(queue_overload(current["port"]))
+            asyncio.run(input_lane_isolation(current["port"]))
             assert Api.calls == 8 and not Api.failures, (Api.calls, Api.failures)
             config = pathlib.Path(directory) / "model.json"
             assert stat.S_IMODE(config.stat().st_mode) == 0o600

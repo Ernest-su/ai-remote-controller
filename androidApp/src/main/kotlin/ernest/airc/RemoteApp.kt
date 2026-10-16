@@ -262,7 +262,7 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
                             }
                             Box(Modifier.size(RemoteDimensions.Dpad).testTag("remote-dpad").background(RemoteColors.Surface, CircleShape).border(0.5.dp, RemoteColors.Divider, CircleShape)) {
                                 @Composable fun Direction(icon: Int, label: String, key: String, alignment: Alignment, padding: PaddingValues) {
-                                    RemoteIconButton({ model.key(key) }, enabled = state.connected, modifier = Modifier.align(alignment).padding(padding).size(60.dp)) {
+                                    RemoteIconButton({ model.key(key) }, enabled = state.connected, modifier = Modifier.align(alignment).padding(padding).size(60.dp), debugName = key) {
                                         Icon(painterResource(icon), label, Modifier.size(28.dp))
                                     }
                                 }
@@ -307,7 +307,7 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
 
 @Composable
 internal fun RemoteKey(icon: Int, label: String, enabled: Boolean, tint: Color = RemoteColors.Text, size: androidx.compose.ui.unit.Dp = 48.dp, action: () -> Unit) {
-    val interactions = rememberRemoteKeyInteractions(enabled)
+    val interactions = rememberRemoteKeyInteractions(enabled, label)
     Column(
         Modifier.widthIn(min = 64.dp).clickable(interactionSource = interactions, indication = androidx.compose.foundation.LocalIndication.current, enabled = enabled, role = Role.Button, onClick = action)
             .semantics(mergeDescendants = true) {}.padding(4.dp),
@@ -344,6 +344,6 @@ private fun RemoteTypePicker(selected: RemotePage, navigate: (RemotePage) -> Uni
 }
 
 @Composable
-private fun RemoteIconButton(onClick: () -> Unit, enabled: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    IconButton(onClick, modifier, enabled = enabled, interactionSource = rememberRemoteKeyInteractions(enabled), content = content)
+private fun RemoteIconButton(onClick: () -> Unit, enabled: Boolean, modifier: Modifier = Modifier, debugName: String = "remote-key", content: @Composable () -> Unit) {
+    IconButton(onClick, modifier, enabled = enabled, interactionSource = rememberRemoteKeyInteractions(enabled, debugName), content = content)
 }

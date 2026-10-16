@@ -12,6 +12,12 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.ViewModelProvider
 
 class MainActivity : ComponentActivity() {
+    override fun dispatchTouchEvent(event: android.view.MotionEvent): Boolean {
+        if (BuildConfig.DEBUG && event.actionMasked != android.view.MotionEvent.ACTION_MOVE) {
+            android.util.Log.i("AircHaptics", "input action=${event.actionMasked} pointers=${event.pointerCount} down=${event.downTime} event=${event.eventTime} lag=${android.os.SystemClock.uptimeMillis() - event.eventTime}")
+        }
+        return super.dispatchTouchEvent(event)
+    }
     private lateinit var model: RemoteViewModel
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile the short-lived Android framework adapters into Cargo OUT_DIR."""
+"""Compile Android framework adapters, including the persistent input bridge, into Cargo OUT_DIR."""
 import os
 import pathlib
 import subprocess

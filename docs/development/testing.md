@@ -78,6 +78,8 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite profil
 
 Compose 桌面测试的取消事件实现与 Android 不同：越界/松开可在 JVM 验证，实际取消、后台与窗口失焦由 Android 专项补充。不能以单纯编译测试 APK 代替执行。
 
+遥控震动诊断可在 debug App 使用 `adb -s <手机序列号> logcat -v threadtime -s AircHaptics:I`，结合 `adb -s <手机序列号> shell dumpsys vibrator_manager` 核对硬件状态。日志包含系统触摸时序、方向键名称、交互源和按下 token、派发完成/取消、计时开始/触发及停止；不记录文字内容或凭据。快速短按需核对同一按钮的多个 token：延迟派发可能正常完成后又出现合成按下/松开对，旧 token 必须在被替代时清理。`remote-haptics-input-ui` 覆盖 Compose 短按、不等待界面空闲的系统输入队列连按，以及按下约 100ms、靠近 Android 延迟按压反馈阈值的连按。
+
 ## 完整本地门禁
 
 准备安装 `websockets`、`zeroconf` 的 Python 环境，并提供与当前信任根匹配的既有签名清单和相邻 `.sig`：
@@ -102,6 +104,15 @@ python3 scripts/verify-local.py --scope commit
 提交后的文档 CI 复核严格构建并生成站点。生成站点不进入源码提交。
 
 ## 设备与提供商专项
+
+普通按键提速专项使用独立的 `inputFixture` APK 和 UUID runtime 目录，安装前拒绝覆盖已有接收 fixture，结束后移除自建资源并恢复目标原 Activity：
+
+```sh
+./gradlew :inputFixture:assembleDebug :androidApp:assembleDebug :androidApp:assembleDebugAndroidTest --no-daemon
+uv run --with websockets python scripts/test-remote-input.py --phone <控制手机序列号> --target <被控端序列号> --host <被控端IP>
+```
+
+专项让控制手机和接收 Activity 保持前台亮屏，测量手机经局域网的热态提交确认延迟，目标 P95≤100ms、10Hz 持续30秒无积压；另行记录桥接注入耗时，区分执行与网络抖动。被控接收 Activity 独立核对按下/抬起数量、顺序、来源和重复计数。额外覆盖慢工具期间按键独立执行、桥接被杀后的仅抬起恢复、正常停止回收和父进程异常退出后的 EOF 清理。RPC 成功不替代接收端实收验证，记录实际指标与失败范围。手机安装器要求正常安装确认时先完成确认；`--use-installed-phone` 校验已有 App/测试 APK 摘要后可省去重复安装。
 
 只有改动涉及真实目标或硬件行为时才选择对应专项，方法见[设备验证](../device-validation.md)。不得不带类或专项选择运行整套 instrumentation，其中包含部署、配对和系统动作测试。
 

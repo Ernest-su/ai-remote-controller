@@ -5,7 +5,7 @@ use serde_json::json;
 use std::{
     fs,
     io::{Read, Write},
-    net::{SocketAddr, TcpStream},
+    net::{SocketAddr, TcpListener, TcpStream},
     os::unix::{fs::OpenOptionsExt, io::AsRawFd, process::CommandExt},
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -111,6 +111,14 @@ pub fn control(action: &str, dir: &Path, port: u16) -> Result<()> {
     let _control = Lock::acquire(&dir.join("control.lock"))?;
     let existing = Record::read(dir)?.filter(Record::owned);
     match action {
+        "check-port" => {
+            // An owned service on this port will be stopped by the deployment transaction.
+            // Missing/deleted state must never authorize stopping an unknown listener.
+            if existing.as_ref().is_none_or(|record| record.port != port) {
+                check_port(port)?;
+            }
+            println!("{}", json!({"available":true,"port":port}));
+        }
         "status" => {
             println!(
                 "{}",
@@ -151,6 +159,7 @@ pub fn control(action: &str, dir: &Path, port: u16) -> Result<()> {
                 );
                 return Ok(());
             }
+            check_port(port)?;
             let log = fs::OpenOptions::new()
                 .append(true)
                 .create(true)
@@ -198,6 +207,13 @@ pub fn control(action: &str, dir: &Path, port: u16) -> Result<()> {
         }
         _ => bail!("unknown service operation: {action}"),
     }
+    Ok(())
+}
+
+fn check_port(port: u16) -> Result<()> {
+    let _listener = TcpListener::bind(("0.0.0.0", port)).with_context(|| {
+        format!("cannot bind service port {port}; it may be occupied by an unmanaged or orphaned service; verify the listener and stop it with its owning UID (root requires su), then retry; do not delete the state directory")
+    })?;
     Ok(())
 }
 

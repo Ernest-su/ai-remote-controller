@@ -16,6 +16,34 @@ class RemoteHapticsTest {
         override fun startHold(key: Any) { held += key }
         override fun stopHold(key: Any) { held -= key }
     }
+    @Test fun secondTokenForTheSameKeyRetiresTheNormallyCompletedDelayedPress() = runTest {
+        val feedback = Feedback()
+        val source = RemoteKeyInteractionSource(this, feedback, 400)
+        val delayed = PressInteraction.Press(Offset.Zero)
+        // Captured on 40ac3b40: the delayed dispatch completes normally, followed
+        // by a synthetic Press/Release pair for the very same physical short tap.
+        launch { source.emit(delayed) }.join()
+        val synthetic = PressInteraction.Press(Offset.Zero)
+        source.emit(synthetic)
+        source.emit(PressInteraction.Release(synthetic))
+        advanceTimeBy(1000)
+        assertTrue("The displaced token must not start a hold after the finger is up", feedback.held.isEmpty())
+        source.dispose()
+    }
+    @Test fun newPressRetiresAnAlreadyActiveHoldForTheSameKey() = runTest {
+        val feedback = Feedback()
+        val source = RemoteKeyInteractionSource(this, feedback, 400)
+        source.tryEmit(PressInteraction.Press(Offset.Zero))
+        advanceTimeBy(401)
+        assertEquals(1, feedback.held.size)
+        val next = PressInteraction.Press(Offset.Zero)
+        source.tryEmit(next)
+        assertTrue(feedback.held.isEmpty())
+        source.tryEmit(PressInteraction.Cancel(next))
+        advanceTimeBy(1000)
+        assertTrue(feedback.held.isEmpty())
+        source.dispose()
+    }
     @Test fun cancelledPressDispatchCannotStartFeedbackLater() = runTest {
         val feedback=Feedback()
         val source=RemoteKeyInteractionSource(this,feedback,500)
@@ -88,15 +116,17 @@ class RemoteHapticsTest {
     @Test fun releasingOneKeyDoesNotStopAnotherHeldKey() = runTest {
         val feedback = Feedback()
         val source = RemoteKeyInteractionSource(this, feedback, 500)
+        val otherSource = RemoteKeyInteractionSource(this, feedback, 500)
         val first = PressInteraction.Press(Offset.Zero)
         val second = PressInteraction.Press(Offset.Zero)
-        source.tryEmit(first); source.tryEmit(second)
+        source.tryEmit(first); otherSource.tryEmit(second)
         advanceTimeBy(501)
         assertEquals(setOf(first, second), feedback.held)
         source.tryEmit(PressInteraction.Release(first))
         assertEquals(setOf(second), feedback.held)
-        source.tryEmit(PressInteraction.Cancel(second))
+        otherSource.tryEmit(PressInteraction.Cancel(second))
         assertTrue(feedback.held.isEmpty())
+        source.dispose(); otherSource.dispose()
     }
     @Test fun releasingAtThresholdDoesNotStartDelayedVibration() = runTest {
         val feedback = Feedback()

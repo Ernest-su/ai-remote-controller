@@ -54,7 +54,8 @@ class RuntimeInstaller(
                     deploy(client, runtimePort, privilege)
                 }
                 check(result.lineSequence().any { it == "airc-committed" }) {
-                    if (result.contains("airc-rolled-back")) "新程序启动失败，已恢复原版本：$result"
+                    if (result.contains("airc-preflight-failed")) result
+                    else if (result.contains("airc-rolled-back")) "新程序启动失败，已恢复原版本：$result"
                     else "更新提交或恢复失败，请查询目标服务状态：$result"
                 }
             } finally {
@@ -94,7 +95,9 @@ class RuntimeInstaller(
             val result = withContext(NonCancellable) {
                 deploy(client, port, privilege)
             }
-            check(result.lineSequence().any { it == "airc-committed" }) { "重启失败，已尝试恢复原服务：$result" }
+            check(result.lineSequence().any { it == "airc-committed" }) {
+                if (result.contains("airc-preflight-failed")) result else "重启失败，已尝试恢复原服务：$result"
+            }
             val reply = result.lineSequence().first { it.contains("\"ready\":true") }
             json.parseToJsonElement(reply).jsonObject.getValue("port").jsonPrimitive.int
         } finally {

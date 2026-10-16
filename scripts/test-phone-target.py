@@ -12,7 +12,7 @@ from instrumentation_result import require_passed
 
 ROOT = Path(__file__).resolve().parent.parent
 SUITES = {
-    "remote-haptics-input-ui": ("ernest.airc.RemoteHapticsInputUiTest", 2),
+    "remote-haptics-input-ui": ("ernest.airc.RemoteHapticsInputUiTest", 4),
     "remote-haptics-ui": ("ernest.airc.RemoteHapticsUiTest", 1),
     "lan-connection-ui": ("ernest.airc.LanConnectionUiTest", 2),
     "appearance": ("ernest.airc.AppearanceUiTest", 2),

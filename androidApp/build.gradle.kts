@@ -42,8 +42,10 @@ val bundleRuntime by tasks.registering(Exec::class) {
     workingDir(rootProject.projectDir)
     commandLine("python3", "scripts/build-runtime.py")
     environment("ANDROID_HOME", androidComponents.sdkComponents.sdkDirectory.get().asFile.absolutePath)
-    inputs.files(rootProject.fileTree("runtime/src"), rootProject.file("runtime/Cargo.toml"),
-        rootProject.file("runtime/Cargo.lock"), rootProject.file("scripts/build-runtime.py"))
+    inputs.files(rootProject.fileTree("runtime/src"), rootProject.fileTree("runtime/platform/android"),
+        rootProject.file("runtime/build.rs"), rootProject.file("runtime/Cargo.toml"),
+        rootProject.file("runtime/Cargo.lock"), rootProject.file("scripts/build-runtime.py"),
+        rootProject.file("scripts/build-platform-bridge.py"))
     outputs.dir(layout.projectDirectory.dir("src/main/assets/runtime"))
 }
 tasks.named("preBuild") { dependsOn(bundleRuntime) }

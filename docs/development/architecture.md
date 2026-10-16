@@ -25,7 +25,7 @@ flowchart LR
 
 手机首先以 `ernest-su/adb` 推送与管理二进制，日常操作通过 runtime WebSocket。ADB mDNS 与 `_airc._tcp.` 独立；服务 UUID 在更新/重启后保持稳定。
 
-直接工具与文字/配置使用独立队列；会话内的模型对话历史受互斥保护。工具使用同一执行层，模型无需额外的命令执行通道。
+普通遥控按键、其他直接工具与文字/配置使用独立队列；每条队列保持内部 FIFO，会话内的模型对话历史受互斥保护。模型与手动普通按键共用有界的输入执行器，模型无需额外的命令执行通道。
 
 设备端进程脱离 ADB 标准输入/输出，通过文件锁、PID、启动时间和可执行路径管理生命周期。当前不含 TUI、Web UI、登录或安全确认。
 
@@ -51,9 +51,13 @@ iOS/鸿蒙目前没有实现。共享模型不依赖 Android UI；新增平台�
 
 播放副本的私有持久化记录位于 media_publications/journal.rs，启动按固定 Downloads 根目录和记录身份恢复，恢复期间不遍历删除未记录的媒体目录。media.publications 同时供直接请求和模型查询，控制端提供手动列出/释放入口。
 
-## Android framework 短时桥接
+## Android framework 桥接
 
-常驻入口、WebSocket/HTTP、任务与工具调度仍由 Rust 可执行文件承担。精确 MediaSession 定位需要系统 framework 对象：runtime/platform/android 保存精简 Java 源码，Android Cargo 构建脚本通过 SDK javac/D8 编译到 OUT_DIR，并将 Dex 嵌入二进制。生成文件不入库。主机 Rust 构建不依赖此桥接，原 dumpsys 解析仍可 fixture 测试。目标仅为请求启动系统 app_process 子进程，限时退出；没有服务 APK、额外安装权限或常驻 JVM 服务。平台不允许上下文/权限调用时明确回退只读状态并关闭定位能力。
+常驻入口、WebSocket/HTTP、任务与工具调度仍由 Rust 可执行文件承担。runtime/platform/android 保存精简 Java 源码，Android Cargo 构建脚本通过 SDK javac/D8 编译到 OUT_DIR，并将 Dex 嵌入二进制。生成文件不入库，Gradle 将 Java 源码及桥接构建脚本纳入 runtime 资产输入。主机 Rust 构建不依赖 Android SDK，原 dumpsys 解析仍可 fixture 测试。
+
+普通 `remote.key` 由 `InputBridge` 常驻 app_process 子进程处理；Rust `remote_input` 有界 actor 独占其 stdin/stdout，验证就绪 PID/UID，并在服务启动时预热。每键直接调用系统输入接口，提交成对按下/抬起，继承 runtime 的 shell/root 身份，无额外 APK 或外部监听端口。调用方取消不打断已开始的事务，未开始的输入在回复接收端取消后跳过。桥接退出、超时或非法回执触发关闭/回收与仅抬起恢复，不自动重放按下；释放恢复失败时阻止新按下。正常服务关闭向子进程发送 EOF 并等待回收；父进程异常退出也通过私有 stdin EOF 结束桥接。输入不可用时明确报错，不退回每键启动命令进程。
+
+精确 MediaSession、应用、系统操作等适配仍按请求启动限时 app_process 子进程。平台不允许媒体上下文/权限调用时明确回退只读状态并关闭定位能力。
 
 应用标签与媒体操作分别由 AppsBridge / MediaBridge 实现；MediaCustomActions 单独处理动作声明边界与即时核对，共用 FrameworkContext 的当前用户上下文；Rust platform_bridge 负责验证和启动嵌入适配资产。scripts/build-platform-bridge.py 为 Android 构建编译所有适配类，主机 Rust 构建仍使用空桥接与可测的原命令回退。
 

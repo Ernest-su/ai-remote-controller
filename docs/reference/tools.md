@@ -4,7 +4,7 @@
 
 | 协议工具 | 模型函数名 | 参数 | Android 行为 |
 | --- | --- | --- | --- |
-| `remote.key` | `remote_key` | `key` | `input keyevent` |
+| `remote.key` | `remote_key` | `key` | 常驻输入桥接提交一次按下/抬起 |
 | `remote.text` | `remote_text` | `text` | 固定参数注入焦点字段 ASCII 文本，字面 `%s` 保留 |
 | `remote.tap` | `remote_tap` | `x`, `y`, 可选 `count` | 归一化坐标点击 |
 | `remote.swipe` | `remote_swipe` | `startX`, `startY`, `endX`, `endY`, 可选 `durationMs` | 受控滑动 |

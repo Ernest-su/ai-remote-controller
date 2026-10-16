@@ -121,3 +121,11 @@ async fn invoke_class(class: &str, operation: &str, arguments: &[String]) -> Res
     args.extend_from_slice(arguments);
     crate::tools::run_platform_bridge(&args, path).await
 }
+
+pub(crate) fn input_bridge_path() -> Result<PathBuf> {
+    let path = BRIDGE
+        .get()
+        .context("persistent input bridge unavailable")?;
+    verify(path)?;
+    Ok(path.clone())
+}

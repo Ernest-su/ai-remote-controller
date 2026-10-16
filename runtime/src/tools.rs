@@ -82,10 +82,6 @@ pub fn command_for(tool: &str, args: &Value) -> Result<(String, Vec<String>)> {
             .with_context(|| format!("missing string argument: {key}"))
     };
     let (program, argv): (&str, Vec<String>) = match tool {
-        "remote.key" => {
-            let code = remote_keys::code(string("key")?)?;
-            ("input", vec!["keyevent".into(), code.to_string()])
-        }
         "apps.open" => {
             let package = string("package")?;
             if package.is_empty()
@@ -133,6 +129,19 @@ pub async fn execute_owned(tool: &str, args: &Value, owner: &str) -> Result<Stri
 }
 
 pub async fn execute(tool: &str, args: &Value) -> Result<String> {
+    if tool == "remote.key" {
+        let object = args.as_object().context("remote.key requires key")?;
+        if object.len() != 1 {
+            bail!("remote.key accepts only key");
+        }
+        let code = remote_key_code(
+            object
+                .get("key")
+                .and_then(Value::as_str)
+                .context("remote.key requires key")?,
+        )?;
+        return crate::remote_input::key(code).await;
+    }
     if tool == "apps.icon" {
         return app_icon::execute(args).await;
     }
@@ -230,6 +239,10 @@ pub async fn execute(tool: &str, args: &Value) -> Result<String> {
     }
     let (program, argv) = command_for(tool, args)?;
     run_command(&program, &argv).await
+}
+
+pub(crate) fn remote_key_code(key: &str) -> Result<u32> {
+    remote_keys::code(key)
 }
 
 pub(crate) async fn run_command(program: &str, argv: &[String]) -> Result<String> {
@@ -368,10 +381,8 @@ mod tests {
 
     #[test]
     fn remote_keys_are_explicit() {
-        assert_eq!(
-            command_for("remote.key", &json!({"key":"up"})).unwrap(),
-            ("input".into(), vec!["keyevent".into(), "19".into()])
-        );
+        assert_eq!(remote_keys::code("up").unwrap(), 19);
+        assert!(command_for("remote.key", &json!({"key":"up"})).is_err());
         assert!(command_for("remote.key", &json!({"key":"19; reboot"})).is_err());
     }
     #[test]

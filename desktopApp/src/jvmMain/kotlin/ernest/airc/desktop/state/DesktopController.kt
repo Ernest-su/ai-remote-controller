@@ -139,7 +139,7 @@ class DesktopController(
                 if (session == generation) {
                     action?.invoke(output)
                     mutable.update { it.copy(output = output) }
-                    feedback(FeedbackPhase.COMPLETE, output.ifBlank { "已发送" }, token)
+                    feedback(FeedbackPhase.COMPLETE, if (tool == "remote.key") "已发送" else output.ifBlank { "已发送" }, token)
                 }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (session == generation) { val error = e.message ?: "执行失败"; mutable.update { it.copy(output = error) }; feedback(FeedbackPhase.ERROR, error, token) } }

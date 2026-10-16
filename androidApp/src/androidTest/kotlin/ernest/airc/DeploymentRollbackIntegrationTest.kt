@@ -32,7 +32,7 @@ class DeploymentRollbackIntegrationTest {
             val original = session.client.shell("sha256sum $binary").text()
             session.client.shell("cp -p $binary $binary.test-backup")
             backedUp = true
-            val bad = "#!/system/bin/sh\nif [ \"\${1}\" = --version ]; then echo ${before.version}; exit 0; fi\necho fixture-startup-failed\nexit 42\n"
+            val bad = "#!/system/bin/sh\nif [ \"\${2}\" = check-port ]; then exec $binary.test-backup \"\${@}\"; fi\nif [ \"\${1}\" = --version ]; then echo ${before.version}; exit 0; fi\necho fixture-startup-failed\nexit 42\n"
             session.client.push(ByteArrayInputStream(bad.toByteArray()), "$binary.next", 0x1C0)
             val output = RuntimeDeploymentRunner.run(directory, port,
                 RuntimePrivilege(RuntimePrivilege.Mode.SHELL, false),

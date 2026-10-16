@@ -204,6 +204,23 @@ const MESSAGES: &[(&str, &str)] = &[
         "设备操作超时，请检查目标状态后重试",
     ),
     ("tool execution timed out", "设备工具执行超时"),
+    (
+        "persistent input bridge unavailable",
+        "常驻输入桥接不可用，请检查设备端服务与输入权限",
+    ),
+    ("input service stopped", "输入服务已停止，请重新连接设备"),
+    (
+        "input key outcome uncertain; no automatic replay; release recovery attempted",
+        "按键执行结果不确定，已尝试释放按键；不会自动重复执行",
+    ),
+    (
+        "input key outcome uncertain; release recovery pending; no automatic retry",
+        "按键执行结果不确定，释放恢复尚未完成；不会自动重复执行",
+    ),
+    (
+        "request queue full; wait for pending operations and retry",
+        "操作队列已满，请等待已有操作完成后重试",
+    ),
     ("gesture timed out", "触控手势执行超时"),
     ("apps.list timed out", "应用列表读取超时"),
     ("device.info timed out", "设备信息读取超时"),

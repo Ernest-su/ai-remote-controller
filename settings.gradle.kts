@@ -10,4 +10,5 @@ include(":shared", ":client", ":sharedUi", ":androidApp", ":desktopApp")
 
 // Disposable target media integration fixture, excluded from runtime/APK distribution.
 include(":mediaFixture")
+include(":inputFixture")
 include(":ascrcpy")

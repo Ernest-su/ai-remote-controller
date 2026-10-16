@@ -136,6 +136,14 @@ port=$3
 directory=${binary%/*}
 # Both the top directory and state must be real directories.
 [ ! -L $directory ] && [ ! -L $directory/state ] && [ ! -L $binary ] && [ ! -L $binary.next ] || exit 1
+chmod 700 $binary.next || exit 1
+reply=$($binary.next service check-port --state-dir $directory/state --port $port 2>&1)
+if [ $? != 0 ]; then
+    echo "部署前检查失败：请检查端口 $port 是否被残留服务占用；root 进程需使用 root 停止，请勿删除状态目录。原服务与程序未替换。"
+    printf '%s\n' "$reply"
+    echo airc-preflight-failed
+    exit 1
+fi
 su_style=$6
 verify_shell() {
     if [ "$(su 2000 -c 'id -u' 2>/dev/null)" = 2000 ]; then su_style=command; return 0; fi
