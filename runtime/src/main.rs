@@ -4,6 +4,7 @@ mod artifacts;
 mod config;
 mod discovery;
 mod file_actions;
+mod i18n;
 mod media_publications;
 mod media_resources;
 mod platform_bridge;
@@ -25,6 +26,7 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         State,
     },
+    http::HeaderMap,
     response::IntoResponse,
     routing::get,
     Json, Router,
@@ -132,12 +134,19 @@ async fn dispatch(
 async fn websocket(
     State(state): State<Arc<AppState>>,
     upgrade: WebSocketUpgrade,
+    headers: HeaderMap,
 ) -> impl IntoResponse {
+    let language = i18n::Language::from_accept_language(
+        headers
+            .get("accept-language")
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or(""),
+    );
     upgrade
         .max_message_size(1024 * 1024)
-        .on_upgrade(move |socket| connection(socket, state))
+        .on_upgrade(move |socket| connection(socket, state, language))
 }
-async fn connection(socket: WebSocket, state: Arc<AppState>) {
+async fn connection(socket: WebSocket, state: Arc<AppState>, language: i18n::Language) {
     // Keep reading control frames while a model/tool call is running, so ping/pong
     // does not time out during a long decision. All queues have bounded memory.
     let owner = uuid::Uuid::new_v4().to_string();
@@ -153,6 +162,7 @@ async fn connection(socket: WebSocket, state: Arc<AppState>) {
         state.clone(),
         history.clone(),
         owner.clone(),
+        language,
     ));
     let worker = tokio::spawn(process_messages(
         incoming,
@@ -160,6 +170,7 @@ async fn connection(socket: WebSocket, state: Arc<AppState>) {
         state,
         history,
         owner.clone(),
+        language,
     ));
     loop {
         tokio::select! {
@@ -204,6 +215,7 @@ async fn process_messages(
     state: Arc<AppState>,
     history: Arc<Mutex<Vec<Value>>>,
     owner: String,
+    language: i18n::Language,
 ) {
     while let Some(message) = incoming.recv().await {
         let response = match message {
@@ -223,7 +235,11 @@ async fn process_messages(
                             id: request.id,
                             protocol: 1,
                             ok: true,
-                            result: Some(result),
+                            result: Some(if request.kind == "tool" {
+                                language.tool_result(request.tool.as_deref().unwrap_or(""), result)
+                            } else {
+                                result
+                            }),
                             error: None,
                         },
                         Err(error) => Response {
@@ -231,7 +247,7 @@ async fn process_messages(
                             protocol: 1,
                             ok: false,
                             result: None,
-                            error: Some(error.to_string()),
+                            error: Some(language.error(&error.to_string())),
                         },
                     }
                 }
@@ -240,7 +256,7 @@ async fn process_messages(
                     protocol: 1,
                     ok: false,
                     result: None,
-                    error: Some(format!("invalid request: {error}")),
+                    error: Some(language.error(&format!("invalid request: {error}"))),
                 },
             },
             Message::Close(_) => break,

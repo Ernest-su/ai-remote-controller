@@ -56,7 +56,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     private val store = DeviceStore(application)
     private val connector = AdbConnector(application)
     private val installer = RuntimeInstaller(application)
-    private val runtime = RuntimeConnection()
+    private val runtime = RuntimeConnection { application.resources.configuration.locales[0].toLanguageTag() }
     val screenshots = ScreenshotController(viewModelScope, runtime::screenshot)
     val ascrcpyPreview = AscrcpyPreviewController(getApplication(),viewModelScope) {
         val record=state.value.history.find{it.id==state.value.selected} ?: error("请先选择目标设备")

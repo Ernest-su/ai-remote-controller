@@ -26,6 +26,10 @@ App 与 runtime 按同一版本配套分发。目标文件与待部署版本不�
 
 连接 `/ws`，文本帧的请求和响应通过 id 关联。
 
+控制端在 HTTP 状态查询和 WebSocket 握手中通过 `Accept-Language` 传递 App 语言：Android 使用当前 App 资源语言，桌面使用当前系统语言。中文语言标签（含 `zh-CN`、`zh-TW`、`zh-Hans`）使用中文，其余控制端语言使用英文。服务支持按标准优先权选择 `zh` 或 `en`，缺少或不支持的语言使用英文。语言绑定到该 WebSocket 连接，多控制端之间互不影响；App 语言变化后重新连接生效。
+
+设备端按语言返回请求错误，手柄 uinput 版本、root 权限等常见错误有对应中英文文案。`gamepad.virtual_capabilities`、`device.system_capabilities`、`device.system_state` 的结构化 `reason` / `error` 也按连接语言显示。未知平台错误在中文说明后保留原始诊断；协议字段、文件内容、路径、工具标识和模型回答不做替换。
+
 ```json
 {"id":"request-1","protocol":1,"type":"tool","tool":"remote.key","arguments":{"key":"up"}}
 ```

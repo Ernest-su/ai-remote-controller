@@ -23,7 +23,8 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
-class RuntimeConnection : AutoCloseable {
+class RuntimeConnection(private val language: () -> String = { java.util.Locale.getDefault().toLanguageTag() }) : AutoCloseable {
+    private fun languageHeader() = if (java.util.Locale.forLanguageTag(language()).language == "zh") "zh" else "en"
     private val client = OkHttpClient.Builder().connectTimeout(5, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS).pingInterval(15, TimeUnit.SECONDS).build()
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -45,7 +46,7 @@ class RuntimeConnection : AutoCloseable {
     }
 
     suspend fun status(host: String, port: Int): RuntimeStatus =
-        execute(client.newCall(Request.Builder().url(url(host, port, "/status")).build())) {
+        execute(client.newCall(Request.Builder().url(url(host, port, "/status")).header("Accept-Language", languageHeader()).build())) {
             check(it.isSuccessful) { "状态查询失败 HTTP ${it.code}" }
             json.decodeFromString<RuntimeStatus>(it.body!!.string()).also { status ->
                 check(status.protocol == PROTOCOL_VERSION) { "不兼容的服务协议 ${status.protocol}" }
@@ -59,7 +60,7 @@ class RuntimeConnection : AutoCloseable {
         synchronized(stateLock) {
         check(generation==currentGeneration) { "目标连接已改变" }
         endpoint = host to port
-        socket = client.newWebSocket(Request.Builder().url(url(host, port, "/ws")).build(), object : WebSocketListener() {
+        socket = client.newWebSocket(Request.Builder().url(url(host, port, "/ws")).header("Accept-Language", languageHeader()).build(), object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 synchronized(stateLock) {
                 if (generation != currentGeneration) { webSocket.cancel(); return }

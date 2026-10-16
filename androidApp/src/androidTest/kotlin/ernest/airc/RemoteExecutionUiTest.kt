@@ -34,19 +34,23 @@ class RemoteExecutionUiTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
     private fun withPreview(adbPort: Int? = null, action: (RemoteViewModel, List<RuntimeRequest>) -> Unit) {
         val types = CopyOnWriteArrayList<RuntimeRequest>()
+        val languages = CopyOnWriteArrayList<String?>()
         val server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
-            override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
-                "/status" -> MockResponse().setBody("""{"version":"0.1.0","protocol":1,"deviceId":"ui-preview-fixture","name":"客厅电视","tools":[],"modelConfigured":true,"uid":2000}""")
-                "/ws" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
-                    override fun onMessage(webSocket: WebSocket, text: String) {
-                        val message = Json.parseToJsonElement(text).jsonObject
-                        types.add(Json.decodeFromString<RuntimeRequest>(text))
-                        val result = if (message.getValue("type").jsonPrimitive.content == "text") "文字指令已执行" else ""
-                        webSocket.send("""{"id":${message.getValue("id")},"protocol":1,"ok":true,"result":"$result"}""")
-                    }
-                })
-                else -> MockResponse().setResponseCode(404)
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                languages.add(request.getHeader("Accept-Language"))
+                return when (request.path) {
+                    "/status" -> MockResponse().setBody("""{"version":"0.1.0","protocol":1,"deviceId":"ui-preview-fixture","name":"客厅电视","tools":[],"modelConfigured":true,"uid":2000}""")
+                    "/ws" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+                        override fun onMessage(webSocket: WebSocket, text: String) {
+                            val message = Json.parseToJsonElement(text).jsonObject
+                            types.add(Json.decodeFromString<RuntimeRequest>(text))
+                            val result = if (message.getValue("type").jsonPrimitive.content == "text") "文字指令已执行" else ""
+                            webSocket.send("""{"id":${message.getValue("id")},"protocol":1,"ok":true,"result":"$result"}""")
+                        }
+                    })
+                    else -> MockResponse().setResponseCode(404)
+                }
             }
         }
         server.start()
@@ -57,6 +61,8 @@ class RemoteExecutionUiTest {
         }
         try {
             compose.waitUntil(10_000) { model.state.value.connected && !model.state.value.busy }
+            val tag = compose.activity.resources.configuration.locales[0].language
+            assertEquals(listOf(if (tag == "zh") "zh" else "en", if (tag == "zh") "zh" else "en"), languages.take(2))
             action(model, types)
         } finally {
             compose.runOnUiThread { model.disconnect() }
