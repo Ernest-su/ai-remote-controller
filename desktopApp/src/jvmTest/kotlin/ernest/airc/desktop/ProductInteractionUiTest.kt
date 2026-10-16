@@ -68,7 +68,7 @@ class ProductInteractionUiTest {
         var confirmed = false
         compose.setContent { RemoteTheme {
             SystemActionPanel(SystemActionState(busy = true, proposal = proposal), false,
-                "客厅电视".repeat(30), {}, {}, { confirmed = it })
+                "客厅电视".repeat(30), {}, { confirmed = it })
         } }
         compose.onNode(hasText("确认关机") and hasClickAction()).assertIsNotEnabled()
         compose.onNodeWithText("取消").assertIsDisplayed().performClick()

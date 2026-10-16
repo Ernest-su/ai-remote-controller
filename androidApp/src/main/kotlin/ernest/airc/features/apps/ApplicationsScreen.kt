@@ -27,9 +27,10 @@ internal fun Applications(state: RemoteUiState, model: RemoteViewModel) {
         onUninstall = { model.appManagement.uninstall(it, state.connected, model::listApps) },
         onClearCache = if("apps.clear_cache" in state.tools) { { model.appCache.prepare(it,state.connected && !management.busy && !installation.busy) } } else null,
         icon = { name -> androidx.compose.runtime.key(iconRevision) { ApplicationIcon(name, state.connected && "apps.icon" in state.tools, model.appIcons.cached(name), model.appIcons::load) } },
-        management = { if("apps.clear_cache" in state.tools || "apps.cache_pending" in state.tools) AppCachePanel(cache,state.connected && !management.busy && !installation.busy,model.appCache::confirm,if("apps.cache_pending" in state.tools) ({ model.appCache.pending(state.connected && !management.busy && !installation.busy) }) else null)
-            AppManagementPanel(management, state.connected && !cache.busy && !installation.busy, model.appManagement::confirm,
-            { model.appManagement.pending(state.connected && !installation.busy && !cache.busy, model::listApps) })
-            if("apps.install_pending" in state.tools) AppInstallationPanel(installation, null, state.connected && !management.busy && !cache.busy,
-                {}, model.appInstallation::confirm, model.appInstallation::cancel, { model.appInstallation.pending(state.connected && !management.busy) }) })
+        management = {
+            if("apps.clear_cache" in state.tools) AppCachePanel(cache,state.connected && !management.busy && !installation.busy,model.appCache::confirm)
+            AppManagementPanel(management, state.connected && !cache.busy && !installation.busy, model.appManagement::confirm)
+            AppInstallationPanel(installation, null, state.connected && !management.busy && !cache.busy,
+                {}, model.appInstallation::confirm, model.appInstallation::cancel)
+        })
 }

@@ -32,11 +32,12 @@ fun DesktopApplications(state: DesktopState, controller: DesktopController) {
         onUninstall = { controller.appManagement.uninstall(it, state.connected, controller::listApps) },
         onClearCache = if("apps.clear_cache" in state.tools) { { controller.appCache.prepare(it,state.connected && !management.busy && !installation.busy) } } else null,
         icon = { name -> androidx.compose.runtime.key(iconRevision) { ApplicationIcon(name, state.connected && "apps.icon" in state.tools, controller.appIcons.cached(name), controller.appIcons::load) } },
-        management = { if("apps.clear_cache" in state.tools || "apps.cache_pending" in state.tools) AppCachePanel(cache,state.connected && !management.busy && !installation.busy,controller.appCache::confirm,if("apps.cache_pending" in state.tools) ({ controller.appCache.pending(state.connected && !management.busy && !installation.busy) }) else null)
-            AppManagementPanel(management, state.connected && !cache.busy && !installation.busy, controller.appManagement::confirm,
-            { controller.appManagement.pending(state.connected && !installation.busy && !cache.busy, controller::listApps) })
-            if("apps.install_pending" in state.tools) AppInstallationPanel(installation, null, state.connected && !management.busy && !cache.busy,
-                {}, controller.appInstallation::confirm, controller.appInstallation::cancel, { controller.appInstallation.pending(state.connected && !management.busy) }) })
+        management = {
+            if("apps.clear_cache" in state.tools) AppCachePanel(cache,state.connected && !management.busy && !installation.busy,controller.appCache::confirm)
+            AppManagementPanel(management, state.connected && !cache.busy && !installation.busy, controller.appManagement::confirm)
+            AppInstallationPanel(installation, null, state.connected && !management.busy && !cache.busy,
+                {}, controller.appInstallation::confirm, controller.appInstallation::cancel)
+        })
 }
 
 @Composable
@@ -69,7 +70,7 @@ fun DesktopDeviceInfo(state: DesktopState, controller: DesktopController) = Page
     val observation by controller.systemObservation.state.collectAsState()
     if("device.system_state" in state.tools)SystemObservationPanel(observation,state.connected&&!state.busy){controller.systemObservation.refresh(state.connected&&!state.busy)}
     val system by controller.systemActions.state.collectAsState()
-    if("device.system_action" in state.tools || system.requiresVerification) SystemActionPanel(system,state.connected && state.uid == 0 && !state.busy,state.name,{controller.systemActions.prepare(it,state.connected && state.uid == 0 && !state.busy)},{controller.systemActions.pending(state.connected && state.uid == 0 && !state.busy)},controller.systemActions::confirm)
+    if("device.system_action" in state.tools || system.requiresVerification) SystemActionPanel(system,state.connected && state.uid == 0 && !state.busy,state.name,{controller.systemActions.prepare(it,state.connected && state.uid == 0 && !state.busy)},controller.systemActions::confirm)
     Panel {
         SectionTitle("当前设备")
         InfoRow("设备名称", state.name)

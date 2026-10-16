@@ -9,7 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun AppInstallationPanel(state: AppInstallationState, apk: TargetApkInfo?, available: Boolean, onPrepare: (Boolean) -> Unit, onConfirm: (Boolean) -> Unit, onCancel: () -> Unit, onPending: (() -> Unit)? = null, onAdd: (() -> Unit)? = null, onRemove: ((TargetApkInfo) -> Unit)? = null, onPrepareSet: ((Boolean) -> Unit)? = null) {
+fun AppInstallationPanel(state: AppInstallationState, apk: TargetApkInfo?, available: Boolean, onPrepare: (Boolean) -> Unit, onConfirm: (Boolean) -> Unit, onCancel: () -> Unit, onAdd: (() -> Unit)? = null, onRemove: ((TargetApkInfo) -> Unit)? = null, onPrepareSet: ((Boolean) -> Unit)? = null) {
     var replacement by remember(apk?.sha256) { mutableStateOf(false) }
     apk?.let {
         ToggleSettingRow("允许覆盖安装现有应用", replacement, !state.busy, checkbox = true) { replacement = it }
@@ -28,7 +28,6 @@ fun AppInstallationPanel(state: AppInstallationState, apk: TargetApkInfo?, avail
         ToggleSettingRow("允许覆盖安装现有应用", replacement, !state.busy, checkbox = true) { replacement = it }
         ActionButton("准备安装整组 APK",available && !state.busy && validationError==null) { onPrepareSet(replacement) }
     }
-    onPending?.let { ActionButton("查看待确认的 APK 安装", available && !state.busy, it) }
     state.proposal?.let { proposal ->
         AlertDialog(onDismissRequest = { onConfirm(false) }, title = { Text(if (proposal.update) "确认覆盖安装" else "确认安装 APK") },
             text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {

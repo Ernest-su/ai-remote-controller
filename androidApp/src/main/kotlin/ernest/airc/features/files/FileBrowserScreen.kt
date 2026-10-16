@@ -98,7 +98,6 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
             if("apps.install" in state.tools) AppInstallationPanel(installation, apk.info, available,
                 { update -> apk.info?.let { model.appInstallation.prepare(it,update,available) } },
                 model.appInstallation::confirm, model.appInstallation::cancel,
-                if("apps.install_pending" in state.tools) ({ model.appInstallation.pending(available) }) else null,
                 onAdd = { apk.info?.let(model.appInstallation::add) }, onRemove = model.appInstallation::remove,
                 onPrepareSet = { update -> model.appInstallation.prepareSelected(update, available) })
             if (apk.info == null && !apk.busy && apk.error == null) Text("从 APK 文件的更多菜单选择 APK 信息，读取后可准备安装。", color=RemoteColors.Secondary)
@@ -108,7 +107,6 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
             if (media.players == null && !media.busy) Text("从媒体文件的更多菜单选择媒体打开，选择播放器后再执行。", color=RemoteColors.Secondary)
             }
             if (section == "transfer") {
-            if("files.pending" in state.tools) ActionButton("查看模型待确认的删除",available&&!transfer.running) { model.transfers.reviewPending(available) }
             FileTransferPanel(transfer,files.root,files.path,canTransfer,{select.launch(arrayOf("*/*"))},
                 {name -> message=null;model.transfers.upload(files.root,path(name),canTransfer)},model.transfers::cancel,
                 {model.transfers.prepareExport()?.let { save.launch(it) }},onOverwrite={name -> model.transfers.upload(files.root,path(name),canTransfer,true)},onConfirm=model.transfers::confirm)

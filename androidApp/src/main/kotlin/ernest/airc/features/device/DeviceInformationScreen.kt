@@ -28,7 +28,7 @@ internal fun DeviceInformation(state: RemoteUiState, model: RemoteViewModel) {
                 InfoRow("设备 ID", it.id)
             }
         }
-        if("device.system_action" in state.tools || system.requiresVerification) SystemActionPanel(system,state.connected && state.runtimeUid == 0 && !state.busy,device?.visibleName ?: "未知设备",{model.systemActions.prepare(it,state.connected && state.runtimeUid == 0 && !state.busy)},{model.systemActions.pending(state.connected && state.runtimeUid == 0 && !state.busy)},model.systemActions::confirm)
+        if("device.system_action" in state.tools || system.requiresVerification) SystemActionPanel(system,state.connected && state.runtimeUid == 0 && !state.busy,device?.visibleName ?: "未知设备",{model.systemActions.prepare(it,state.connected && state.runtimeUid == 0 && !state.busy)},model.systemActions::confirm)
         Panel {
             SectionTitle("系统与硬件", "查询目标设备实际信息；不可用字段显示未知。")
             ActionButton(if (state.deviceInfoLoading) "正在查询…" else "刷新设备信息",

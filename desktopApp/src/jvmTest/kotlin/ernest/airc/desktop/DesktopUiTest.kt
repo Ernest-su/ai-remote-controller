@@ -41,7 +41,7 @@ class DesktopUiTest {
     @Test fun cacheCleanupConfirmationIsDistinctFromUninstallAndCanBeRejected() {
         val app=TargetAppInfo("com.test.app",0,10001,1,"1","/data/app/test","test",false)
         var accepted:Boolean?=null
-        compose.setContent {RemoteTheme {AppCachePanel(AppCacheState(proposal=AppCacheProposal("id","app_cache_clear",app,true,true,"package_manager_cache_only")),true,{accepted=it},{})}}
+        compose.setContent {RemoteTheme {AppCachePanel(AppCacheState(proposal=AppCacheProposal("id","app_cache_clear",app,true,true,"package_manager_cache_only")),true,{accepted=it})}}
         compose.onNodeWithText("确认仅清理应用缓存").assertExists()
         compose.onNodeWithText("卸载并删除数据").assertDoesNotExist()
         compose.onNodeWithText("取消").performClick();assertEquals(false,accepted)

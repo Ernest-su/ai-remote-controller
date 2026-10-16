@@ -8,11 +8,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun SystemActionPanel(state:SystemActionState,available:Boolean,targetName:String,onPrepare:(String)->Unit,onPending:()->Unit,onConfirm:(Boolean)->Unit){
+fun SystemActionPanel(state:SystemActionState,available:Boolean,targetName:String,onPrepare:(String)->Unit,onConfirm:(Boolean)->Unit){
     Panel{
         SectionTitle("系统管理","锁屏、重启和关机需要 root，提交前必须确认。")
         for(action in listOf("lock","reboot","shutdown"))OutlinedButton({onPrepare(action)},enabled=available&&!state.busy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp),shape=MaterialTheme.shapes.small){Text("准备${systemActionLabel(action)}")}
-        OutlinedButton(onPending,enabled=available&&!state.busy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp),shape=MaterialTheme.shapes.small){Text("查看模型待确认的系统操作")}
         state.message?.let{Text(it,color=RemoteColors.Secondary)}
         state.error?.let{Text(it,color=RemoteColors.Warning)}
         if(state.busy)Text(if(state.proposal!=null)"等待确认" else "正在处理…",color=RemoteColors.Secondary)
