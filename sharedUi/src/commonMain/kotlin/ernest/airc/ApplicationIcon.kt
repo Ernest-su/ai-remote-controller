@@ -12,10 +12,10 @@ import kotlinx.coroutines.CancellationException
 internal expect fun decodeApplicationIcon(bytes: ByteArray): ImageBitmap
 
 @Composable
-fun ApplicationIcon(packageName: String, available: Boolean, load: suspend (String) -> ByteArray) {
-    var image by remember(packageName, available) { mutableStateOf<ImageBitmap?>(null) }
+fun ApplicationIcon(packageName: String, available: Boolean, cached: ByteArray? = null, load: suspend (String) -> ByteArray) {
+    var image by remember(packageName, available) { mutableStateOf(if (available && cached != null) runCatching { decodeApplicationIcon(cached) }.getOrNull() else null) }
     LaunchedEffect(packageName, available) {
-        if(available) try { image = decodeApplicationIcon(load(packageName)) }
+        if(available && image == null) try { image = decodeApplicationIcon(load(packageName)) }
         catch(e: CancellationException) { throw e }
         catch(_: Exception) { image = null }
     }

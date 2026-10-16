@@ -25,6 +25,23 @@ class AppPackagesUiTest {
         val image=compose.onNodeWithTag("application-icon-test.app").captureToImage().asAndroidBitmap()
         assertEquals(android.graphics.Color.GREEN,image.getPixel(image.width/2,image.height/2))
     }
+    @Test fun returningRowUsesCachedIconBeforeAnyRequest() {
+        val bitmap=Bitmap.createBitmap(96,96,Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.GREEN) }
+        val png=ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }.toByteArray()
+        bitmap.recycle()
+        var visible by mutableStateOf(true)
+        var requests=0
+        compose.setContent { RemoteTheme {
+            if(visible) ApplicationIcon("test.cached",true,png) { requests++;error("cached row must not load") }
+        } }
+        compose.runOnIdle { visible=false }
+        compose.waitForIdle()
+        compose.runOnIdle { visible=true }
+        compose.waitForIdle()
+        val image=compose.onNodeWithTag("application-icon-test.cached").captureToImage().asAndroidBitmap()
+        assertEquals(android.graphics.Color.GREEN,image.getPixel(image.width/2,image.height/2))
+        assertEquals(0,requests)
+    }
     @Test fun splitSelectionRequiresBaseAndExplicitSubmission() {
         val base=TargetApkInfo("inbox","base.apk","test.app",1,sizeBytes=10,sha256="a".repeat(64),signatures=emptyList(),signatureVerified=false)
         val split=base.copy(path="split.apk",split="config.en",sha256="b".repeat(64))

@@ -26,7 +26,7 @@ internal fun Applications(state: RemoteUiState, model: RemoteViewModel) {
         onInspect = { model.appManagement.inspect(it, state.connected) },
         onUninstall = { model.appManagement.uninstall(it, state.connected, model::listApps) },
         onClearCache = if("apps.clear_cache" in state.tools) { { model.appCache.prepare(it,state.connected && !management.busy && !installation.busy) } } else null,
-        icon = { name -> androidx.compose.runtime.key(iconRevision) { ApplicationIcon(name, state.connected && "apps.icon" in state.tools, model.appIcons::load) } },
+        icon = { name -> androidx.compose.runtime.key(iconRevision) { ApplicationIcon(name, state.connected && "apps.icon" in state.tools, model.appIcons.cached(name), model.appIcons::load) } },
         management = { if("apps.clear_cache" in state.tools || "apps.cache_pending" in state.tools) AppCachePanel(cache,state.connected && !management.busy && !installation.busy,model.appCache::confirm,if("apps.cache_pending" in state.tools) ({ model.appCache.pending(state.connected && !management.busy && !installation.busy) }) else null)
             AppManagementPanel(management, state.connected && !cache.busy && !installation.busy, model.appManagement::confirm,
             { model.appManagement.pending(state.connected && !installation.busy && !cache.busy, model::listApps) })

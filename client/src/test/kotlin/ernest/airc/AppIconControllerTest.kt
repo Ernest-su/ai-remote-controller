@@ -13,6 +13,25 @@ import javax.imageio.ImageIO
 import kotlin.test.*
 
 class AppIconControllerTest {
+    @Test fun cachedIconsSurviveLongListsAndBypassBusyRequests(): Unit = runBlocking {
+        IconFixture().use { fixture ->
+            repeat(70) { index ->
+                val load = async { fixture.controller.load("test.app$index") }
+                fixture.reply(fixture.nextRequest())
+                assertContentEquals(fixture.png, withTimeout(3000) { load.await() })
+            }
+            val blocked = List(2) { index -> async { fixture.controller.load("test.slow$index") } }
+            val requests = List(2) { fixture.nextRequest() }
+            assertContentEquals(fixture.png, fixture.controller.cached("test.app0"))
+            assertContentEquals(fixture.png, withTimeout(500) { fixture.controller.load("test.app0") })
+            blocked.forEach { it.cancel() }
+            requests.forEach(fixture::reply)
+            blocked.joinAll()
+            fixture.controller.clear()
+            assertNull(fixture.controller.cached("test.app0"))
+        }
+    }
+
     @Test fun scrollingCancellationKeepsSentRequestsWithinTheLimit(): Unit = runBlocking {
         val server = MockWebServer()
         val runtime = RuntimeConnection()

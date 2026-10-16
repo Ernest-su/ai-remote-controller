@@ -31,7 +31,7 @@ fun DesktopApplications(state: DesktopState, controller: DesktopController) {
         onInspect = { controller.appManagement.inspect(it, state.connected) },
         onUninstall = { controller.appManagement.uninstall(it, state.connected, controller::listApps) },
         onClearCache = if("apps.clear_cache" in state.tools) { { controller.appCache.prepare(it,state.connected && !management.busy && !installation.busy) } } else null,
-        icon = { name -> androidx.compose.runtime.key(iconRevision) { ApplicationIcon(name, state.connected && "apps.icon" in state.tools, controller.appIcons::load) } },
+        icon = { name -> androidx.compose.runtime.key(iconRevision) { ApplicationIcon(name, state.connected && "apps.icon" in state.tools, controller.appIcons.cached(name), controller.appIcons::load) } },
         management = { if("apps.clear_cache" in state.tools || "apps.cache_pending" in state.tools) AppCachePanel(cache,state.connected && !management.busy && !installation.busy,controller.appCache::confirm,if("apps.cache_pending" in state.tools) ({ controller.appCache.pending(state.connected && !management.busy && !installation.busy) }) else null)
             AppManagementPanel(management, state.connected && !cache.busy && !installation.busy, controller.appManagement::confirm,
             { controller.appManagement.pending(state.connected && !installation.busy && !cache.busy, controller::listApps) })

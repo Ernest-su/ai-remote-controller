@@ -13,7 +13,7 @@ import kotlinx.coroutines.sync.withPermit
 /** Memory-only cache; every request remains bound to its original runtime connection. */
 class AppIconController(scope: CoroutineScope, private val runtime: RuntimeConnection) {
     private val gate = Semaphore(2)
-    private val cache = LinkedHashMap<Pair<RuntimeTransferTarget,String>, ByteArray>(64, .75f, true)
+    private val cache = HashMap<Pair<RuntimeTransferTarget,String>, ByteArray>()
     private var generation = 0L
     private val mutableRevision = MutableStateFlow(0L)
     val revision = mutableRevision.asStateFlow()
@@ -22,9 +22,15 @@ class AppIconController(scope: CoroutineScope, private val runtime: RuntimeConne
         if(session != observedSession) { observedSession = session; clear() }
     } } }
     fun clear() = synchronized(cache) { generation++; cache.clear(); mutableRevision.value = generation }
+    fun cached(packageName: String): ByteArray? {
+        val target = runCatching { runtime.transferTarget() }.getOrNull() ?: return null
+        return synchronized(cache) { cache[target to packageName] }
+    }
     suspend fun load(packageName: String): ByteArray {
         val target = runtime.transferTarget()
         val token = synchronized(cache) { generation }
+        // Returning to a loaded row must not wait behind uncached, slow requests.
+        synchronized(cache) { cache[target to packageName] }?.let { return it }
         return gate.withPermit {
             currentCoroutineContext().ensureActive()
             runtime.checkTransferTarget(target)
@@ -37,7 +43,6 @@ class AppIconController(scope: CoroutineScope, private val runtime: RuntimeConne
             synchronized(cache) {
                 check(token == generation) { "目标连接已改变" }
                 cache[target to packageName] = bytes
-                while(cache.size > 64) cache.remove(cache.keys.first())
             }
             bytes
         }
