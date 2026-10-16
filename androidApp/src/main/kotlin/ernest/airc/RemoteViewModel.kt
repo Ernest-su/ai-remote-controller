@@ -42,6 +42,7 @@ data class RemoteUiState(
     val modelConfigured: Boolean = false,
     val qr: PairingQr? = null,
     val preferRoot: Boolean = false,
+    val keyHapticsEnabled: Boolean = true,
     val runtimeUid: Int? = null,
     val apps: List<InstalledApp> = emptyList(),
     val appsLoading: Boolean = false,
@@ -90,7 +91,8 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     private var gestureGeneration = 0L
     private val feedbackGeneration = AtomicLong()
     private val releasePreferences = application.getSharedPreferences("runtime-release", android.content.Context.MODE_PRIVATE)
-    private val mutable = MutableStateFlow(RemoteUiState(history = store.read(), preferRoot = releasePreferences.getBoolean("prefer-root", false)))
+    private val mutable = MutableStateFlow(RemoteUiState(history = store.read(), preferRoot = releasePreferences.getBoolean("prefer-root", false),
+        keyHapticsEnabled = application.getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).getBoolean("key-haptics", true)))
     val state = mutable.asStateFlow()
     private val discovery = ServiceDiscovery(application, RUNTIME_SERVICE_TYPE,
         onFound = { service ->
@@ -144,6 +146,11 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     }
     private fun progress(token: Long, event: RuntimeProgress) {
         progressPhase(event.phase)?.let { feedback(it, event.text, token) }
+    }
+    fun setKeyHapticsEnabled(enabled: Boolean) {
+        getApplication<Application>().getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE)
+            .edit().putBoolean("key-haptics", enabled).apply()
+        mutable.update { it.copy(keyHapticsEnabled = enabled) }
     }
     fun showMessage(message: String) {
         mutable.update { it.copy(output = message) }

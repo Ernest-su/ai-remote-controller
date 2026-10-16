@@ -16,7 +16,7 @@ fun KeypadPanel(connected: Boolean, output: String, onKey: (String) -> Unit) {
             listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"), listOf("delete", "0", "mute")).forEach { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     row.forEach { key ->
-                        OutlinedButton({ onKey(key) }, enabled = connected,
+                        OutlinedButton({ onKey(key) }, enabled = connected, interactionSource = rememberRemoteKeyInteractions(connected),
                             modifier = Modifier.weight(1f).heightIn(min = 56.dp).testTag("keypad-$key"), shape = MaterialTheme.shapes.small, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)) {
                             Text(when (key) { "delete" -> "删除"; "mute" -> "静音"; else -> key })
                         }
@@ -25,7 +25,7 @@ fun KeypadPanel(connected: Boolean, output: String, onKey: (String) -> Unit) {
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("channel_down" to "上一频道", "channel_up" to "下一频道").forEach { (key, title) ->
-                    OutlinedButton({ onKey(key) }, enabled = connected,
+                    OutlinedButton({ onKey(key) }, enabled = connected, interactionSource = rememberRemoteKeyInteractions(connected),
                         modifier = Modifier.weight(1f).heightIn(min = 56.dp).testTag("keypad-$key"), shape = MaterialTheme.shapes.small, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 12.dp)) { Text(title) }
                 }
             }

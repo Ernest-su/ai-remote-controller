@@ -210,7 +210,10 @@ fun OperationDetails(output: String) {
 }
 
 @Composable
-fun AppearanceSettings(mode: ThemeMode, onModeChange: (ThemeMode) -> Unit) {
+fun AppearanceSettings(mode: ThemeMode, onModeChange: (ThemeMode) -> Unit) = AppearanceSettings(mode, onModeChange) {}
+
+@Composable
+fun AppearanceSettings(mode: ThemeMode, onModeChange: (ThemeMode) -> Unit, additionalSettings: @Composable () -> Unit) {
     PageContent(Modifier.testTag("settings-page")) {
         Text("外观", style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
         Text("选择适合你的显示方式", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
@@ -233,6 +236,7 @@ fun AppearanceSettings(mode: ThemeMode, onModeChange: (ThemeMode) -> Unit) {
             }
         }
         Text("跟随系统会随设备的深色模式自动切换。设置仅保存在当前控制端。", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
+        additionalSettings()
     }
 }
 

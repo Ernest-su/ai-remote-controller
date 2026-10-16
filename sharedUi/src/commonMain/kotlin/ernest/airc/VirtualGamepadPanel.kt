@@ -3,6 +3,7 @@ package ernest.airc
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
@@ -83,7 +84,19 @@ private fun GamepadButtons(buttons: List<String>, state: VirtualGamepadState, en
 
 @Composable
 private fun HoldButton(label: String, tag: String, enabled: Boolean, pressed: Boolean, modifier: Modifier = Modifier, round: Boolean = false, onHold: (Boolean) -> Unit) {
-    val hold by rememberUpdatedState(onHold)
+    val interactions = rememberRemoteKeyInteractions(enabled)
+    var hapticPress by remember { mutableStateOf<PressInteraction.Press?>(null) }
+    val hold by rememberUpdatedState<(Boolean) -> Unit>({ down ->
+        if (down && hapticPress == null) {
+            val press = PressInteraction.Press(androidx.compose.ui.geometry.Offset.Zero)
+            hapticPress = press
+            interactions.tryEmit(press)
+        } else if (!down) {
+            hapticPress?.let { interactions.tryEmit(PressInteraction.Release(it)) }
+            hapticPress = null
+        }
+        onHold(down)
+    })
     val scope = rememberCoroutineScope()
     var keyboardHeld by remember { mutableStateOf(false) }
     val controlModifier = modifier.heightIn(min=48.dp).widthIn(min=48.dp).testTag("virtual-button-$tag")

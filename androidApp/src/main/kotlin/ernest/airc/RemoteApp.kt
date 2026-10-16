@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
@@ -59,6 +60,19 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
     fun back() { navigate(page.androidBackDestination(deviceOrigin)) }
     BackHandler(enabled = page != RemotePage.REMOTE) { back() }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    val haptics = remember(context) { AndroidRemoteHaptics(context) }
+    DisposableEffect(haptics, lifecycle, state.keyHapticsEnabled, page) {
+        haptics.setActive(state.keyHapticsEnabled && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED))
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) haptics.setActive(state.keyHapticsEnabled)
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) haptics.setActive(false)
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer); haptics.setActive(false) }
+    }
+    CompositionLocalProvider(LocalRemoteHaptics provides if (state.keyHapticsEnabled) haptics else LocalRemoteHaptics.current) {
     Column(Modifier.fillMaxSize().background(RemoteColors.Background).safeDrawingPadding()) {
         Surface(color = RemoteColors.Header) {
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -100,7 +114,19 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                         RemotePage.DEVICE_INFO -> DeviceInformation(state, model)
                         RemotePage.RESULTS -> PageContent(Modifier.testTag("results-page")) { ResultPanel(state.output) }
                         RemotePage.HELP -> HelpScreen()
-                        RemotePage.SETTINGS -> AppearanceSettings(themeMode, onThemeChange)
+                        RemotePage.SETTINGS -> AppearanceSettings(themeMode, onThemeChange) {
+                            Panel {
+                                Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("remote-key-haptics")
+                                    .toggleable(value = state.keyHapticsEnabled, role = Role.Switch, onValueChange = model::setKeyHapticsEnabled)
+                                    .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text("遥控按键震动反馈", style = MaterialTheme.typography.bodyLarge)
+                                        Text("点按轻震，长按持续弱震", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
+                                    }
+                                    Switch(checked = state.keyHapticsEnabled, onCheckedChange = null)
+                                }
+                            }
+                        }
                         RemotePage.TOUCHPAD -> TouchpadScreen(state, model)
                         RemotePage.GAMEPAD -> GamepadScreen(state, model)
                         RemotePage.KEYPAD -> KeypadScreen(state, model)
@@ -113,6 +139,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter), color = RemoteColors.Brand)
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
         }
+    }
     }
 }
 
@@ -191,15 +218,15 @@ private fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRes
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                IconButton({ model.key("power") }, enabled = state.connected,
+                                RemoteIconButton({ model.key("power") }, enabled = state.connected,
                                     modifier = Modifier.size(48.dp).background(RemoteColors.Surface, CircleShape)) {
                                     Icon(painterResource(R.drawable.ic_power), "电源", Modifier.size(24.dp),
                                         tint = if (state.connected) RemoteColors.Warning else RemoteColors.Disabled)
                                 }
                                 Row {
-                                    IconButton({ model.key("volume_down") }, enabled = state.connected) { Icon(painterResource(R.drawable.ic_volume_down), "音量 −") }
-                                    IconButton({ model.key("mute") }, enabled = state.connected) { Icon(painterResource(R.drawable.ic_mute), "静音") }
-                                    IconButton({ model.key("volume_up") }, enabled = state.connected) { Icon(painterResource(R.drawable.ic_volume_up), "音量 +") }
+                                    RemoteIconButton({ model.key("volume_down") }, enabled = state.connected) { Icon(painterResource(R.drawable.ic_volume_down), "音量 −") }
+                                    RemoteIconButton({ model.key("mute") }, enabled = state.connected) { Icon(painterResource(R.drawable.ic_mute), "静音") }
+                                    RemoteIconButton({ model.key("volume_up") }, enabled = state.connected) { Icon(painterResource(R.drawable.ic_volume_up), "音量 +") }
                                 }
                             }
                             Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -229,7 +256,7 @@ private fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRes
                             }
                             Box(Modifier.size(RemoteDimensions.Dpad).testTag("remote-dpad").background(RemoteColors.Surface, CircleShape).border(0.5.dp, RemoteColors.Divider, CircleShape)) {
                                 @Composable fun Direction(icon: Int, label: String, key: String, alignment: Alignment, padding: PaddingValues) {
-                                    IconButton({ model.key(key) }, enabled = state.connected, modifier = Modifier.align(alignment).padding(padding).size(60.dp)) {
+                                    RemoteIconButton({ model.key(key) }, enabled = state.connected, modifier = Modifier.align(alignment).padding(padding).size(60.dp)) {
                                         Icon(painterResource(icon), label, Modifier.size(28.dp))
                                     }
                                 }
@@ -237,7 +264,7 @@ private fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRes
                                 Direction(R.drawable.ic_down, "向下", "down", Alignment.BottomCenter, PaddingValues(bottom = 8.dp))
                                 Direction(R.drawable.ic_left, "向左", "left", Alignment.CenterStart, PaddingValues(start = 8.dp))
                                 Direction(R.drawable.ic_right, "向右", "right", Alignment.CenterEnd, PaddingValues(end = 8.dp))
-                                Button({ model.key("ok") }, enabled = state.connected, shape = CircleShape,
+                                Button({ model.key("ok") }, enabled = state.connected, interactionSource = rememberRemoteKeyInteractions(state.connected), shape = CircleShape,
                                     modifier = Modifier.size(RemoteDimensions.Confirm).align(Alignment.Center), contentPadding = PaddingValues(0.dp)) {
                                     Text("OK", fontSize = 20.sp)
                                 }
@@ -274,8 +301,9 @@ private fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRes
 
 @Composable
 internal fun RemoteKey(icon: Int, label: String, enabled: Boolean, tint: Color = RemoteColors.Text, size: androidx.compose.ui.unit.Dp = 48.dp, action: () -> Unit) {
+    val interactions = rememberRemoteKeyInteractions(enabled)
     Column(
-        Modifier.widthIn(min = 64.dp).clickable(enabled = enabled, role = Role.Button, onClick = action)
+        Modifier.widthIn(min = 64.dp).clickable(interactionSource = interactions, indication = androidx.compose.foundation.LocalIndication.current, enabled = enabled, role = Role.Button, onClick = action)
             .semantics(mergeDescendants = true) {}.padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -307,4 +335,9 @@ private fun RemoteTypePicker(selected: RemotePage, navigate: (RemotePage) -> Uni
             }
         }
     }
+}
+
+@Composable
+private fun RemoteIconButton(onClick: () -> Unit, enabled: Boolean, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    IconButton(onClick, modifier, enabled = enabled, interactionSource = rememberRemoteKeyInteractions(enabled), content = content)
 }
