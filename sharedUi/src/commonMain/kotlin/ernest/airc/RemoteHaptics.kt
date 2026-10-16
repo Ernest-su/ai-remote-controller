@@ -4,8 +4,6 @@ import androidx.compose.foundation.interaction.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalViewConfiguration
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.collect
 
 interface RemoteHaptics {
     fun tap()
@@ -21,39 +19,57 @@ private object SilentRemoteHaptics : RemoteHaptics {
 
 val LocalRemoteHaptics = staticCompositionLocalOf<RemoteHaptics> { SilentRemoteHaptics }
 
-/** Observe existing button interactions without consuming gestures or changing remote actions. */
-@Composable
-fun rememberRemoteKeyInteractions(enabled: Boolean): MutableInteractionSource {
-    val source = remember { MutableInteractionSource() }
-    val haptics = LocalRemoteHaptics.current
-    val timeout = LocalViewConfiguration.current.longPressTimeoutMillis
-    LaunchedEffect(source, enabled, haptics, timeout) {
-        if (enabled) observeRemoteKeyHaptics(source.interactions, haptics, timeout)
+/** Stop feedback in the release dispatch itself, before ripple delivery or remote click actions. */
+class RemoteKeyInteractionSource(
+    private val scope: CoroutineScope,
+    private val haptics: RemoteHaptics,
+    private val longPressMillis: Long,
+) : MutableInteractionSource {
+    private val delegate = MutableInteractionSource()
+    private val presses = mutableMapOf<PressInteraction.Press, Job>()
+    private var disposed = false
+    override val interactions = delegate.interactions
+
+    override suspend fun emit(interaction: Interaction) {
+        feedback(interaction)
+        delegate.emit(interaction)
     }
-    return source
+    override fun tryEmit(interaction: Interaction): Boolean {
+        feedback(interaction)
+        return delegate.tryEmit(interaction)
+    }
+    private fun feedback(interaction: Interaction) {
+        if (disposed) return
+        when (interaction) {
+            is PressInteraction.Press -> {
+                haptics.tap()
+                presses[interaction] = scope.launch {
+                    delay(longPressMillis)
+                    haptics.startHold(interaction)
+                }
+            }
+            is PressInteraction.Release -> release(interaction.press)
+            is PressInteraction.Cancel -> release(interaction.press)
+        }
+    }
+    private fun release(press: PressInteraction.Press) {
+        presses.remove(press)?.cancel()
+        haptics.stopHold(press)
+    }
+    fun dispose() {
+        disposed = true
+        presses.keys.toList().forEach(::release)
+    }
 }
 
-suspend fun observeRemoteKeyHaptics(interactions: Flow<Interaction>, haptics: RemoteHaptics, longPressMillis: Long) = coroutineScope {
-    val presses = mutableMapOf<PressInteraction.Press, Job>()
-    try {
-        interactions.collect { event ->
-            when (event) {
-                is PressInteraction.Press -> {
-                    haptics.tap()
-                    presses[event] = launch { delay(longPressMillis); haptics.startHold(event) }
-                }
-                is PressInteraction.Release -> presses.remove(event.press)?.let { job ->
-                    job.cancelAndJoin()
-                    haptics.stopHold(event.press)
-                }
-                is PressInteraction.Cancel -> presses.remove(event.press)?.let { job ->
-                    job.cancelAndJoin()
-                    haptics.stopHold(event.press)
-                }
-                else -> Unit
-            }
-        }
-    } finally {
-        presses.forEach { (press, job) -> job.cancel(); haptics.stopHold(press) }
+@Composable
+fun rememberRemoteKeyInteractions(enabled: Boolean): MutableInteractionSource {
+    val scope = rememberCoroutineScope()
+    val haptics = LocalRemoteHaptics.current
+    val timeout = LocalViewConfiguration.current.longPressTimeoutMillis
+    val source = remember(scope, enabled, haptics, timeout) {
+        RemoteKeyInteractionSource(scope, if (enabled) haptics else SilentRemoteHaptics, timeout)
     }
+    DisposableEffect(source) { onDispose { source.dispose() } }
+    return source
 }

@@ -2,8 +2,7 @@ package ernest.airc
 
 import androidx.compose.foundation.interaction.*
 import androidx.compose.ui.geometry.Offset
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -17,62 +16,73 @@ class RemoteHapticsTest {
         override fun startHold(key: Any) { held += key }
         override fun stopHold(key: Any) { held -= key }
     }
-
     @Test fun shortPressVibratesOnceAndDoesNotStartHold() = runTest {
-        val events = MutableSharedFlow<Interaction>()
         val feedback = Feedback()
-        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { observeRemoteKeyHaptics(events, feedback, 500) }
+        val source = RemoteKeyInteractionSource(this, feedback, 500)
         val press = PressInteraction.Press(Offset.Zero)
-        events.emit(press)
-        advanceTimeBy(100)
-        events.emit(PressInteraction.Release(press))
-        advanceTimeBy(1000)
+        source.tryEmit(press)
         assertEquals(1, feedback.taps)
+        advanceTimeBy(100)
+        source.tryEmit(PressInteraction.Release(press))
+        advanceTimeBy(1000)
         assertTrue(feedback.held.isEmpty())
-        job.cancelAndJoin()
     }
-
-    @Test fun longPressVibratesUntilReleaseAndIndependentKeysRemainHeld() = runTest {
-        val events = MutableSharedFlow<Interaction>()
+    @Test fun releaseStopsHoldSynchronouslyWithoutAdvancingScheduler() = runTest {
         val feedback = Feedback()
-        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { observeRemoteKeyHaptics(events, feedback, 500) }
+        val source = RemoteKeyInteractionSource(this, feedback, 500)
+        val press = PressInteraction.Press(Offset.Zero)
+        source.tryEmit(press)
+        advanceTimeBy(501)
+        assertEquals(setOf(press), feedback.held)
+        source.tryEmit(PressInteraction.Release(press))
+        assertTrue("Stop must happen inside the release call", feedback.held.isEmpty())
+        advanceTimeBy(1000)
+        assertTrue(feedback.held.isEmpty())
+    }
+    @Test fun suspendingReleaseAlsoStopsBeforeReturning() = runTest {
+        val feedback = Feedback()
+        val source = RemoteKeyInteractionSource(this, feedback, 500)
+        val press = PressInteraction.Press(Offset.Zero)
+        source.emit(press)
+        advanceTimeBy(501)
+        assertFalse(feedback.held.isEmpty())
+        source.emit(PressInteraction.Release(press))
+        assertTrue(feedback.held.isEmpty())
+    }
+    @Test fun releasingOneKeyDoesNotStopAnotherHeldKey() = runTest {
+        val feedback = Feedback()
+        val source = RemoteKeyInteractionSource(this, feedback, 500)
         val first = PressInteraction.Press(Offset.Zero)
         val second = PressInteraction.Press(Offset.Zero)
-        events.emit(first)
-        events.emit(second)
+        source.tryEmit(first); source.tryEmit(second)
         advanceTimeBy(501)
-        runCurrent()
         assertEquals(setOf(first, second), feedback.held)
-        events.emit(PressInteraction.Release(first))
-        runCurrent()
+        source.tryEmit(PressInteraction.Release(first))
         assertEquals(setOf(second), feedback.held)
-        events.emit(PressInteraction.Release(second))
-        runCurrent()
+        source.tryEmit(PressInteraction.Cancel(second))
         assertTrue(feedback.held.isEmpty())
-        job.cancelAndJoin()
     }
-
-    @Test fun cancelledGestureDoesNotStartDelayedVibration() = runTest {
-        val events = MutableSharedFlow<Interaction>()
+    @Test fun releasingAtThresholdDoesNotStartDelayedVibration() = runTest {
         val feedback = Feedback()
-        val job = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { observeRemoteKeyHaptics(events, feedback, 500) }
+        val source = RemoteKeyInteractionSource(this, feedback, 500)
         val press = PressInteraction.Press(Offset.Zero)
-        events.emit(press)
-        events.emit(PressInteraction.Cancel(press))
-        advanceTimeBy(1000)
-        assertTrue(feedback.held.isEmpty())
-        job.cancelAndJoin()
-    }
-
-    @Test fun leavingOrDisablingControlsReleasesAllHolds() = runTest {
-        val events = MutableSharedFlow<Interaction>()
-        val feedback = Feedback()
-        val job = launch(UnconfinedTestDispatcher(testScheduler)) { observeRemoteKeyHaptics(events, feedback, 500) }
-        events.emit(PressInteraction.Press(Offset.Zero))
-        advanceTimeBy(501)
+        source.tryEmit(press)
+        advanceTimeBy(500)
+        source.tryEmit(PressInteraction.Cancel(press))
         runCurrent()
+        assertTrue(feedback.held.isEmpty())
+    }
+    @Test fun disposingStopsImmediatelyAndIgnoresLateEvents() = runTest {
+        val feedback = Feedback()
+        val source = RemoteKeyInteractionSource(this, feedback, 500)
+        source.tryEmit(PressInteraction.Press(Offset.Zero))
+        advanceTimeBy(501)
         assertFalse(feedback.held.isEmpty())
-        job.cancelAndJoin()
+        source.dispose()
+        assertTrue(feedback.held.isEmpty())
+        source.tryEmit(PressInteraction.Press(Offset.Zero))
+        advanceTimeBy(1000)
+        assertEquals(1, feedback.taps)
         assertTrue(feedback.held.isEmpty())
     }
 }

@@ -66,7 +66,8 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
-    val haptics = remember(context) { AndroidRemoteHaptics(context) }
+    val hapticScope = rememberCoroutineScope()
+    val haptics = remember(context, hapticScope) { AndroidRemoteHaptics(context, hapticScope) }
     DisposableEffect(haptics, lifecycle, state.keyHapticsEnabled, page) {
         haptics.setActive(state.keyHapticsEnabled && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED))
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -125,7 +126,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                                     .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
                                         Text("遥控按键震动反馈", style = MaterialTheme.typography.bodyLarge)
-                                        Text("点按轻震，长按持续弱震", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
+                                        Text("点按短震，长按持续弱震", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
                                     }
                                     Switch(checked = state.keyHapticsEnabled, onCheckedChange = null)
                                 }

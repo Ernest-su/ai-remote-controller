@@ -29,4 +29,23 @@ class RemoteHapticsUiTest {
         compose.onNodeWithTag("keypad-1").assertIsNotEnabled().performTouchInput { click() }
         compose.runOnIdle { assertEquals(1, feedback.taps); assertEquals(1, calls); assertTrue(feedback.held.isEmpty()) }
     }
+    @Test fun realButtonReleaseAndCancellationStopHeldFeedback() {
+        val feedback = Feedback()
+        compose.setContent { RemoteTheme { CompositionLocalProvider(LocalRemoteHaptics provides feedback) {
+            KeypadPanel(true, "", {})
+        } } }
+        val key = compose.onNodeWithTag("keypad-1")
+        key.performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(600)
+        compose.runOnIdle { assertEquals(1, feedback.held.size) }
+        key.performTouchInput { up() }
+        compose.runOnIdle { assertTrue(feedback.held.isEmpty()) }
+        key.performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(600)
+        compose.runOnIdle { assertEquals(1, feedback.held.size) }
+        key.performTouchInput { moveTo(androidx.compose.ui.geometry.Offset(-100f, -100f)) }
+        compose.runOnIdle { assertTrue(feedback.held.isEmpty()) }
+        key.performTouchInput { up() }
+    }
+
 }
