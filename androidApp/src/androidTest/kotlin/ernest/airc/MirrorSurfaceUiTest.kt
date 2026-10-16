@@ -1,6 +1,11 @@
 package ernest.airc
 
 import android.view.Surface
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.test.*
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -15,6 +20,34 @@ import java.util.concurrent.atomic.AtomicReference
 /** Controlled connection failure with real Android Surface lifecycle; no remote actions. */
 class MirrorSurfaceUiTest {
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
+    @Test fun fullScreenRelocationKeepsSurfaceAndTouchCoordinates() {
+        val current=AtomicReference<Surface?>()
+        var fullscreen by mutableStateOf(false)
+        val events=mutableListOf<List<Float>>()
+        compose.setContent {
+            val video=remember { movableContentOf {
+                MirrorSurface(0,true,16f/9f,{current.set(it)},{error("Surface destroyed during relocation")},
+                    modifier=Modifier.width(280.dp),onTouch={action,_,x,y,_ -> events.add(listOf(action.toFloat(),x,y))})
+            } }
+            if(fullscreen) Box(Modifier.fillMaxSize()) { video() }
+            else Column { Text("普通预览");video() }
+        }
+        compose.waitUntil(5000){current.get()?.isValid==true}
+        val initial=current.get()
+        repeat(2) {
+            compose.onNodeWithTag("screen-mirror-image").performTouchInput { click(center) }
+            compose.runOnIdle { fullscreen=!fullscreen }
+            compose.waitForIdle()
+            assertSame(initial,current.get())
+            val bounds=compose.onNodeWithTag("screen-mirror-image").fetchSemanticsNode().boundsInRoot
+            assertEquals(16f/9f,bounds.width/bounds.height,0.02f)
+        }
+        assertEquals(4,events.size)
+        assertEquals(0f,events[0][0])
+        assertEquals(1f,events[1][0])
+        assertEquals(0.5f,events[0][1],0.02f)
+        assertEquals(0.5f,events[0][2],0.02f)
+    }
     @Test fun stalledFirstFrameExpiresAtRealDeadlineAndReleasesSession()=runBlocking {
         val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
         val adb=MalformedPreviewAdb(stallAfterCodec=true)

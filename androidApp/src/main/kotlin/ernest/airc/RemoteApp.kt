@@ -54,6 +54,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
         message?.let { snackbar.showSnackbar(it.take(240)) }
     }
     var selectedTypeName by rememberSaveable { mutableStateOf(RemotePage.REMOTE.name) }
+    var mirrorFullscreen by remember { mutableStateOf(false) }
     val isRemoteType = remoteTypes.any { it.page == page }
     fun navigate(target: RemotePage) {
         if (target == page) return
@@ -79,7 +80,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
     }
     CompositionLocalProvider(LocalRemoteHaptics provides if (state.keyHapticsEnabled) haptics else LocalRemoteHaptics.current) {
     Column(Modifier.fillMaxSize().background(RemoteColors.Background).safeDrawingPadding()) {
-        Surface(color = RemoteColors.Header) {
+        if (!mirrorFullscreen) Surface(color = RemoteColors.Header) {
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
                     onClick = { if (page == RemotePage.REMOTE) navigate(RemotePage.MENU) else back() },
@@ -104,7 +105,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            Box(Modifier.widthIn(max = if (page == RemotePage.GAMEPAD) RemoteDimensions.GamepadContentWidth else 560.dp).fillMaxWidth()) {
+            Box(Modifier.widthIn(max = if (mirrorFullscreen) androidx.compose.ui.unit.Dp.Infinity else if (page == RemotePage.GAMEPAD) RemoteDimensions.GamepadContentWidth else 560.dp).fillMaxWidth()) {
                 pages.SaveableStateProvider(page.name) {
                     when (page) {
                         RemotePage.REMOTE_TYPES -> RemoteTypePicker(RemotePage.valueOf(selectedTypeName), ::navigate)
@@ -135,7 +136,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                         RemotePage.TOUCHPAD -> TouchpadScreen(state, model)
                         RemotePage.GAMEPAD -> GamepadScreen(state, model)
                         RemotePage.KEYPAD -> KeypadScreen(state, model)
-                        RemotePage.SCREENSHOT -> ScreenshotScreen(state, model)
+                        RemotePage.SCREENSHOT -> ScreenshotScreen(state, model, mirrorFullscreen) { mirrorFullscreen = it }
                         RemotePage.MEDIA_CONTROL -> MediaControls(state, model)
                         RemotePage.FILES -> FileBrowserScreen(state, model)
                     }
@@ -181,7 +182,7 @@ private fun FeatureMenu(navigate: (RemotePage) -> Unit) {
 }
 
 @Composable
-private fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showResults: () -> Unit) {
+internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showResults: () -> Unit) {
     var draft by rememberSaveable { mutableStateOf("") }
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current

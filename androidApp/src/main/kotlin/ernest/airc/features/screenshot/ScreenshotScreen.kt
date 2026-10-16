@@ -17,7 +17,18 @@ import java.io.File
 private val screenshotShareMutex = Mutex()
 
 @Composable
-internal fun ScreenshotScreen(state: RemoteUiState, model: RemoteViewModel) {
+internal fun ScreenshotScreen(state: RemoteUiState, model: RemoteViewModel, fullscreen:Boolean=false, onFullscreen:(Boolean)->Unit={}) {
+    val activity=LocalContext.current as? android.app.Activity
+    DisposableEffect(fullscreen,activity) {
+        val window=activity?.window
+        val controller=window?.let { androidx.core.view.WindowCompat.getInsetsController(it,it.decorView) }
+        val wasVisible=window?.decorView?.let { androidx.core.view.ViewCompat.getRootWindowInsets(it)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.systemBars()) } ?: true
+        if(fullscreen) {
+            controller?.systemBarsBehavior=androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller?.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        }
+        onDispose { if(fullscreen && wasVisible) controller?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars()) }
+    }
     val screenshot by model.screenshots.state.collectAsState()
     val dynamic by model.ascrcpyPreview.state.collectAsState()
     val dynamicActive=dynamic !is ernest.ascrcpy.scrcpy.ScrcpyState.Idle && dynamic !is ernest.ascrcpy.scrcpy.ScrcpyState.Failed
@@ -47,6 +58,12 @@ internal fun ScreenshotScreen(state: RemoteUiState, model: RemoteViewModel) {
             catch (_: Exception) { message = "无法保存截图" }
         }
     }
+    val mirrorContent=remember(model) { movableContentOf<RemoteUiState,Boolean> { current,full ->
+        AndroidScreenMirror(current,model,full,onFullscreen)
+    } }
+    androidx.activity.compose.BackHandler(fullscreen) { onFullscreen(false) }
+    DisposableEffect(Unit) { onDispose { onFullscreen(false) } }
+    if(fullscreen) { mirrorContent(state,true); return }
     ScreenshotPanel(image, screenshot.loading, state.connected && !state.busy && !dynamicActive && "device.screenshot" in state.tools,
         screenshot.error ?: message,
         onCapture = { message = null; model.screenshots.refresh(state.connected && !state.busy && !dynamicActive && "device.screenshot" in state.tools) },
@@ -67,5 +84,5 @@ internal fun ScreenshotScreen(state: RemoteUiState, model: RemoteViewModel) {
                 } catch (e: CancellationException) { throw e }
                 catch (_: Exception) { message = "无法分享截图" }
             }
-        }, preview = { Panel { AndroidScreenMirror(state,model) } }, unavailableMessage = if(dynamicActive) "停止连续画面后可获取单张截图。" else "请连接支持截图工具的服务。")
+        }, preview = { Panel { mirrorContent(state,false) } }, unavailableMessage = if(dynamicActive) "停止连续画面后可获取单张截图。" else "请连接支持截图工具的服务。")
 }

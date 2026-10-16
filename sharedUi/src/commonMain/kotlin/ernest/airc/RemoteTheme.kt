@@ -79,6 +79,8 @@ object RemoteColors {
 
 /** Dimensions from AIVoice phoneRemoteApp, with scrolling for short windows / large text. */
 object RemoteDimensions {
+    val MirrorPreviewHeight = 300.dp
+    val MirrorRemoteWidth = 320.dp
     val SettingRowHeight = 56.dp
     val ManagementWidth = 560.dp
     val ManagementDialogHeight = 640.dp

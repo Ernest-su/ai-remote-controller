@@ -63,3 +63,5 @@ debug APK 输出为 `androidApp/build/outputs/apk/debug/androidApp-debug.apk`，
 功能子页返回功能菜单，菜单返回遥控器；设备页返回来源页。短窗口、大字体或键盘展开时，遥控按键区域可以滚动，底部文字输入入口保留。
 
 桌面联调可从项目目录运行 `./gradlew :desktopApp:run --no-daemon`，使用宿主机 adb；操作与限制见[桌面指南](guide/desktop.md)。遇到问题先阅读[故障排查](troubleshooting.md)。
+
+Android 动态预览可直接触摸操作目标，通过“全屏预览”放大画面并展开悬浮遥控；两种模式均保持原比例。详见[设备截图与动态预览](guide/screenshots.md#screen-mirror)。
