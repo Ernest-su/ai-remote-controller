@@ -28,3 +28,7 @@ fun progressPhase(phase: String): FeedbackPhase? = when (phase) {
     "tool" -> FeedbackPhase.TOOL
     else -> null
 }
+
+/** Completion is shown by page state; snackbars only surface new errors absent from that page. */
+fun RemoteFeedback.snackbarMessage(lastSeenRevision: Long, inlineText: String? = null): String? =
+    text.takeIf { revision > lastSeenRevision && phase == FeedbackPhase.ERROR && it.isNotBlank() && it != inlineText }

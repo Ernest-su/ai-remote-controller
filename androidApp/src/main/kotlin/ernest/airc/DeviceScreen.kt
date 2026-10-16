@@ -64,6 +64,7 @@ internal fun Devices(state: RemoteUiState, model: RemoteViewModel) {
             }
             if (state.adbScanning) LinearProgressIndicator(Modifier.fillMaxWidth())
             Text("自动查找同网段 ADB 与遥控服务，点击设备后连接。", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
+            Text(state.status, modifier = Modifier.testTag("device-connection-status"), style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
         }
         Surface(color = RemoteColors.Surface, shape = MaterialTheme.shapes.small, modifier = Modifier.testTag("unified-device-list")) {
             Column {
@@ -114,7 +115,6 @@ internal fun Devices(state: RemoteUiState, model: RemoteViewModel) {
                 }
             }
         }
-        Text(state.status, style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
         OperationDetails(state.output)
         val remembered = state.history.firstOrNull { it.id == state.selected }
         val diagnosticHost = host.ifBlank { remembered?.host.orEmpty() }

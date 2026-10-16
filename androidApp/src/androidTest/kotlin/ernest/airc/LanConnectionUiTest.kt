@@ -20,6 +20,8 @@ class LanConnectionUiTest {
         }
         compose.waitUntil(60_000) { !model.state.value.busy && model.state.value.status.contains("自动部署失败") }
         assertFalse(model.state.value.connected)
+        compose.onAllNodesWithText(model.state.value.status).assertCountEquals(1)
+        compose.onNodeWithText("已收到操作反馈").assertDoesNotExist()
         compose.onNodeWithText("目标设备 IP / 主机名").performScrollTo().assertTextContains("127.0.0.2")
         compose.onNodeWithText("ADB 端口").performScrollTo().assertTextContains("5555")
         compose.onNodeWithText("遥控服务端口").performScrollTo().assertTextContains("1")

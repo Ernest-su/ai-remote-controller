@@ -159,9 +159,11 @@ class RemoteExecutionUiTest {
         compose.runOnUiThread { model.text("fixture task") }
         compose.waitUntil(10_000) { model.state.value.feedback.phase == FeedbackPhase.COMPLETE && model.state.value.feedback.text.isNotBlank() }
         compose.onNodeWithTag("open-menu").performClick()
+        compose.onNodeWithText("已收到操作反馈").assertDoesNotExist()
         Thread.sleep(5200)
         compose.activityRule.scenario.recreate()
         compose.onNodeWithTag("navigate-back").performClick()
+        compose.onNodeWithText("已收到操作反馈").assertDoesNotExist()
         compose.onNodeWithTag("remote-feedback").assertDoesNotExist()
         compose.onNodeWithTag("remote-playback").assertExists()
     }

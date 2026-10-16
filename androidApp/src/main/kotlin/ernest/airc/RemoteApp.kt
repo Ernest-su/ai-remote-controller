@@ -40,14 +40,18 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
     val deviceOrigin = RemotePage.valueOf(deviceOriginName)
     val pages = rememberSaveableStateHolder()
     val snackbar = remember { SnackbarHostState() }
+    var lastNoticeRevision by remember { mutableLongStateOf(state.feedback.revision) }
+    LaunchedEffect(page) { snackbar.currentSnackbarData?.dismiss() }
     LaunchedEffect(state.feedback.revision) {
-        if (state.feedback.revision > 0 && page != RemotePage.REMOTE) {
-            when (state.feedback.phase) {
-                FeedbackPhase.ERROR -> snackbar.showSnackbar(state.feedback.text.take(240))
-                FeedbackPhase.COMPLETE -> if (remoteTypes.none { it.page == page }) snackbar.showSnackbar("已收到操作反馈")
-                else -> Unit
-            }
+        val inlineText = when (page) {
+            RemotePage.REMOTE, RemotePage.TEXT -> state.feedback.text
+            RemotePage.DEVICES -> state.status
+            RemotePage.RESULTS -> state.output
+            else -> null
         }
+        val message = state.feedback.snackbarMessage(lastNoticeRevision, inlineText)
+        lastNoticeRevision = state.feedback.revision
+        message?.let { snackbar.showSnackbar(it.take(240)) }
     }
     var selectedTypeName by rememberSaveable { mutableStateOf(RemotePage.REMOTE.name) }
     val isRemoteType = remoteTypes.any { it.page == page }

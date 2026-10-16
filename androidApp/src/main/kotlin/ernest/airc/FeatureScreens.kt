@@ -23,6 +23,10 @@ internal fun TextCommands(state: RemoteUiState, model: RemoteViewModel) {
             TextSubmissionHint(state.connected, state.modelConfigured, state.submitting)
             ActionButton("发送指令", state.connected && state.modelConfigured && !state.submitting && text.isNotBlank()) { if (model.text(text)) { text = ""; focus.clearFocus(); keyboard?.hide() } }
         }
+        if (state.feedback.text.isNotBlank()) Text(state.feedback.phase.label + "：" +
+            if (state.feedback.phase == FeedbackPhase.ERROR) state.feedback.text else if (state.submitting) "请等待指令执行" else "可展开查看操作详情",
+            modifier = Modifier.testTag("text-execution-status"), style = MaterialTheme.typography.bodyMedium,
+            color = if (state.feedback.phase == FeedbackPhase.ERROR) RemoteColors.Warning else RemoteColors.Secondary)
         OperationDetails(state.output)
     }
 }

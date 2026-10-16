@@ -36,14 +36,18 @@ fun DesktopApp(controller: DesktopController, navigation: DesktopNavigation = re
     val state by controller.state.collectAsState()
     val pages = rememberSaveableStateHolder()
     val snackbar = remember { SnackbarHostState() }
+    var lastNoticeRevision by remember { mutableLongStateOf(state.feedback.revision) }
+    LaunchedEffect(navigation.page) { snackbar.currentSnackbarData?.dismiss() }
     LaunchedEffect(state.feedback.revision) {
-        if (state.feedback.revision > 0 && navigation.page != RemotePage.REMOTE) {
-            when (state.feedback.phase) {
-                FeedbackPhase.ERROR -> snackbar.showSnackbar(state.feedback.text.take(240))
-                FeedbackPhase.COMPLETE -> if (navigation.page !in listOf(RemotePage.TOUCHPAD, RemotePage.KEYPAD, RemotePage.GAMEPAD, RemotePage.MEDIA_CONTROL)) snackbar.showSnackbar("已收到操作反馈")
-                else -> Unit
-            }
+        val inlineText = when (navigation.page) {
+            RemotePage.REMOTE, RemotePage.TEXT -> state.feedback.text
+            RemotePage.DEVICES -> state.status
+            RemotePage.RESULTS -> state.output
+            else -> null
         }
+        val message = state.feedback.snackbarMessage(lastNoticeRevision, inlineText)
+        lastNoticeRevision = state.feedback.revision
+        message?.let { snackbar.showSnackbar(it.take(240)) }
     }
     RemoteTheme(darkTheme = themeMode.isDark(isSystemInDarkTheme())) {
         Box(Modifier.fillMaxSize().background(RemoteColors.Background), contentAlignment = Alignment.TopCenter) {
