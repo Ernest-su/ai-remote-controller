@@ -25,7 +25,7 @@ class InputToolsUiTest {
         val server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
-                "/status" -> MockResponse().setBody("""{"version":"0.1.0","protocol":1,"deviceId":"input-tools-fixture","tools":["remote.key","remote.tap","remote.swipe","remote.long_press"]}""")
+                "/status" -> MockResponse().setBody(alignedRuntimeStatusFixture("""{"version":"0.1.0","protocol":1,"deviceId":"input-tools-fixture","tools":["remote.key","remote.tap","remote.swipe","remote.long_press"]}"""))
                 "/ws" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                     override fun onMessage(webSocket: WebSocket, text: String) {
                         val request = Json.decodeFromString<RuntimeRequest>(text)

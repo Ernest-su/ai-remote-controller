@@ -161,10 +161,10 @@ const MESSAGES: &[(&str, &str)] = &[
     ("hat must be -1, 0 or 1", "方向帽轴值必须为 -1、0 或 1"),
     ("gamepad arguments must be object", "手柄参数必须是对象"),
     (
-        "only buttons, x, y and holdMs accepted",
-        "手柄仅接受 buttons、x、y 和 holdMs 参数",
+        "only buttons, x, y, rightX, rightY and holdMs accepted",
+        "手柄仅接受 buttons、x、y、rightX、rightY 和 holdMs 参数",
     ),
-    ("at most four buttons accepted", "最多支持同时按下四个按键"),
+    ("at most six buttons accepted", "最多支持同时按下六个按键"),
     ("unsupported gamepad button", "不支持此手柄按键"),
     (
         "opposite directions cannot be combined",

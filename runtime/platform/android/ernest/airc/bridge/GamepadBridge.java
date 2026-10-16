@@ -26,16 +26,16 @@ public final class GamepadBridge {
     private void key(int code,int action,long down) throws Exception {
         send(new KeyEvent(down,SystemClock.uptimeMillis(),action,code,0,0,-1,0,0,InputDevice.SOURCE_GAMEPAD));
     }
-    private void axes(float x,float y,long down) throws Exception {
+    private void axes(float x,float y,float rightX,float rightY,long down) throws Exception {
         MotionEvent.PointerProperties properties=new MotionEvent.PointerProperties();properties.id=0;properties.toolType=MotionEvent.TOOL_TYPE_UNKNOWN;
-        MotionEvent.PointerCoords coordinates=new MotionEvent.PointerCoords();coordinates.setAxisValue(MotionEvent.AXIS_X,x);coordinates.setAxisValue(MotionEvent.AXIS_Y,y);
+        MotionEvent.PointerCoords coordinates=new MotionEvent.PointerCoords();coordinates.setAxisValue(MotionEvent.AXIS_X,x);coordinates.setAxisValue(MotionEvent.AXIS_Y,y);coordinates.setAxisValue(MotionEvent.AXIS_Z,rightX);coordinates.setAxisValue(MotionEvent.AXIS_RZ,rightY);
         MotionEvent event=MotionEvent.obtain(down,SystemClock.uptimeMillis(),MotionEvent.ACTION_MOVE,1,new MotionEvent.PointerProperties[]{properties},new MotionEvent.PointerCoords[]{coordinates},0,0,1,1,-1,0,InputDevice.SOURCE_JOYSTICK,0);
         try {send(event);} finally {event.recycle();}
     }
     private void release(int[] codes,long down) throws Exception {
         Exception failure=null;
         for(int i=codes.length-1;i>=0;i--)try{key(codes[i],KeyEvent.ACTION_UP,down);}catch(Exception error){failure=error;}
-        try {axes(0,0,down);}catch(Exception error){failure=error;}
+        try {axes(0,0,0,0,down);}catch(Exception error){failure=error;}
         if(failure!=null)throw failure;
     }
     private static boolean allowed(int code) {
@@ -43,18 +43,20 @@ public final class GamepadBridge {
     }
     public static void main(String[] args) {
         try {
-            if(args.length!=5||(!args[0].equals("pulse")&&!args[0].equals("release")))throw new IllegalArgumentException("invalid gamepad bridge operation");
+            if(args.length!=7||(!args[0].equals("pulse")&&!args[0].equals("release")))throw new IllegalArgumentException("invalid gamepad bridge operation");
             String[] values=args[1].isEmpty()?new String[0]:args[1].split(",");
             if(values.length>16)throw new IllegalArgumentException("too many buttons");
             int[] codes=new int[values.length];java.util.HashSet<Integer> seen=new java.util.HashSet<>();
             for(int i=0;i<values.length;i++){codes[i]=Integer.parseInt(values[i]);if(!allowed(codes[i])||!seen.add(codes[i]))throw new IllegalArgumentException("invalid button code");}
             float x=Float.parseFloat(args[2]),y=Float.parseFloat(args[3]);int hold=Integer.parseInt(args[4]);
             if(!Float.isFinite(x)||!Float.isFinite(y)||Math.abs(x)>1||Math.abs(y)>1||hold<10||hold>2000)throw new IllegalArgumentException("invalid axes or hold duration");
+            float rightX=Float.parseFloat(args[5]),rightY=Float.parseFloat(args[6]);
+            if(!Float.isFinite(rightX)||!Float.isFinite(rightY)||Math.abs(rightX)>1||Math.abs(rightY)>1)throw new IllegalArgumentException("invalid right axes");
             GamepadBridge bridge=new GamepadBridge();long down=SystemClock.uptimeMillis();
             if(args[0].equals("release")){bridge.release(codes,down);}
             else {
-                if(codes.length>4)throw new IllegalArgumentException("too many pulse buttons");
-                try {bridge.axes(x,y,down);for(int code:codes)bridge.key(code,KeyEvent.ACTION_DOWN,down);SystemClock.sleep(hold);}
+                if(codes.length>6)throw new IllegalArgumentException("too many pulse buttons");
+                try {bridge.axes(x,y,rightX,rightY,down);for(int code:codes)bridge.key(code,KeyEvent.ACTION_DOWN,down);SystemClock.sleep(hold);}
                 finally {bridge.release(codes,down);}
             }
             System.out.println(new JSONObject().put("submitted",true).put("released",true).put("gameVerified",false).put("sourceGamepad",InputDevice.SOURCE_GAMEPAD).put("sourceJoystick",InputDevice.SOURCE_JOYSTICK).put("elapsedMs",SystemClock.uptimeMillis()-down).toString());

@@ -53,7 +53,7 @@ class GamepadLifecycleTargetTest(private val control:String) {
             compose.onNodeWithTag("remote-type-gamepad").performScrollTo().performClick()
             compose.waitUntil(15000){(!requiresRotation||compose.activity!==before) && compose.activity.lifecycle.currentState==Lifecycle.State.RESUMED && compose.activity.resources.configuration.orientation==Configuration.ORIENTATION_LANDSCAPE}
             compose.waitForIdle()
-            compose.onNodeWithText("开始持续手柄").performScrollTo().performClick()
+            compose.onNodeWithText("开始手柄").performScrollTo().performClick()
             await("virtual device"){model.virtualGamepad.state.value.running&&!model.virtualGamepad.state.value.starting || model.virtualGamepad.state.value.error!=null}
             assertNull(model.virtualGamepad.state.value.error)
             val name=checkNotNull(model.virtualGamepad.state.value.deviceName)
@@ -111,7 +111,7 @@ class GamepadLifecycleTargetTest(private val control:String) {
             if(multiTouch)compose.onRoot().performTouchInput{up(2);up(1);up(0)}
             else if(!combined)input.performTouchInput{up()}
             assertFalse(model.virtualGamepad.state.value.running)
-            compose.onNodeWithText("开始持续手柄").performScrollTo().assertIsEnabled()
+            compose.onNodeWithText("开始手柄").performScrollTo().assertIsEnabled()
         }finally{if(initialized)compose.runOnUiThread{model.virtualGamepad.stop();model.disconnect()};observer.close();id?.let{DeviceStore(instrumentation.targetContext).remove(it)}}
     }
 }

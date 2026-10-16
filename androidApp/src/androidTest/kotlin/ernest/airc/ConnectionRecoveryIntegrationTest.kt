@@ -30,7 +30,7 @@ class ConnectionRecoveryIntegrationTest {
         val server = MockWebServer()
         server.enqueue(MockResponse().setResponseCode(503))
         server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
-        server.enqueue(MockResponse().setBody("""{"version":"0.1.0","protocol":1,"deviceId":"recovery-runtime-fixture","tools":[]}"""))
+        server.enqueue(MockResponse().setBody(alignedRuntimeStatusFixture("""{"version":"0.1.0","protocol":1,"deviceId":"recovery-runtime-fixture","tools":[]}""")))
         server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {}))
         server.start()
         val store = ViewModelStore()

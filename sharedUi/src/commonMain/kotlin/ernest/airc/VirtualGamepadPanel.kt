@@ -36,6 +36,9 @@ fun VirtualGamepadPanel(state: VirtualGamepadState, available: Boolean, onStart:
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (wide) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     StickPad("左摇杆", "left", state.input.leftX, state.input.leftY, enabled) { x, y -> onChange { it.copy(leftX=x,leftY=y) } }
+                    if (dualSticks) Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        GamepadButtons(listOf("select", "start"), state, enabled, onChange)
+                    }
                     if (dualSticks) StickPad("右摇杆", "right", state.input.rightX, state.input.rightY, enabled) { x, y -> onChange { it.copy(rightX=x,rightY=y) } }
                     FaceButtons(state, enabled, onChange)
                 }
@@ -43,30 +46,24 @@ fun VirtualGamepadPanel(state: VirtualGamepadState, available: Boolean, onStart:
                     StickPad("左摇杆", "left", state.input.leftX, state.input.leftY, enabled) { x, y -> onChange { it.copy(leftX=x,leftY=y) } }
                     FaceButtons(state, enabled, onChange)
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                if (!dualSticks) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
                     GamepadButtons(listOf("select", "start"), state, enabled, onChange)
-                }
-                if (!state.running) ActionButton("开始持续手柄", available && !state.starting && !state.stopping, onStart)
-                if (state.running || state.stopping) ActionButton("停止持续手柄", !state.stopping, onStop)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GamepadButtons(virtualGamepadButtons.filter { it !in listOf("a", "b", "x", "y", "start", "select") }, state, enabled, onChange)
                 }
                 if (!dualSticks) StickPad("右摇杆", "right", state.input.rightX, state.input.rightY, enabled) { x, y -> onChange { it.copy(rightX=x,rightY=y) } }
             }
         }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("上" to (0 to -1), "下" to (0 to 1), "左" to (-1 to 0), "右" to (1 to 0)).forEach { (label, axis) ->
-                HoldButton(label, "hat-$label", enabled, if(axis.first != 0) state.input.hatX == axis.first else state.input.hatY == axis.second) { down ->
-                    onChange { old -> if(axis.first != 0) old.copy(hatX = if(down) axis.first else if(old.hatX == axis.first) 0 else old.hatX)
-                        else old.copy(hatY = if(down) axis.second else if(old.hatY == axis.second) 0 else old.hatY) }
-                }
-            }
-        }
-        Text("持续手柄需要 root 与 uinput，输入发送到当前焦点应用。", color = RemoteColors.Secondary)
+        if (!state.running) ActionButton("开始手柄", available && !state.starting && !state.stopping, onStart)
+        if (state.running || state.stopping) ActionButton("停止手柄", !state.stopping, onStop)
+        Text(when {
+            state.stopping -> "正在停止手柄并释放输入。"
+            !state.running -> "开始后自动选择输入方式；非 root 使用合成输入，游戏兼容性需实际核对。"
+            state.mode == "uinput" -> "虚拟手柄已启动。"
+            state.mode == "synthetic" -> "合成输入已启动；按住时重复短时输入，部分游戏可能忽略，连续性与延迟有限。"
+            else -> "正在准备手柄。"
+        }, color = RemoteColors.Secondary)
         if(state.starting || state.stopping) LinearProgressIndicator(Modifier.fillMaxWidth())
         state.error?.let { Text(it, color = RemoteColors.Warning) }
-        if (!available) Text("请连接支持虚拟手柄工具的服务。", color = RemoteColors.Secondary)
-        state.deviceName?.let { Text("设备：$it · 已确认快照 ${state.sequence}", color = RemoteColors.Secondary) }
+        if (!available) Text("请连接支持手柄工具的服务。", color = RemoteColors.Secondary)
         ActionButton("全部释放并回中", enabled) { onChange { VirtualGamepadInput() } }
         Text("按住按钮，松开释放；拖动摇杆，松开回中。无障碍点击按压100ms。离页、后台或断线停止，需手动重启。", color=RemoteColors.Secondary)
     }

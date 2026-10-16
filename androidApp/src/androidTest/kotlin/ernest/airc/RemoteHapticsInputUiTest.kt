@@ -37,7 +37,7 @@ class RemoteHapticsInputUiTest {
         val server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
-                "/status" -> MockResponse().setBody("""{"version":"fixture","protocol":1,"deviceId":"haptics-input-fixture","tools":[],"modelConfigured":false}""")
+                "/status" -> MockResponse().setBody(alignedRuntimeStatusFixture("""{"version":"fixture","protocol":1,"deviceId":"haptics-input-fixture","tools":[],"modelConfigured":false}"""))
                 "/ws" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                     override fun onMessage(socket: WebSocket, text: String) {
                         val id = Json.parseToJsonElement(text).jsonObject.getValue("id")

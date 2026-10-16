@@ -35,6 +35,10 @@ class GamepadOrientationUiTest {
         compose.onNodeWithTag("virtual-stick-right").assertIsDisplayed()
         compose.onNodeWithTag("virtual-button-start").assertIsDisplayed()
         compose.onNodeWithTag("virtual-button-select").assertIsDisplayed()
+        listOf("select", "start").forEach {
+            val node = compose.onNodeWithTag("virtual-button-$it").fetchSemanticsNode()
+            assertTrue("$it must be fully visible in landscape", node.boundsInRoot.height >= node.size.height - 1)
+        }
         assertEquals(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE,compose.activity.requestedOrientation)
         compose.activityRule.scenario.recreate()
         compose.waitForIdle()
@@ -43,24 +47,22 @@ class GamepadOrientationUiTest {
         transition(originalOrientation,original){compose.onNodeWithTag("navigate-back").performClick()}
         compose.onNodeWithTag("remote-types-page").assertIsDisplayed()
     }
-    @Test fun devicePageRoundTripAndSystemBackRestoreOrientationWithDraftRetained(){
+    @Test fun devicePageRoundTripAndSystemBackRestoreOrientationWithNeutralControls(){
         val original=compose.activity.requestedOrientation
         val originalOrientation=compose.activity.resources.configuration.orientation
         compose.onNodeWithTag("open-remote-types").performClick()
         transition(Configuration.ORIENTATION_LANDSCAPE,ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE){
             compose.onNodeWithTag("remote-type-gamepad").performScrollTo().performClick()
         }
-        compose.onNodeWithTag("gamepad-advanced").performScrollTo().performClick()
-        compose.onNodeWithText("300 毫秒").performScrollTo().performClick()
         transition(originalOrientation,original){compose.onNodeWithTag("device-status").performClick()}
         transition(Configuration.ORIENTATION_LANDSCAPE,ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE){compose.onNodeWithTag("navigate-back").performClick()}
-        compose.onNodeWithText("300 毫秒").performScrollTo().assertIsSelected()
+        compose.onNodeWithTag("virtual-button-a").assertIsNotEnabled()
         transition(originalOrientation,original){androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)}
         compose.onNodeWithTag("remote-types-page").assertIsDisplayed()
         transition(Configuration.ORIENTATION_LANDSCAPE,ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE){
             compose.onNodeWithTag("remote-type-gamepad").performScrollTo().performClick()
         }
-        compose.onNodeWithText("300 毫秒").performScrollTo().assertIsSelected()
+        compose.onNodeWithTag("virtual-button-a").assertIsNotEnabled()
         transition(originalOrientation,original){androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)}
     }
 

@@ -92,7 +92,7 @@ object RemoteDimensions {
     val DeviceIcon = 24.dp
     val DeviceSourceIcon = 14.dp
     val GamepadContentWidth = 960.dp
-    val GamepadDualStickMinWidth = 520.dp
+    val GamepadDualStickMinWidth = 560.dp
     val GamepadFaceSize = 176.dp
     val GamepadButtonSize = 56.dp
     val TouchpadMaximumHeight = 240.dp

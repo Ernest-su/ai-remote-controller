@@ -55,4 +55,29 @@ class LanConnectionTest {
         job.cancelAndJoin()
         assertTrue(job.isCancelled)
     }
+    @Test fun sameVersionWithDifferentBytesTriggersUpgradeBeforeConnectionCanBeUsed() = runBlocking {
+        val expected = RuntimeRelease("0.1.0", 1, listOf(RuntimeAsset("arm64-v8a", "runtime", "a".repeat(64), 1)))
+        var actual = RuntimeStatus("0.1.0", 1, "fixture", emptyList(), binarySha256 = "b".repeat(64))
+        val events = mutableListOf<String>()
+        connectLanOrDeploy(target,
+            { requireRuntimeAlignment(actual, expected) },
+            { events += "deploy"; actual = actual.copy(binarySha256 = "a".repeat(64)); requireRuntimeAlignment(actual, expected) },
+            { events += it }, { fail("unexpected manual connection") })
+        assertTrue(events[0].contains("不一致"))
+        assertEquals("deploy", events[1])
+        events.clear()
+        connectLanOrDeploy(target, { requireRuntimeAlignment(actual, expected) }, { fail("already aligned") }, {}, {})
+        assertTrue(events.isEmpty())
+    }
+
+    @Test fun failedUpgradeDoesNotAcceptTheOldService() = runBlocking {
+        var manual: ManualConnectionTarget? = null
+        val old = RuntimeStatus("0.1.0", 1, "fixture", emptyList())
+        assertThrows(IllegalStateException::class.java) { runBlocking {
+            connectLanOrDeploy(target, { throw RuntimeAlignmentRequired(old, "0.1.0") },
+                { error("ADB authorization denied") }, {}, { manual = it })
+        } }
+        assertEquals(target, manual)
+    }
+
 }

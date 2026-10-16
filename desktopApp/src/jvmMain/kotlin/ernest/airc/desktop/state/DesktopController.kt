@@ -14,7 +14,8 @@ class DesktopController(
     store: ModelProfileStore = DesktopProfileStore(defaultStateDirectory()),
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main),
     private val runtime: RuntimeConnection = RuntimeConnection(),
-    private val project: Path = Path.of("").toAbsolutePath(),
+    private val project: Path = generateSequence(Path.of("").toAbsolutePath()) { it.parent }
+        .firstOrNull { it.resolve("android-build-run.sh").toFile().isFile } ?: Path.of("").toAbsolutePath(),
     catalog: ModelCatalog = ModelCatalogClient(),
     private val deviceNames: DesktopDeviceNames = DesktopDeviceNames(defaultStateDirectory()),
 ) : AutoCloseable {
@@ -87,12 +88,26 @@ class DesktopController(
         val previous = forward; forward = null
         if (previous != null) runCatching { adb.removeForward(previous.first, previous.second) }
     }
+    private suspend fun bundledRelease(): RuntimeRelease = withContext(Dispatchers.IO) {
+        val file = project.resolve("androidApp/src/main/assets/runtime/manifest.json").toFile()
+        check(file.isFile) { "缺少配套设备端程序清单，请从项目目录启动并先构建设备端程序" }
+        json.decodeFromString<RuntimeRelease>(file.readText()).also { it.validate(1) }
+    }
     private suspend fun attach(host: String, port: Int, serial: String?, runtimePort: Int = port) {
         generation++; feedbackGeneration++
         appIcons.clear(); screenshots.clear(); files.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear()
         runtime.disconnect()
         mutable.update { it.copy(connected = false, apps = emptyList(), appsLoading = false, appsError = null, deviceInfo = null, status = "正在连接服务…", touchBusy = false) }
-        val status = runtime.connect(host, port)
+        val release = bundledRelease()
+        val status = try { runtime.connect(host, port, release) }
+        catch (e: RuntimeAlignmentRequired) {
+            mutable.update { it.copy(status = "被控端程序与当前控制端不一致，正在升级配套版本…") }
+            val target = serial ?: "$host:5555"
+            if (serial == null) adb.connect(target)
+            val output = adb.deploy(target, runtimePort, state.value.preferRoot, project)
+            mutable.update { it.copy(output = output) }
+            runtime.connect(host, port, bundledRelease())
+        }
         val name = withContext(Dispatchers.IO) { deviceNames.read()[status.deviceId] } ?: status.name ?: "Android 设备"
         mutable.update { it.copy(connected = true, deviceId = status.deviceId, name = name, host = host,
             port = port, runtimePort = runtimePort, serial = serial, version = status.version, uid = status.uid, tools = status.tools,

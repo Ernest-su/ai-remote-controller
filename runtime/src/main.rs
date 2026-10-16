@@ -44,6 +44,7 @@ struct AppState {
     id: String,
     name: String,
     directory: PathBuf,
+    binary_sha256: String,
     config: RwLock<ModelConfig>,
 }
 
@@ -292,10 +293,27 @@ async fn process_messages(
         }
     }
 }
+// Hash the running executable once, rather than a path that may later be replaced.
+fn executable_sha256() -> Result<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    let mut file = std::fs::File::open("/proc/self/exe")?;
+    let mut hash = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        hash.update(&buffer[..count]);
+    }
+    Ok(format!("{:x}", hash.finalize()))
+}
+
 async fn status(State(state): State<Arc<AppState>>) -> Json<Value> {
     let configured = state.config.read().await.validate().is_ok();
     Json(
-        json!({"version":env!("CARGO_PKG_VERSION"),"protocol":1,"deviceId":state.id,"name":state.name,"tools":tools::TOOLS,"modelConfigured":configured,"textToolScope":true,"uid":unsafe { libc::geteuid() }}),
+        json!({"version":env!("CARGO_PKG_VERSION"),"binarySha256":state.binary_sha256,"protocol":1,"deviceId":state.id,"name":state.name,"tools":tools::TOOLS,"modelConfigured":configured,"textToolScope":true,"uid":unsafe { libc::geteuid() }}),
     )
 }
 
@@ -324,6 +342,7 @@ async fn serve(directory: PathBuf, port: u16, enable_mdns: bool) -> Result<()> {
     }
     let state = Arc::new(AppState {
         id: id.clone(),
+        binary_sha256: executable_sha256()?,
         name: name.clone(),
         config: RwLock::new(ModelConfig::load(&directory)?),
         directory: directory.clone(),

@@ -60,7 +60,7 @@ class DesktopCoreTest {
         val server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
-                "/status" -> MockResponse().setBody("""{"version":"fixture","protocol":1,"deviceId":"desktop-fixture","tools":["device.info","remote.key"],"uid":2000}""")
+                "/status" -> MockResponse().setBody(alignedRuntimeStatusFixture("""{"version":"fixture","protocol":1,"deviceId":"desktop-fixture","tools":["device.info","remote.key"],"uid":2000}"""))
                 "/ws" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                     override fun onMessage(socket: WebSocket, text: String) {
                         val request = Json.decodeFromString<RuntimeRequest>(text); calls.add(request)

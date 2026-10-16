@@ -101,4 +101,58 @@ class VirtualGamepadControllerTest {
             assertFalse(controller.state.value.running)
         } finally { scope.cancel() }
     }
+    @Test fun nonRootUsesBothSticksAndAllSixButtonsThenResetsOnStop(): Unit = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val pulses = CopyOnWriteArrayList<JsonObject>()
+        val release = CompletableDeferred<Unit>()
+        var resets = 0
+        val controller = VirtualGamepadController(scope, { tool, args -> when (tool) {
+            "gamepad.virtual_capabilities" -> """{"supported":false,"runtimeUid":2000,"mode":"uinput","reason":"需要 root"}"""
+            "gamepad.pulse" -> {
+                pulses += args
+                release.await()
+                """{"operation":"pulse","submitted":true,"released":true,"sourceGamepad":1025,"sourceJoystick":16777232,"gameVerified":false}"""
+            }
+            "gamepad.reset" -> { resets++; "{}" }
+            else -> error("Non-root must not open a uinput device: $tool")
+        } })
+        try {
+            assertTrue(controller.start(true, allowSynthetic = true))
+            assertEquals("synthetic", controller.state.value.mode)
+            assertTrue(controller.replace(VirtualGamepadInput(
+                buttons = listOf("a", "b", "x", "y", "select", "start"), leftX = .5, rightX = -.75, rightY = 1.0)))
+            withTimeout(2000) { while (pulses.isEmpty()) delay(10) }
+            assertEquals(.5, pulses[0]["x"]!!.jsonPrimitive.double)
+            assertEquals(-.75, pulses[0]["rightX"]!!.jsonPrimitive.double)
+            assertEquals(1.0, pulses[0]["rightY"]!!.jsonPrimitive.double)
+            assertEquals(6, pulses[0]["buttons"]!!.jsonArray.size)
+            controller.stop()
+            assertTrue(controller.state.value.stopping)
+            assertEquals(0, resets, "Release must wait for the in-flight finite transaction")
+            release.complete(Unit)
+            withTimeout(2000) { controller.state.first { !it.stopping } }
+            assertEquals(1, resets)
+            assertEquals(VirtualGamepadInput(), controller.state.value.input)
+            assertEquals(1, pulses.size)
+        } finally { release.complete(Unit); controller.stop(); scope.cancel() }
+    }
+
+    @Test fun syntheticReleaseFailureStopsInputAndReportsError(): Unit = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        var resets = 0
+        val controller = VirtualGamepadController(scope, { tool, _ -> when (tool) {
+            "gamepad.virtual_capabilities" -> """{"supported":false,"runtimeUid":2000,"mode":"uinput"}"""
+            "gamepad.pulse" -> """{"submitted":true,"released":false}"""
+            "gamepad.reset" -> { resets++; "{}" }
+            else -> error(tool)
+        } })
+        try {
+            controller.start(true, allowSynthetic = true)
+            controller.replace(VirtualGamepadInput(rightY = .5))
+            withTimeout(2000) { controller.state.first { !it.running } }
+            assertTrue(controller.state.value.error!!.contains("释放未确认"))
+            assertEquals(1, resets)
+        } finally { controller.stop(); scope.cancel() }
+    }
+
 }

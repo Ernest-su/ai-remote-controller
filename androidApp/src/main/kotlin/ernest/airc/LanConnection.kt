@@ -13,13 +13,15 @@ internal suspend fun connectLanOrDeploy(
     onDeploying: (String) -> Unit,
     onDeploymentFailed: (ManualConnectionTarget) -> Unit,
 ) {
+    var alignmentRequired = false
     try {
         connectRuntime()
         return
     } catch (e: Exception) {
         currentCoroutineContext().ensureActive()
+        alignmentRequired = e is RuntimeAlignmentRequired
     }
-    onDeploying("遥控服务连接失败，正在尝试通过 ADB ${target.host}:${target.adbPort} 自动部署，请在目标设备上允许授权…")
+    onDeploying((if (alignmentRequired) "被控端程序与当前 App 不一致，正在升级配套版本；" else "遥控服务连接失败，") + "正在尝试通过 ADB ${target.host}:${target.adbPort} 自动部署，请在目标设备上允许授权…")
     try {
         deploy()
     } catch (e: Exception) {

@@ -31,16 +31,17 @@ class VirtualGamepadController(
         true
     }
 
-    fun start(available: Boolean): Boolean = synchronized(lock) {
+    fun start(available: Boolean, allowSynthetic: Boolean = false): Boolean = synchronized(lock) {
         if (!available || job != null) return false
         val token = ++generation
         mutable.value = VirtualGamepadState(running = true, starting = true)
-        job = scope.launch(start = CoroutineStart.LAZY) { run(token) }
+        job = scope.launch(start = CoroutineStart.LAZY) { run(token, allowSynthetic) }
         job!!.start()
         true
     }
 
-    private suspend fun run(token: Long) {
+    private suspend fun run(token: Long, allowSynthetic: Boolean) {
+        var synthetic = false
         var id: String? = null
         var guard: (() -> Unit)? = null
         var opened: JsonObject? = null
@@ -55,6 +56,42 @@ class VirtualGamepadController(
                 send("gamepad.virtual_capabilities", buildJsonObject {})
             }).jsonObject
             guard()
+            if (allowSynthetic && capability["supported"]?.jsonPrimitive?.boolean == false &&
+                capability["runtimeUid"]?.jsonPrimitive?.int != null &&
+                capability["mode"]?.jsonPrimitive?.content == "uinput") {
+                synthetic = true
+                synchronized(lock) {
+                    if (token == generation) mutable.update { it.copy(starting = false, mode = "synthetic") }
+                }
+                var sequence = 0L
+                var sent = VirtualGamepadInput()
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    guard()
+                    val input = synchronized(lock) { state.value.input }
+                    val pulse = GamepadPulse(input.buttons, input.leftX, input.leftY, 100, input.rightX, input.rightY)
+                    val tool = if (pulse.valid()) "gamepad.pulse" else "gamepad.reset"
+                    if (pulse.valid() || input != sent) {
+                        val args = if (tool == "gamepad.pulse") json.encodeToJsonElement(GamepadPulse.serializer(), pulse).jsonObject
+                            else buildJsonObject {}
+                        // Finish each finite transaction before cleanup or another snapshot.
+                        val reply = Json.parseToJsonElement(withContext(NonCancellable) {
+                            withTimeout(5000) { send(tool, args) }
+                        }).jsonObject
+                        guard()
+                        check(reply["submitted"]?.jsonPrimitive?.boolean == true &&
+                            reply["released"]?.jsonPrimitive?.boolean == true &&
+                            reply["sourceGamepad"]?.jsonPrimitive?.int == 1025 &&
+                            reply["sourceJoystick"]?.jsonPrimitive?.int == 16777232 &&
+                            reply["operation"]?.jsonPrimitive?.content == tool.substringAfter('.') &&
+                            reply["gameVerified"]?.jsonPrimitive?.boolean == false) { "手柄输入响应不匹配或释放未确认" }
+                        sent = input
+                        sequence++
+                        synchronized(lock) { if (token == generation) mutable.update { it.copy(sequence = sequence) } }
+                    }
+                    delay(33)
+                }
+            }
             check(capability["supported"]?.jsonPrimitive?.boolean == true &&
                 capability["runtimeUid"]?.jsonPrimitive?.int == 0 &&
                 capability["mode"]?.jsonPrimitive?.content == "uinput") {
@@ -81,7 +118,7 @@ class VirtualGamepadController(
             currentCoroutineContext().ensureActive()
             synchronized(lock) {
                 if (token == generation) mutable.update {
-                    it.copy(starting = false, deviceName = session["deviceName"]?.jsonPrimitive?.content)
+                    it.copy(starting = false, mode = "uinput", deviceName = session["deviceName"]?.jsonPrimitive?.content)
                 }
             }
             var sent: VirtualGamepadInput? = null
@@ -116,6 +153,11 @@ class VirtualGamepadController(
         catch (error: Exception) {
             synchronized(lock) { if (token == generation) mutable.update { it.copy(error = error.message ?: "虚拟手柄失败") } }
         } finally {
+            if (synthetic && guard != null) withContext(NonCancellable) {
+                withTimeoutOrNull(5000) {
+                    runCatching { guard(); send("gamepad.reset", buildJsonObject {}) }
+                }
+            }
             if (id != null && guard != null) withContext(NonCancellable) {
                 withTimeoutOrNull(5000) {
                     runCatching {

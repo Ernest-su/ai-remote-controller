@@ -181,7 +181,7 @@ apps.list 保持 apps 数组兼容旧控制端，增加 source、labelsAvailable
 
 单帧最多 16 MiB、32M 像素，边长最多 16384；间隔 500..5000 毫秒、时长 10..120 秒。无历史帧队列，不追赶补帧；实际间隔包含捕获和消费耗时。捕获失败终止流；停止/断开取消命令进程组并释放读取资源。恶意或停滞的读取者可能延迟资源释放，需关闭旧读取连接再开始；服务重启清空所有会话，无自动续流。
 
-`gamepad.pulse {buttons?,x?,y?,holdMs?}` 是 10..2000 毫秒的有限输入事务，默认100，按钮最多四个、轴值 -1..1。`gamepad.reset {}` 提交全部受控合成按键抬起与零轴。工具响应包含 `operation:pulse|reset,submitted,released,sourceGamepad:1025,sourceJoystick:16777232,elapsedMs,gameVerified:false`；released 只确认系统队列接受释放。请求中止不取消已接受的在途事务，按钮/轴状态不落盘。输入拒绝或释放失败返回错误；服务强制终止不保证释放。详见[手柄工具](reference/tools.md#gamepad)。
+`gamepad.pulse {buttons?,x?,y?,rightX?,rightY?,holdMs?}` 是 10..2000 毫秒的有限输入事务，默认100，按钮最多六个、轴值 -1..1。`gamepad.reset {}` 提交全部受控合成按键抬起与零轴。工具响应包含 `operation:pulse|reset,submitted,released,sourceGamepad:1025,sourceJoystick:16777232,elapsedMs,gameVerified:false`；released 只确认系统队列接受释放。请求中止不取消已接受的在途事务，按钮/轴状态不落盘。输入拒绝或释放失败返回错误；服务强制终止不保证释放。详见[手柄工具](reference/tools.md#gamepad)。
 
 应用缓存清理为独立提案/确认流程：`apps.clear_cache {package}` 返回 `{id,kind:app_cache_clear,app,approvalRequired:true,cacheOnly:true,mode:package_manager_cache_only}`；模型只能准备或查询 `apps.cache_pending`。人工 `approve_cache` 拒绝或提交不可取消的缓存长任务。`apps.cache_capabilities` 只读探测；未明确声明 cache-only、缺少 INTERNAL_DELETE_CACHE_FILES 或 UID 不适用时拒绝，不执行数据清除 fallback。任务结果不提供回收字节，不宣称全面的数据保留验证。
 
@@ -261,3 +261,5 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 模型提供商 message.role 必须为 assistant；tool_calls 只接受缺省、null 或数组。错误类型不能降级为正文答案，避免畸形调用消息进入会话历史。
 
 模型 remote_key 不允许 power，即使请求 allowedTools 包含 remote.key 也拒绝该参数；模型应通过系统提案和 App 确认处理锁屏/重启/关机。直接工具 remote.key 的用户手动电源键仍保持原能力。此检查仅约束该明确的按键入口，不是目标 GUI 行为的通用权限隔离。
+
+`GET /status` 的 `binarySha256` 为服务启动时读取自身运行中可执行文件得到的 SHA-256，启动后缓存；它不读取可能被替换的部署路径。控制端在建立 WebSocket 前对比配套清单的版本与摘要，不匹配或缺少摘要时先部署配套程序，再次校验通过后连接。

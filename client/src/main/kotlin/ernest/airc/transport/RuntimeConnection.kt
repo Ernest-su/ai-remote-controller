@@ -45,17 +45,18 @@ class RuntimeConnection(private val language: () -> String = { java.util.Locale.
             .scheme("http").host(host).port(port).encodedPath(path).build()
     }
 
-    suspend fun status(host: String, port: Int): RuntimeStatus =
+    suspend fun status(host: String, port: Int, validateProtocol: Boolean = true): RuntimeStatus =
         execute(client.newCall(Request.Builder().url(url(host, port, "/status")).header("Accept-Language", languageHeader()).build())) {
             check(it.isSuccessful) { "状态查询失败 HTTP ${it.code}" }
             json.decodeFromString<RuntimeStatus>(it.body!!.string()).also { status ->
-                check(status.protocol == PROTOCOL_VERSION) { "不兼容的服务协议 ${status.protocol}" }
+                check(!validateProtocol || status.protocol == PROTOCOL_VERSION) { "不兼容的服务协议 ${status.protocol}" }
             }
         }
 
-    suspend fun connect(host: String, port: Int): RuntimeStatus {
+    suspend fun connect(host: String, port: Int, expectedRelease: RuntimeRelease? = null): RuntimeStatus {
         val generation=synchronized(stateLock) { disconnect();currentGeneration }
-        val status = status(host, port)
+        val status = status(host, port, validateProtocol = expectedRelease == null)
+        if (expectedRelease != null) requireRuntimeAlignment(status, expectedRelease)
         val opened = CompletableDeferred<Unit>()
         synchronized(stateLock) {
         check(generation==currentGeneration) { "目标连接已改变" }

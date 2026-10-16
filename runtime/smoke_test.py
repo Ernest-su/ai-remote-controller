@@ -4,6 +4,7 @@ Run after cargo build: python3 runtime/smoke_test.py
 Requires the Python websockets package.
 """
 import asyncio
+import hashlib
 import json
 import os
 import pathlib
@@ -29,6 +30,7 @@ async def verify(port):
             await asyncio.sleep(0.05)
     else:
         raise AssertionError("runtime did not become ready")
+    assert status["binarySha256"] == hashlib.sha256(binary.read_bytes()).hexdigest()
     assert status["protocol"] == 1
     assert status["uid"] == os.geteuid(), status
     assert "remote.key" in status["tools"]

@@ -19,15 +19,18 @@ class RuntimeInstaller(
 ) {
     companion object { const val DIRECTORY = "/data/local/tmp/airc"; const val BINARY = "$DIRECTORY/airc-runtime" }
     private val json = Json { ignoreUnknownKeys = true }
+    fun bundledRelease(): RuntimeRelease = try {
+        context.assets.open("runtime/manifest.json").bufferedReader().use { json.decodeFromString<RuntimeRelease>(it.readText()) }
+            .also { it.validate(BuildConfig.VERSION_CODE) }
+    } catch (e: Exception) { throw IllegalStateException("当前安装包未包含有效的设备端程序，请安装完整版本", e) }
+
     suspend fun install(client: AdbClient, releaseUrl: String? = null, runtimePort: Int = 9876, preferRoot: Boolean = false, report: (String) -> Unit): RuntimeRelease = withContext(Dispatchers.IO) {
         require(runtimePort in 1..65535)
         val privilege = access(client, preferRoot)
         report(if (preferRoot && !privilege.useRoot) "root 不可用，使用 ADB shell" else "运行权限：${privilege.description}")
         val operation = currentCoroutineContext()
         val repository = repositoryFactory(java.io.File(context.cacheDir, "runtime-releases"))
-        val release = if (!releaseUrl.isNullOrBlank()) repository.release(releaseUrl, BuildConfig.VERSION_CODE) else try {
-            context.assets.open("runtime/manifest.json").bufferedReader().use { json.decodeFromString<RuntimeRelease>(it.readText()) }
-        } catch (e: Exception) { throw IllegalStateException("当前安装包未包含设备端程序，请安装完整版本", e) }
+        val release = if (!releaseUrl.isNullOrBlank()) repository.release(releaseUrl, BuildConfig.VERSION_CODE) else bundledRelease()
         release.validate(BuildConfig.VERSION_CODE)
         val abis = client.shell("getprop ro.product.cpu.abilist").text().trim().split(',')
         val asset = release.selectAsset(abis)

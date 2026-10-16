@@ -63,7 +63,7 @@ iOS/鸿蒙目前没有实现。共享模型不依赖 Android UI；新增平台�
 
 屏幕捕获复用 screen_capture 的单捕获锁与 PNG 限额；单张结果仍由 artifacts 保存，连续预览由 screen_preview 单会话 registry 和 HTTP Body 背压驱动，无驻留目标 APK、帧队列或 WebSocket 图像负载。客户端帧解析/HTTP 读取/控制器分别放在 client 的 transfer/state，共享 ScreenPreviewPanel 负责展示，平台层仅解码图像并在退出时停止。
 
-GamepadBridge 是随二进制嵌入的短时输入适配，标准 GAMEPAD 键与 JOYSTICK 轴通过系统输入管理器提交。Rust gamepad 模块校验并以单名额独立 task 运行有限事务；请求 future 被丢弃时不 abort task，服务关闭等待释放路径。client GamepadController 校验输入/响应及连接代次，共享 GamepadPanel 仅编辑草稿与明确发送；不引入目标常驻 APK 或 Java 服务。
+GamepadBridge 是随二进制嵌入的短时输入适配，标准 GAMEPAD 键与 JOYSTICK 轴通过系统输入管理器提交。Rust gamepad 模块校验并以单名额独立 task 运行有限事务；请求 future 被丢弃时不 abort task，服务关闭等待释放路径。client GamepadController 校验输入/响应及连接代次，共享 GamepadPanel 使用统一双摇杆和六键布局，非 root 通过串行有限事务驱动，root/uinput 使用虚拟设备快照；不引入目标常驻 APK 或 Java 服务。
 
 应用缓存处理在 app_actions/cache 独立管理提案、权限检查、身份核对和只带 cache-only 标志的包管理器任务。CachePermissionBridge 只读取当前 caller 的内部缓存权限，不授予权限或执行删除；模型只能准备/查询，approve_cache 由客户端人工确认。客户端 AppCacheController 与共享 AppCachePanel 独立于卸载流程。
 

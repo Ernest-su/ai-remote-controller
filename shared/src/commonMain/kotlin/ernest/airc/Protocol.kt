@@ -64,6 +64,7 @@ data class RuntimeStatus(
     val modelConfigured: Boolean = false,
     val uid: Int? = null,
     val textToolScope: Boolean = false,
+    val binarySha256: String? = null,
 )
 
 /** Pure shared logic; actual storage and networking belong to platform adapters. */

@@ -46,13 +46,13 @@ class DesktopUiTest {
         compose.onNodeWithText("卸载并删除数据").assertDoesNotExist()
         compose.onNodeWithText("取消").performClick();assertEquals(false,accepted)
     }
-    @Test fun gamepadActionsAreDisabledOfflineButDraftSelectionRemainsAvailable() {
-        compose.setContent { RemoteTheme { GamepadPanel(GamepadControlState(),false,{fail("Offline pulse")},{fail("Offline reset")}) } }
-        compose.onNodeWithTag("gamepad-advanced").performScrollTo().performClick()
-        compose.onNodeWithTag("gamepad-a").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithTag("gamepad-combine-a").performScrollTo().performClick().assertIsSelected()
-        compose.onNodeWithText("发送组合与摇杆").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithText("释放按钮并回中").performScrollTo().assertIsNotEnabled()
+    @Test fun gamepadActionsAreDisabledOffline() {
+        compose.setContent { RemoteTheme { GamepadPanel(VirtualGamepadState(), false,
+            { fail("Offline start") }, { fail("Offline stop") }, { fail("Offline input") }) } }
+        compose.onNodeWithTag("virtual-button-a").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("开始手柄").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("全部释放并回中").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("gamepad-advanced").assertDoesNotExist()
     }
     @Test fun screenPreviewIsManualAndCannotStartOffline() {
         compose.setContent { RemoteTheme { PageContent { ScreenPreviewPanel(ScreenPreviewState(),null,false,{ fail("Offline preview started") },{}) } } }

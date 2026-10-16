@@ -36,6 +36,8 @@ debug APK 输出为 `androidApp/build/outputs/apk/debug/androidApp-debug.apk`，
 
 普通按键使用独立遥控通道和预热输入桥接，不受媒体查询或文件操作排队影响。若提示按键结果不确定，请先核对目标状态；服务仅尝试释放按键，不会自动重复按下。
 
+连接时自动核对被控服务的版本与二进制摘要，不匹配时通过 ADB 更新配套程序并重新连接，保留现有配置；ADB 未授权或更新失败时不会继续使用旧服务。版本与摘要均匹配时直接复用连接。
+
 目标程序默认安装到 `/data/local/tmp/airc/airc-runtime`，服务端口默认 `9876`，默认以 ADB shell 身份运行。在「功能 → 运行权限」可选择优先 root；只在目标已支持并授权时使用，不为目标获取 root。
 
 若部署提示端口被占用，请先核实并停止占用进程，再重试；残留 root 服务需要 root 权限停止。不要删除程序或状态目录来代替停止服务。处理方法见[设备端服务与更新](guide/services.md)。
@@ -73,3 +75,5 @@ debug APK 输出为 `androidApp/build/outputs/apk/debug/androidApp-debug.apk`，
 Android 动态预览可直接触摸操作目标，通过“全屏预览”放大画面并展开悬浮遥控；两种模式均保持原比例。详见[设备截图与动态预览](guide/screenshots.md#screen-mirror)。
 
 “目标文件”提供列表/网格、目录内搜索与分类、长按选择和底部快捷操作；上传及删除沿用独立确认与任务进度。详见[目标文件管理](guide/files.md)。
+
+游戏手柄在 root 与非 root 下使用相同的左右摇杆、X/Y/A/B、SELECT/START 布局，连接后点击“开始手柄”。root/uinput 可用时创建虚拟设备，非 root 使用重复短时合成输入，连续性与游戏兼容性有限。详见[游戏手柄](guide/gamepad.md)。

@@ -27,7 +27,7 @@ class GamepadTargetTest {
             adb.command("-s",serial,"shell","am start -W -n $pkg/.GamepadActivity")
             withTimeout(5000){while(runCatching{adb.command("-s",serial,"shell","run-as $pkg test -f files/gamepad-ready")}.isFailure)delay(50)}
             runtime.connect("127.0.0.1",port)
-            assertTrue(controller.pulse(GamepadPulse(listOf("a","r1"),0.5,-0.75,300),true))
+            assertTrue(controller.pulse(GamepadPulse(listOf("a","r1"),0.5,-0.75,300,rightX=-0.25,rightY=1.0),true))
             val done=withTimeout(15000){controller.state.first{!it.busy}};assertNull(done.error)
             var observed=emptyList<JsonObject>()
             val first=try {withTimeout(5000){observed=events();while(observed.size<6){delay(100);observed=events()};observed}}
@@ -41,6 +41,8 @@ class GamepadTargetTest {
             assertTrue(motion.all{it.int("source")==16777232&&it.int("action")==2&&it.int("deviceId")==-1})
             assertEquals(0.5,motion[0]["x"]!!.jsonPrimitive.double);assertEquals(-0.75,motion[0]["y"]!!.jsonPrimitive.double)
             assertEquals(0.0,motion[1]["x"]!!.jsonPrimitive.double);assertEquals(0.0,motion[1]["y"]!!.jsonPrimitive.double)
+            assertEquals(-0.25,motion[0]["z"]!!.jsonPrimitive.double);assertEquals(1.0,motion[0]["rz"]!!.jsonPrimitive.double)
+            assertEquals(0.0,motion[1]["z"]!!.jsonPrimitive.double);assertEquals(0.0,motion[1]["rz"]!!.jsonPrimitive.double)
             assertFails{runtime.request("tool","gamepad.pulse",buildJsonObject{put("buttons",buildJsonArray{add("power")})})}
             assertEquals(first.size,events().size)
 

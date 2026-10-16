@@ -16,7 +16,7 @@ class VirtualGamepadUiTest {
         compose.setContent { RemoteTheme { PageContent {
             VirtualGamepadPanel(VirtualGamepadState(),false,{submitted=true},{},{submitted=true})
         } } }
-        compose.onNodeWithText("开始持续手柄").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("开始手柄").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithTag("virtual-button-a").performScrollTo().assertIsNotEnabled()
         assertFalse(submitted)
     }
@@ -32,7 +32,7 @@ class VirtualGamepadUiTest {
         compose.runOnIdle { org.junit.Assert.assertTrue(state.input.buttons.isEmpty()) }
     }
 
-    @Test fun faceButtonsFormDiamondAndExtendedInputsRemainAvailable() {
+    @Test fun faceButtonsFormDiamondAndOnlyRequestedControlsRemain() {
         compose.setContent { RemoteTheme { PageContent {
             VirtualGamepadPanel(VirtualGamepadState(), false, {}, {}, {})
         } } }
@@ -43,9 +43,12 @@ class VirtualGamepadUiTest {
         val b = compose.onNodeWithTag("virtual-button-b").fetchSemanticsNode().boundsInRoot.center
         org.junit.Assert.assertTrue(y.y < x.y && x.y < a.y)
         org.junit.Assert.assertTrue(x.x < y.x && y.x < b.x)
-        listOf("start", "select", "l1", "r1").forEach {
+        listOf("start", "select").forEach {
             compose.onNodeWithTag("virtual-button-$it").performScrollTo().assertIsNotEnabled()
         }
         compose.onNodeWithTag("virtual-stick-right").performScrollTo().assertExists()
+        listOf("l1", "r1", "l2", "r2", "thumb_l", "thumb_r", "hat-上", "hat-下", "hat-左", "hat-右").forEach {
+            compose.onNodeWithTag("virtual-button-$it").assertDoesNotExist()
+        }
     }
 }

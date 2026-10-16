@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SUITES = {
     "remote-haptics-input-ui": ("ernest.airc.RemoteHapticsInputUiTest", 4),
     "remote-haptics-ui": ("ernest.airc.RemoteHapticsUiTest", 1),
-    "lan-connection-ui": ("ernest.airc.LanConnectionUiTest", 2),
+    "lan-connection-ui": ("ernest.airc.LanConnectionUiTest", 3),
     "appearance": ("ernest.airc.AppearanceUiTest", 2),
     "management-ui": ("ernest.airc.ManagementUiTest", 12),
     "app-packages-ui": ("ernest.airc.AppPackagesUiTest", 2),

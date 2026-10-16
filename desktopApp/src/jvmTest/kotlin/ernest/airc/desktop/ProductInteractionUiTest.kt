@@ -79,7 +79,7 @@ class ProductInteractionUiTest {
         compose.setContent { RemoteTheme {
             PageContent { VirtualGamepadPanel(VirtualGamepadState(starting = true), true, {}, {}, {}) }
         } }
-        compose.onNodeWithText("开始持续手柄").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithText("开始手柄").performScrollTo().assertIsNotEnabled()
     }
 
     @Test fun largeTextSettingHasOneControlAndCanWrap() {

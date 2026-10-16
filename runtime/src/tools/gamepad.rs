@@ -34,9 +34,9 @@ fn arguments(args: &Value) -> Result<Vec<String>> {
         .context("gamepad arguments must be object")?;
     if object
         .keys()
-        .any(|key| !["buttons", "x", "y", "holdMs"].contains(&key.as_str()))
+        .any(|key| !["buttons", "x", "y", "rightX", "rightY", "holdMs"].contains(&key.as_str()))
     {
-        bail!("only buttons, x, y and holdMs accepted");
+        bail!("only buttons, x, y, rightX, rightY and holdMs accepted");
     }
     let empty = vec![];
     let buttons = args
@@ -44,8 +44,8 @@ fn arguments(args: &Value) -> Result<Vec<String>> {
         .map(|value| value.as_array().context("buttons must be array"))
         .transpose()?
         .unwrap_or(&empty);
-    if buttons.len() > 4 {
-        bail!("at most four buttons accepted");
+    if buttons.len() > 6 {
+        bail!("at most six buttons accepted");
     }
     let mut names = std::collections::BTreeSet::new();
     let mut codes = vec![];
@@ -79,6 +79,8 @@ fn arguments(args: &Value) -> Result<Vec<String>> {
     };
     let x = axis("x")?;
     let y = axis("y")?;
+    let right_x = axis("rightX")?;
+    let right_y = axis("rightY")?;
     let hold = args
         .get("holdMs")
         .map(|value| value.as_u64().context("holdMs must be integer"))
@@ -87,7 +89,7 @@ fn arguments(args: &Value) -> Result<Vec<String>> {
     if !(10..=2000).contains(&hold) {
         bail!("holdMs must be 10..2000");
     }
-    if buttons.is_empty() && x == 0.0 && y == 0.0 {
+    if buttons.is_empty() && x == 0.0 && y == 0.0 && right_x == 0.0 && right_y == 0.0 {
         bail!("pulse must include buttons or nonzero axes; use gamepad.reset");
     }
     Ok(vec![
@@ -95,6 +97,8 @@ fn arguments(args: &Value) -> Result<Vec<String>> {
         x.to_string(),
         y.to_string(),
         hold.to_string(),
+        right_x.to_string(),
+        right_y.to_string(),
     ])
 }
 async fn owned<F>(work: F) -> Result<String>
@@ -121,6 +125,8 @@ pub(super) async fn execute(tool: &str, args: &Value) -> Result<String> {
             "0".into(),
             "0".into(),
             "100".into(),
+            "0".into(),
+            "0".into(),
         ]
     } else {
         arguments(args)?
@@ -175,7 +181,7 @@ mod tests {
     fn controlled_buttons_axes_and_timings_reject_arbitrary_injection() {
         assert_eq!(
             arguments(&json!({"buttons":["a","r1"],"x":0.5,"y":-1,"holdMs":300})).unwrap(),
-            vec!["96,103", "0.5", "-1", "300"]
+            vec!["96,103", "0.5", "-1", "300", "0", "0"]
         );
         for args in [
             json!({}),
@@ -189,6 +195,19 @@ mod tests {
         ] {
             assert!(arguments(&args).is_err());
         }
+    }
+    #[test]
+    fn dual_sticks_and_six_buttons_are_validated_and_forwarded() {
+        assert_eq!(
+            arguments(
+                &json!({"buttons":["a","b","x","y","select","start"],"rightX":-0.5,"rightY":1})
+            )
+            .unwrap(),
+            vec!["96,97,99,100,109,108", "0", "0", "100", "-0.5", "1"]
+        );
+        assert!(arguments(&json!({"rightX":1.1})).is_err());
+        assert!(arguments(&json!({"rightY":"1"})).is_err());
+        assert!(arguments(&json!({"buttons":["a","b","x","y","select","start","l1"]})).is_err());
     }
     #[tokio::test]
     async fn dropped_request_does_not_abort_owned_completion() {

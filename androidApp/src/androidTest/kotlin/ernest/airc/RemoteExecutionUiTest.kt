@@ -40,7 +40,7 @@ class RemoteExecutionUiTest {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 languages.add(request.getHeader("Accept-Language"))
                 return when (request.path) {
-                    "/status" -> MockResponse().setBody("""{"version":"0.1.0","protocol":1,"deviceId":"ui-preview-fixture","name":"客厅电视","tools":[],"modelConfigured":true,"uid":2000}""")
+                    "/status" -> MockResponse().setBody(alignedRuntimeStatusFixture("""{"version":"0.1.0","protocol":1,"deviceId":"ui-preview-fixture","name":"客厅电视","tools":[],"modelConfigured":true,"uid":2000}"""))
                     "/ws" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                         override fun onMessage(webSocket: WebSocket, text: String) {
                             val message = Json.parseToJsonElement(text).jsonObject
@@ -77,7 +77,7 @@ class RemoteExecutionUiTest {
         val servers=listOf(MockWebServer(),MockWebServer())
         for ((index,server) in servers.withIndex()) {
             server.dispatcher=object:Dispatcher(){override fun dispatch(request:RecordedRequest):MockResponse=when(request.path){
-                "/status"->MockResponse().setBody("""{"version":"fixture","protocol":1,"deviceId":"ui-preview-fixture","tools":[],"modelConfigured":true}""")
+                "/status"->MockResponse().setBody(alignedRuntimeStatusFixture("""{"version":"fixture","protocol":1,"deviceId":"ui-preview-fixture","tools":[],"modelConfigured":true}"""))
                 "/ws"->MockResponse().withWebSocketUpgrade(object:WebSocketListener(){override fun onMessage(socket:WebSocket,text:String){
                     val request=Json.parseToJsonElement(text).jsonObject
                     if(index==0){oldStarted.complete(Unit);return}

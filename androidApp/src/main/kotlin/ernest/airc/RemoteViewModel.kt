@@ -243,16 +243,23 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
             // A successful ADB session survives an interrupted or failed deployment.
             val history = withContext(Dispatchers.IO) { store.remember(adbRecord) }
             mutable.update { it.copy(history = history) }
-            installer.install(session.client, releaseUrl, runtimePort, state.value.preferRoot) { message -> mutable.update { it.copy(status = message) } }
+            val release = installer.install(session.client, releaseUrl, runtimePort, state.value.preferRoot) { message -> mutable.update { it.copy(status = message) } }
             mutable.update { it.copy(status = "启动目标服务…") }
             val actualPort = installer.start(session.client, runtimePort, state.value.preferRoot)
-            attachRuntime(session.host, actualPort, method, session.port, session.guid, model, previousId = adbRecord.id)
+            try {
+                attachRuntime(session.host, actualPort, method, session.port, session.guid, model, previousId = adbRecord.id, expectedRelease = release)
+            } catch (e: RuntimeAlignmentRequired) {
+                // The file may already be current while an older executable is still running.
+                mutable.update { it.copy(status = "目标文件已对齐，正在重启旧服务…") }
+                val restartedPort = installer.restart(session.client, actualPort, state.value.preferRoot)
+                attachRuntime(session.host, restartedPort, method, session.port, session.guid, model, previousId = adbRecord.id, expectedRelease = release)
+            }
         } catch (e: Exception) { session.close(); if (adb === session) adb = null; throw e }
     }
 
-    private suspend fun attachRuntime(host: String, port: Int, method: ConnectionMethod?, adbPort: Int?, guid: String?, model: String?, previousId: String? = null) {
+    private suspend fun attachRuntime(host: String, port: Int, method: ConnectionMethod?, adbPort: Int?, guid: String?, model: String?, previousId: String? = null, expectedRelease: RuntimeRelease? = null) {
         appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear()
-        val status = runtime.connect(host, port)
+        val status = runtime.connect(host, port, expectedRelease ?: withContext(Dispatchers.IO) { installer.bundledRelease() })
         val previous = state.value.history.find { it.id == status.deviceId }
         val record = RememberedDevice(status.deviceId, model?.ifBlank { null } ?: previous?.name ?: status.name ?: "AI 设备",
             method ?: previous?.method ?: ConnectionMethod.TCP, host, adbPort ?: previous?.adbPort,
@@ -270,7 +277,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
 
     fun reconnect(device: RememberedDevice) = connection {
         adb?.close(); adb = null
-        // Healthy LAN service reuse avoids ADB pairing and deployment for every reconnect.
+        // Reuse LAN only after its running bytes match the bundled release.
         val live = state.value.discovered.find { it.attributes["id"] == device.id }
         val host = live?.host ?: device.host ?: error("没有保存目标地址")
         val port = live?.port ?: device.runtimePort ?: 9876
@@ -450,6 +457,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     private suspend fun restartSelectedService() {
         val session = selectedAdb()
         val record = state.value.history.find { it.id == state.value.selected } ?: error("请先选择目标设备")
+        installer.install(session.client, runtimePort = record.runtimePort ?: 9876, preferRoot = state.value.preferRoot) { message -> mutable.update { it.copy(status = message) } }
         val port = installer.restart(session.client, record.runtimePort ?: 9876, state.value.preferRoot)
         attachRuntime(session.host, port, record.method, session.port, session.guid, record.name)
     }

@@ -23,5 +23,6 @@ data class VirtualGamepadState(
     val input: VirtualGamepadInput = VirtualGamepadInput(),
     val sequence: Long = 0,
     val deviceName: String? = null,
+    val mode: String? = null,
     val error: String? = null,
 )

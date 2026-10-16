@@ -29,7 +29,7 @@ class QueuedDesktopActionsTest {
         val oldPollingStarted=CompletableDeferred<Unit>()
         val servers=listOf(MockWebServer(),MockWebServer())
         for(server in servers) {
-            server.enqueue(MockResponse().setBody("""{"version":"fixture","protocol":1,"deviceId":"same-id","tools":["remote.tap"],"modelConfigured":true}"""))
+            server.enqueue(MockResponse().setBody(alignedRuntimeStatusFixture("""{"version":"fixture","protocol":1,"deviceId":"same-id","tools":["remote.tap"],"modelConfigured":true}""")))
             server.enqueue(MockResponse().withWebSocketUpgrade(object:WebSocketListener(){
                 override fun onMessage(webSocket:WebSocket,text:String){
                     val request=Json.parseToJsonElement(text).jsonObject

@@ -42,7 +42,7 @@ class VirtualGamepadComposeTargetTest {
             } } }
             controller.connectLan("127.0.0.1",checkNotNull(target.port))
             assertEquals(0,withTimeout(7000){controller.state.first{it.connected}}.uid)
-            compose.onNodeWithText("开始持续手柄").performScrollTo().performClick()
+            compose.onNodeWithText("开始手柄").performScrollTo().performClick()
             val active=withTimeout(7000){controller.virtualGamepad.state.first{it.running&&!it.starting}}
             var name=checkNotNull(active.deviceName);delay(700)
             val a=compose.onNodeWithTag("virtual-button-a")
@@ -71,7 +71,7 @@ class VirtualGamepadComposeTargetTest {
             assertFalse(controller.virtualGamepad.state.value.running,"Focus restoration restarted input")
             target.awaitRemoved(name)
             val previous=name
-            compose.onNodeWithText("开始持续手柄").performScrollTo().performClick()
+            compose.onNodeWithText("开始手柄").performScrollTo().performClick()
             name=checkNotNull(withTimeout(7000){controller.virtualGamepad.state.first{it.running&&!it.starting&&it.deviceName!=previous}}.deviceName)
             delay(700)
             val b=compose.onNodeWithTag("virtual-button-b")

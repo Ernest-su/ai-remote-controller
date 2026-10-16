@@ -38,7 +38,7 @@ class ModelProfilesUiTest {
         val server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
-                "/status" -> MockResponse().setBody("""{"version":"0.1.0","protocol":1,"deviceId":"model-profile-fixture","tools":[]}""")
+                "/status" -> MockResponse().setBody(alignedRuntimeStatusFixture("""{"version":"0.1.0","protocol":1,"deviceId":"model-profile-fixture","tools":[]}"""))
                 "/v1/models" -> MockResponse().setBody("""{"data":[{"id":"Model-B"},{"id":"Model-A"}]}""")
                 "/ws" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                     override fun onMessage(webSocket: WebSocket, text: String) {

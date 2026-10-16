@@ -170,11 +170,11 @@ apps.list / apps_list 优先通过短时框架桥接读取当前 Android 用户�
 
 ## 有限手柄输入 {#gamepad}
 
-`gamepad.pulse` / 模型 `gamepad_pulse` 接受 `buttons`（最多四个且不重复）、X/Y `x,y`（有限浮点数 -1..1，默认0）及 `holdMs`（10..2000，默认100）。按钮白名单：a/b/x/y/l1/r1/l2/r2/start/select/thumb_l/thumb_r/up/down/left/right；相反方向不能组合。空且零轴拒绝。受控代码映射、参数与时长在 Rust 校验，不接受 shell 字符串或任意事件/设备 ID。
+`gamepad.pulse` / 模型 `gamepad_pulse` 接受 `buttons`（最多六个且不重复）、X/Y `x,y`（有限浮点数 -1..1，默认0），右摇杆 `rightX,rightY`（Z/RZ，同范围，默认0）及 `holdMs`（10..2000，默认100）。按钮白名单：a/b/x/y/l1/r1/l2/r2/start/select/thumb_l/thumb_r/up/down/left/right；相反方向不能组合。空且零轴拒绝。受控代码映射、参数与时长在 Rust 校验，不接受 shell 字符串或任意事件/设备 ID。
 
-单事务经 GamepadBridge 提交 GAMEPAD KeyEvent 按下、JOYSTICK AXIS_X/Y、持有时间、逆序抬起和回中，虚拟设备 ID=-1。操作在独立、单名额的 Rust task 中完成，请求断开不取消释放；错误另行重试释放，服务正常关闭等待在途事务。`gamepad.reset` / 模型 `gamepad_reset` 只接受空对象，等待在途事务释放名额（最多20秒）后提交白名单全部按键抬起与回中，不操作物理控制器 ID。响应 `submitted/released:true` 仅表示注入队列接受输入和释放，`gameVerified:false`，不宣称游戏实际消费。
+单事务经 GamepadBridge 提交 GAMEPAD KeyEvent 按下、JOYSTICK AXIS_X/Y/Z/RZ、持有时间、逆序抬起和回中，虚拟设备 ID=-1。操作在独立、单名额的 Rust task 中完成，请求断开不取消释放；错误另行重试释放，服务正常关闭等待在途事务。`gamepad.reset` / 模型 `gamepad_reset` 只接受空对象，等待在途事务释放名额（最多20秒）后提交白名单全部按键抬起与回中，不操作物理控制器 ID。响应 `submitted/released:true` 仅表示注入队列接受输入和释放，`gameVerified:false`，不宣称游戏实际消费。
 
-标准来源定义见 [Android InputDevice](https://developer.android.com/reference/android/view/InputDevice)。未注册硬件轴范围、右摇杆或连续低延迟输入，真实消费需另测。
+标准来源定义见 [Android InputDevice](https://developer.android.com/reference/android/view/InputDevice)。合成输入未注册硬件轴范围，不保证连续低延迟输入，真实消费需另测。
 
 ## 应用缓存清理 {#app-cache}
 
