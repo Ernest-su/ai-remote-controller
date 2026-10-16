@@ -55,9 +55,14 @@ class ScreenMirrorLifecycleTargetTest {
             await("connection"){model.state.value.connected&&!model.state.value.busy}
             compose.onNodeWithTag("open-menu").performClick()
             compose.onNodeWithTag("feature-screenshot").performScrollTo().performClick()
-            compose.onNodeWithText("开始屏幕镜像").performScrollTo().performClick()
             await("decoded frame"){(model.ascrcpyPreview.state.value as? ScrcpyState.Streaming)?.renderedFrames?.let{it>0}==true||model.ascrcpyPreview.state.value is ScrcpyState.Failed}
             assertTrue("Actual preview state: ${model.ascrcpyPreview.state.value}",model.ascrcpyPreview.state.value is ScrcpyState.Streaming)
+            repeat(2) {
+                compose.onNodeWithTag("mirror-fullscreen").performScrollTo().performClick()
+                await("fullscreen preview"){(model.ascrcpyPreview.state.value as? ScrcpyState.Streaming)?.renderedFrames?.let{it>0}==true}
+                compose.onNodeWithText("退出全屏").performClick()
+                await("inline preview"){(model.ascrcpyPreview.state.value as? ScrcpyState.Streaming)?.renderedFrames?.let{it>0}==true}
+            }
             val beforeBackground=previewView()
             compose.runOnUiThread{assertTrue(compose.activity.moveTaskToBack(true))}
             await("background lifecycle"){!compose.activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)}
@@ -104,7 +109,6 @@ class ScreenMirrorLifecycleTargetTest {
             compose.onNodeWithTag("open-menu").performClick()
             compose.onNodeWithTag("feature-screenshot").performScrollTo().performClick()
             compose.onNodeWithText("1920 · 8 Mbps · 60 fps").performScrollTo().assertExists()
-            compose.onNodeWithText("开始屏幕镜像").performScrollTo().performClick()
             await("decoded frame"){(model.ascrcpyPreview.state.value as? ScrcpyState.Streaming)?.renderedFrames?.let{it>0}==true||model.ascrcpyPreview.state.value is ScrcpyState.Failed}
             assertTrue("Actual preview state: ${model.ascrcpyPreview.state.value}",model.ascrcpyPreview.state.value is ScrcpyState.Streaming)
             val before=compose.activity

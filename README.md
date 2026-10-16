@@ -60,7 +60,7 @@ Android 控制端与 JVM 桌面测试工具，共享协议与设备记录位于 
 
 视觉规范参考[微信官方 WeUI](https://github.com/Tencent/weui)，项目约束见[视觉与交互规范](docs/development/visual-guidelines.md)；ADB 依赖 [ernest-su/adb](https://github.com/ernest-su/adb)。
 
-设备截图支持手动捕获、预览、保存 PNG，手机可系统分享；参见[截图指南](docs/guide/screenshots.md)。
+设备预览支持手动捕获、预览、保存 PNG，手机可系统分享；参见[截图指南](docs/guide/screenshots.md)。
 
 ## 许可证与正式发布
 

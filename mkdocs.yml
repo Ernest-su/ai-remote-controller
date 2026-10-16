@@ -50,8 +50,8 @@ nav:
       - 连接设备: guide/connections.md
       - 桌面测试工具: guide/desktop.md
       - 遥控与文字: guide/remote.md
-      - 设备截图: guide/screenshots.md
-      - 目标文件: guide/files.md
+      - 设备预览: guide/screenshots.md
+      - 文件管理: guide/files.md
       - 媒体投送: guide/media.md
       - 游戏手柄: guide/gamepad.md
       - 应用缓存: guide/cache.md

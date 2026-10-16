@@ -26,6 +26,8 @@ internal object ManagementIcons {
         path(fill = null, stroke = SolidColor(Color.Black), strokeLineWidth = 1.7f,
             strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round, pathBuilder = draw)
     }.build()
+    val Upload = vector("Upload") { moveTo(12f,16f);lineTo(12f,3f);moveTo(7f,8f);lineTo(12f,3f);lineTo(17f,8f);moveTo(3f,15f);lineTo(3f,21f);lineTo(21f,21f);lineTo(21f,15f) }
+    val Storage = vector("Storage") { moveTo(4f,20f);lineTo(4f,12f);lineTo(8f,12f);lineTo(8f,20f);close();moveTo(10f,20f);lineTo(10f,4f);lineTo(14f,4f);lineTo(14f,20f);close();moveTo(16f,20f);lineTo(16f,8f);lineTo(20f,8f);lineTo(20f,20f);close() }
     val Image = vector("Image") { moveTo(3f,4f);lineTo(21f,4f);lineTo(21f,20f);lineTo(3f,20f);close();moveTo(3f,17f);lineTo(9f,11f);lineTo(14f,16f);lineTo(17f,13f);lineTo(21f,17f);moveTo(16f,8f);lineTo(16.1f,8f) }
     val List = vector("List") { moveTo(4f,6f);lineTo(6f,6f);moveTo(10f,6f);lineTo(20f,6f);moveTo(4f,12f);lineTo(6f,12f);moveTo(10f,12f);lineTo(20f,12f);moveTo(4f,18f);lineTo(6f,18f);moveTo(10f,18f);lineTo(20f,18f) }
     val Search = vector("Search") { moveTo(17f,17f); lineTo(21f,21f); moveTo(11f,4f); curveTo(20f,4f,20f,18f,11f,18f); curveTo(2f,18f,2f,4f,11f,4f); close() }

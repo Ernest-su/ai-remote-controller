@@ -59,7 +59,7 @@ class ManagementUiTest {
         assertEquals("notes.txt",deleted)
         compose.onNodeWithTag("files-tools-dialog-close").performClick()
         compose.onNodeWithTag("files-clear-selection").performClick()
-        compose.onNodeWithText("上传文件").assertIsDisplayed()
+        compose.onNodeWithContentDescription("上传文件").assertIsDisplayed()
     }
 
     @Test fun hiddenFilesAndGridPreferenceSurviveRestoration() {

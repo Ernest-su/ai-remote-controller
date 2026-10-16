@@ -61,9 +61,9 @@ debug APK 输出为 `androidApp/build/outputs/apk/debug/androidApp-debug.apk`，
 | 右上角连接状态 | 设备连接、显示名、断开与网络诊断 |
 | 右上角遥控器类型 | 标准遥控器、触控板、数字键盘、播放控制与游戏手柄 |
 | 功能 → 应用管理 | 搜索、启动、应用信息及确认后的缓存清理/卸载 |
-| 功能 → 设备截图 | [截图保存、分享与动态预览](guide/screenshots.md) |
-| 功能 → 目标文件 | [浏览、上传、下载、目录、APK 与存储分析](guide/files.md) |
-| 目标文件 → 媒体 | [目标播放器、HTTP 媒体流与本地播放副本](guide/media.md) |
+| 功能 → 设备预览 | [截图保存、分享与动态预览](guide/screenshots.md) |
+| 功能 → 文件管理 | [浏览、上传、下载、目录、APK 与存储分析](guide/files.md) |
+| 文件管理 → 媒体 | [目标播放器、HTTP 媒体流与本地播放副本](guide/media.md) |
 | 功能 → 设备信息 | 只读系统与硬件信息、[电源观察与系统管理](guide/system.md) |
 | 功能 → 设置 | 跟随系统、亮色或暗色，以及遥控按键震动开关（点按短震、长按弱震、松开或取消即停，同键重复按下会清理旧计时，快速连按不延续长按反馈），离线可修改并本地保存 |
 | 功能 → 服务管理 | [查询、更新、重启和停止服务](guide/services.md)，需要已保存的 ADB 连接 |
@@ -72,9 +72,9 @@ debug APK 输出为 `androidApp/build/outputs/apk/debug/androidApp-debug.apk`，
 
 桌面联调可从项目目录运行 `./gradlew :desktopApp:run --no-daemon`，使用宿主机 adb；操作与限制见[桌面指南](guide/desktop.md)。遇到问题先阅读[故障排查](troubleshooting.md)。
 
-Android 动态预览可直接触摸操作目标，通过“全屏预览”放大画面并展开悬浮遥控；两种模式均保持原比例。详见[设备截图与动态预览](guide/screenshots.md#screen-mirror)。
+Android 进入“设备预览”后自动开启动态预览，可直接触摸操作目标，通过画面右上角全屏图标放大画面并展开悬浮遥控；两种模式均保持原比例，切换后持续或自动恢复预览。详见[设备预览与动态预览](guide/screenshots.md#screen-mirror)。
 
-“目标文件”提供列表/网格、目录内搜索与分类、长按选择和底部快捷操作；上传及删除沿用独立确认与任务进度。详见[目标文件管理](guide/files.md)。
+“文件管理”提供列表/网格、目录内搜索与分类、长按选择和底部快捷操作；上传及删除沿用独立确认与任务进度。详见[目标文件管理](guide/files.md)。
 
 游戏手柄在 root 与非 root 下使用相同的左右摇杆、X/Y/A/B、SELECT/START 布局，连接后点击“开始手柄”。root/uinput 可用时创建虚拟设备，非 root 使用重复短时合成输入，连续性与游戏兼容性有限。详见[游戏手柄](guide/gamepad.md)。
 

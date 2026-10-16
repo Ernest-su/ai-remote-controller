@@ -13,8 +13,9 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun ScreenshotPanel(image: ImageBitmap?, loading: Boolean, available: Boolean, error: String?,
     onCapture: () -> Unit, onSave: () -> Unit, onShare: (() -> Unit)? = null, preview: (@Composable () -> Unit)? = null, unavailableMessage: String = "请连接支持截图工具的服务。") = PageContent(Modifier.testTag("screenshot-page")) {
+    preview?.invoke()
     Panel {
-        SectionTitle("设备截图", "获取目标当前画面，可刷新、保存；此功能不是实时投屏。")
+        SectionTitle("单张截图", "获取目标当前画面，可刷新、保存。")
         ActionButton(if (loading) "正在获取截图…" else "获取 / 刷新截图", available && !loading, onCapture)
         if (!available) Text(unavailableMessage, color = RemoteColors.Secondary)
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -25,5 +26,4 @@ fun ScreenshotPanel(image: ImageBitmap?, loading: Boolean, available: Boolean, e
             onShare?.let { share -> OutlinedButton(share, enabled = !loading, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("分享截图") } }
         } else if (!loading) Text("尚未获取截图。", color = RemoteColors.Secondary)
     }
-    preview?.invoke()
 }

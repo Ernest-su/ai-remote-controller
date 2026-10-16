@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.testTag
 import kotlin.math.roundToInt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -24,18 +25,31 @@ import ernest.ascrcpy.scrcpy.ScrcpyState
     val surfaceEpoch by model.ascrcpyPreview.surfaceEpoch.collectAsState()
     val shot by model.screenshots.state.collectAsState()
     var surface by remember{mutableStateOf<Surface?>(null)}
+    var autoStarted by rememberSaveable { mutableStateOf(false) }
+    var previewWanted by remember { mutableStateOf(!autoStarted) }
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     var foreground by remember(lifecycle){mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))}
     DisposableEffect(lifecycle,model){
         val observer=LifecycleEventObserver{_,event->
             foreground=lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
-            if(event==Lifecycle.Event.ON_PAUSE||event==Lifecycle.Event.ON_STOP)model.ascrcpyPreview.stop()
+            if(event==Lifecycle.Event.ON_PAUSE||event==Lifecycle.Event.ON_STOP) {
+                previewWanted=false
+                model.ascrcpyPreview.stop()
+            }
         }
         lifecycle.addObserver(observer)
         onDispose{lifecycle.removeObserver(observer);model.ascrcpyPreview.stop()}
     }
     val active=mirror !is ScrcpyState.Idle && mirror !is ScrcpyState.Failed
     val available=foreground&&state.connected&&!state.busy&&!shot.loading
+    LaunchedEffect(surface, available, mirror, previewWanted) {
+        if (previewWanted && available && mirror is ScrcpyState.Idle) {
+            surface?.takeIf { it.isValid }?.let {
+                autoStarted = true
+                model.ascrcpyPreview.start(it)
+            }
+        }
+    }
     val size=(mirror as? ScrcpyState.Streaming)?.videoSize
     val ratio=size?.let{it.width.toFloat()/it.height} ?: (16f/9f)
     var showResults by remember { mutableStateOf(false) }
@@ -58,6 +72,13 @@ import ernest.ascrcpy.scrcpy.ScrcpyState
             MirrorSurface(surfaceEpoch,active,ratio,onSurface={surface=it},onDestroyed=model.ascrcpyPreview::stop,
                 modifier=Modifier.width(videoWidth),
                 onTouch=if(available && mirror is ScrcpyState.Streaming) model.ascrcpyPreview::touch else null)
+            if(!fullscreen) {
+                Surface(Modifier.align(Alignment.TopEnd), color=RemoteColors.Surface, shape=MaterialTheme.shapes.small) {
+                    IconButton({ onFullscreen(true) },enabled=active,modifier=Modifier.size(48.dp).testTag("mirror-fullscreen")) {
+                        Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_fullscreen),"全屏预览",Modifier.size(24.dp),tint=if(active) RemoteColors.Action else RemoteColors.Disabled)
+                    }
+                }
+            }
             if(fullscreen) {
                 val panelWidth=minOf(maxWidth,RemoteDimensions.MirrorRemoteWidth)
                 val panelHeight=if(expanded) maxHeight else 48.dp
@@ -81,9 +102,8 @@ import ernest.ascrcpy.scrcpy.ScrcpyState
             }
         }
         if(!fullscreen) {
-            ActionButton("开始屏幕镜像",available&&!active&&surface?.isValid==true){surface?.takeIf{it.isValid}?.let{model.ascrcpyPreview.start(it)}}
-            if(active)ActionButton("停止屏幕镜像",true,model.ascrcpyPreview::stop)
-            ActionButton("全屏预览",active) { onFullscreen(true) }
+            ActionButton("开始屏幕镜像",available&&!active&&surface?.isValid==true){previewWanted=true;autoStarted=true;surface?.takeIf{it.isValid}?.let{model.ascrcpyPreview.start(it)}}
+            if(active)ActionButton("停止屏幕镜像",true) { previewWanted=false;model.ascrcpyPreview.stop() }
             when(val value=mirror){
                 ScrcpyState.Idle->Text("通过设备页记录的 ADB 连接开始动态预览。",color=RemoteColors.Secondary)
                 is ScrcpyState.Failed->Text(value.cause.message ?: "动态预览失败",color=RemoteColors.Warning)

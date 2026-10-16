@@ -20,6 +20,19 @@ import java.util.concurrent.atomic.AtomicReference
 /** Controlled connection failure with real Android Surface lifecycle; no remote actions. */
 class MirrorSurfaceUiTest {
     @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
+    @Test fun enteringPreviewAutomaticallyStartsOnceAndKeepsFailureForRetry() {
+        lateinit var model: RemoteViewModel
+        compose.runOnUiThread { model=androidx.lifecycle.ViewModelProvider(compose.activity)[RemoteViewModel::class.java] }
+        compose.setContent { RemoteTheme {
+            AndroidScreenMirror(RemoteUiState(connected=true),model)
+        } }
+        compose.waitUntil(10000) { model.ascrcpyPreview.state.value is ScrcpyState.Failed }
+        val failure=model.ascrcpyPreview.state.value
+        compose.waitForIdle()
+        assertSame(failure,model.ascrcpyPreview.state.value)
+        compose.onNodeWithTag("mirror-fullscreen").assertIsNotEnabled()
+        compose.onNodeWithText("开始屏幕镜像").assertIsEnabled()
+    }
     @Test fun fullScreenRelocationKeepsSurfaceAndTouchCoordinates() {
         val current=AtomicReference<Surface?>()
         var fullscreen by mutableStateOf(false)

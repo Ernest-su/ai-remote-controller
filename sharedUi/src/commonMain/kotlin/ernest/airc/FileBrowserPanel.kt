@@ -1,5 +1,7 @@
 package ernest.airc
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -120,17 +122,17 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                 Surface(color = RemoteColors.Surface, shape = MaterialTheme.shapes.small) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         ManagementIconButton(ManagementIcons.Up, "上一级", enabled && state.path.isNotEmpty(), "files-parent", onParent)
-                        FlowRow(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                        Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
                             val segments = state.path.split('/').filter { it.isNotEmpty() }
                             TextButton({ onNavigate?.invoke("") }, enabled = enabled && segments.isNotEmpty() && onNavigate != null,
                                 colors = ButtonDefaults.textButtonColors(disabledContentColor = RemoteColors.Text),
-                                modifier = Modifier.heightIn(min = 48.dp).testTag("files-path-root")) { Text(fileRootTitle(state.root), style = MaterialTheme.typography.bodyMedium) }
+                                modifier = Modifier.heightIn(min = 48.dp).testTag("files-path-root")) { Text(fileRootTitle(state.root), style = MaterialTheme.typography.bodyMedium, maxLines = 1, softWrap = false) }
                             segments.forEachIndexed { index, segment ->
                                 Icon(ManagementIcons.Next, null, Modifier.height(48.dp).width(16.dp), tint = RemoteColors.Secondary)
                                 TextButton({ onNavigate?.invoke(segments.take(index + 1).joinToString("/")) },
                                     enabled = enabled && index != segments.lastIndex && onNavigate != null,
                                     colors = ButtonDefaults.textButtonColors(disabledContentColor = RemoteColors.Text),
-                                    modifier = Modifier.heightIn(min = 48.dp).testTag("files-path-$index")) { Text(segment, style = MaterialTheme.typography.bodyMedium) }
+                                    modifier = Modifier.heightIn(min = 48.dp).testTag("files-path-$index")) { Text(segment, style = MaterialTheme.typography.bodyMedium, maxLines = 1, softWrap = false) }
                             }
                         }
                         onCreateDirectory?.let { ManagementIconButton(ManagementIcons.AddFolder, "新建目录", directoryAvailable && !state.loading, "files-create-directory") { showDirectory = true } }
@@ -207,9 +209,9 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                         onDelete?.let { action -> TextButton({tools("transfer"){action(selected)}},enabled=enabled,modifier=Modifier.heightIn(min=48.dp),colors=ButtonDefaults.textButtonColors(contentColor=RemoteColors.Warning)) {Text("删除") } }
                     }
                 } else FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                    TextButton({tools("transfer")},modifier=Modifier.heightIn(min=48.dp)) {Text("上传文件")}
-                    onCreateDirectory?.let { TextButton({showDirectory=true},enabled=directoryAvailable && !state.loading,modifier=Modifier.heightIn(min=48.dp)) {Text("新建目录") } }
-                    TextButton({tools("storage")},modifier=Modifier.heightIn(min=48.dp)) {Text("存储分析")}
+                    ManagementIconButton(ManagementIcons.Upload,"上传文件",tag="files-upload") { tools("transfer") }
+                    onCreateDirectory?.let { ManagementIconButton(ManagementIcons.AddFolder,"新建目录",directoryAvailable && !state.loading,"files-create-directory-bottom") { showDirectory=true } }
+                    ManagementIconButton(ManagementIcons.Storage,"存储分析",tag="files-storage") { tools("storage") }
                 }
             }
         }

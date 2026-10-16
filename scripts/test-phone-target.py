@@ -24,7 +24,7 @@ SUITES = {
     "models": ("ernest.airc.ModelProfilesUiTest", 1),
     "model-sync": ("ernest.airc.ModelProfileSyncTargetTest", 1),
     "gamepad-lifecycle": ("ernest.airc.GamepadLifecycleTargetTest", 5),
-    "mirror-surface-ui": ("ernest.airc.MirrorSurfaceUiTest", 4),
+    "mirror-surface-ui": ("ernest.airc.MirrorSurfaceUiTest", 5),
     "mirror-ui": ("ernest.airc.RemoteNavigationUiTest#dynamicSurfaceRecreatesWithoutStartingOfflineCapture,ernest.airc.RemoteNavigationUiTest#ascrcpyAppParametersSurviveRotationAndReturnWithoutCapture,ernest.airc.RemoteNavigationUiTest#ascrcpyReplacesLegacyPngPreviewAfterRotation", 3),
     "ascrcpy": ("ernest.airc.AscrcpyPreviewTargetTest", 4),
     "files": ("ernest.airc.FileTransferTargetTest", 1),
