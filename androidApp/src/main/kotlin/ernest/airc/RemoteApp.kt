@@ -58,6 +58,8 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
     val isRemoteType = remoteTypes.any { it.page == page }
     fun navigate(target: RemotePage) {
         if (target == page) return
+        // A fresh visit starts preview; Activity recreation retains its stopped state.
+        if (page == RemotePage.SCREENSHOT) pages.removeState(RemotePage.SCREENSHOT.name)
         if (target == RemotePage.DEVICES) deviceOriginName = page.name
         if (remoteTypes.any { it.page == target }) selectedTypeName = target.name
         pageName = target.name

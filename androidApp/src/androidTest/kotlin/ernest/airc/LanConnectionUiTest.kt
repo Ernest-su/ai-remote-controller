@@ -11,6 +11,60 @@ import org.junit.Test
 class LanConnectionUiTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
+    @Test fun startupConnectsLastSuccessfulDeviceAndUnexpectedLossReconnectsUntilExplicitDisconnect() {
+        val context=androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val history=context.getSharedPreferences("devices",0)
+        val preferences=context.getSharedPreferences("runtime-release",0)
+        val originalHistory=history.getString("history",null)
+        val originalLast=preferences.getString("last-connected-device",null)
+        val sockets=java.util.concurrent.CopyOnWriteArrayList<okhttp3.WebSocket>()
+        val connections=java.util.concurrent.atomic.AtomicInteger()
+        val server=okhttp3.mockwebserver.MockWebServer()
+        server.dispatcher=object:okhttp3.mockwebserver.Dispatcher() {
+            override fun dispatch(request:okhttp3.mockwebserver.RecordedRequest)=when(request.path) {
+                "/status" -> {
+                    connections.incrementAndGet()
+                    okhttp3.mockwebserver.MockResponse().setBody(alignedRuntimeStatusFixture(
+                        """{"version":"fixture","protocol":1,"deviceId":"automatic-connection-fixture","tools":[]}"""))
+                }
+                "/ws" -> okhttp3.mockwebserver.MockResponse().withWebSocketUpgrade(object:okhttp3.WebSocketListener() {
+                    override fun onOpen(socket:okhttp3.WebSocket,response:okhttp3.Response) { sockets.add(socket) }
+                    override fun onMessage(socket:okhttp3.WebSocket,text:String) {
+                        val request=kotlinx.serialization.json.Json.parseToJsonElement(text) as kotlinx.serialization.json.JsonObject
+                        socket.send("""{"id":${request["id"]},"protocol":1,"ok":true,"result":""}""")
+                    }
+                })
+                else -> okhttp3.mockwebserver.MockResponse().setResponseCode(404)
+            }
+        }
+        val owner=androidx.lifecycle.ViewModelStore()
+        lateinit var model:RemoteViewModel
+        try {
+            server.start()
+            val record=RememberedDevice("automatic-connection-fixture","fixture",ConnectionMethod.TCP,
+                "127.0.0.1",runtimePort=server.port,lastConnectedAt=System.currentTimeMillis())
+            DeviceStore(context).remember(record)
+            preferences.edit().putString("last-connected-device",record.id).commit()
+            compose.runOnUiThread {
+                model=androidx.lifecycle.ViewModelProvider(owner,androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory(
+                    compose.activity.application))[RemoteViewModel::class.java]
+            }
+            compose.waitUntil(10000) { model.state.value.connected && !model.state.value.busy && sockets.size==1 }
+            assertEquals(record.id,model.state.value.selected)
+            assertTrue(sockets[0].close(1012,"fixture service restart"))
+            compose.waitUntil(10000) { connections.get()==2 && sockets.size==2 && model.state.value.connected && !model.state.value.busy }
+            compose.runOnUiThread { model.disconnect() }
+            compose.waitUntil(10000) { !model.state.value.connected }
+            Thread.sleep(3500)
+            assertEquals(2,connections.get())
+        } finally {
+            compose.runOnUiThread { owner.clear() }
+            server.shutdown()
+            history.edit().apply { if(originalHistory==null)remove("history")else putString("history",originalHistory) }.commit()
+            preferences.edit().apply { if(originalLast==null)remove("last-connected-device")else putString("last-connected-device",originalLast) }.commit()
+        }
+    }
+
     @Test fun failedLanDeploymentPrefillsFormAndPreservesEditedDraftAfterRecreation() {
         lateinit var model: RemoteViewModel
         compose.runOnUiThread { model = ViewModelProvider(compose.activity)[RemoteViewModel::class.java] }

@@ -127,13 +127,24 @@ class ManagementUiTest {
 
     @Test fun breadcrumbAndFullRootRequireExplicitActions() {
         var path = "unset"; var root = "downloads"
-        compose.setContent { RemoteTheme { FileBrowserPanel(FileBrowserState(path = "one/two", loaded = true), true, {}, {}, {}, {}, {},
-            onRoot = { root = it }, onNavigate = { path = it }) } }
+        var location by mutableStateOf("one/two")
+        compose.setContent { RemoteTheme { Box(Modifier.width(320.dp)) {
+            FileBrowserPanel(FileBrowserState(path = location, loaded = true), true, {}, {}, {}, {}, {},
+                onRoot = { root = it }, onNavigate = { path = it })
+        } } }
         compose.onNodeWithTag("files-path-0").performClick(); assertEquals("one", path)
         compose.onNodeWithTag("files-root-full").performClick(); assertEquals("downloads", root)
         compose.onNodeWithText("取消").performClick(); assertEquals("downloads", root)
         compose.onNodeWithTag("files-root-full").performClick()
         compose.onNodeWithText("进入").performClick(); assertEquals("full", root)
+        compose.runOnIdle { location="one/long-folder-name/two/another-long-folder/current" }
+        compose.onNodeWithTag("files-path-4").performScrollTo().assertIsDisplayed()
+        val last=compose.onNodeWithTag("files-path-4").getUnclippedBoundsInRoot()
+        compose.onNodeWithTag("files-path-0").performScrollTo().assertIsDisplayed().performClick()
+        val first=compose.onNodeWithTag("files-path-0").getUnclippedBoundsInRoot()
+        assertEquals(first.top.value,last.top.value,1f)
+        assertEquals((first.bottom-first.top).value,(last.bottom-last.top).value,1f)
+        assertEquals("one",path)
     }
 
     @Test fun offlineFileActionsAreDisabledAndCachedRowsRemainReadable() {
@@ -207,7 +218,7 @@ class ManagementUiTest {
             CompositionLocalProvider(LocalDensity provides Density(density.density, if (large.value) 1.6f else 1f)) {
                 RemoteTheme(dark.value) { Surface(color = RemoteColors.Background, modifier = Modifier.fillMaxSize()) {
                     Column(Modifier.widthIn(max = if (large.value) 320.dp else 360.dp)) {
-                        Text(if (files.value) "目标文件" else "应用管理", Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge)
+                        Text(if (files.value) "文件管理" else "应用管理", Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge)
                         if (files.value) FileBrowserPanel(FileBrowserState(entries = entries, loaded = true), true, {}, {}, {}, {}, {}, onRoot = {}, onCreateDirectory = {})
                         else ApplicationsPanel(apps, true, false, null, "", {}, {}, onInspect = {})
                     }

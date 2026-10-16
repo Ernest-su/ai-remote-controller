@@ -71,6 +71,22 @@ class RemoteExecutionUiTest {
             DeviceStore(InstrumentationRegistry.getInstrumentation().targetContext).remove("ui-preview-fixture")
         }
     }
+    @Test fun everyPreviewVisitAutomaticallyStartsButLeavingStopsCapture() = withPreview { model, _ ->
+        repeat(2) {
+            compose.onNodeWithTag("open-menu").let { menu -> if(it==0) menu.performClick() }
+            compose.onNodeWithTag("feature-screenshot").performScrollTo().performClick()
+            // This runtime-only fixture has no saved ADB port: attempting preview must fail once.
+            try {
+                compose.waitUntil(10000) { model.ascrcpyPreview.state.value is ernest.ascrcpy.scrcpy.ScrcpyState.Failed }
+            } catch(error: Exception) {
+                throw AssertionError("Visit $it: preview=${model.ascrcpyPreview.state.value}, connected=${model.state.value.connected}, busy=${model.state.value.busy}",error)
+            }
+            compose.onNodeWithTag("navigate-back").performClick()
+            compose.waitForIdle()
+            assertEquals(ernest.ascrcpy.scrcpy.ScrcpyState.Idle,model.ascrcpyPreview.state.value)
+        }
+    }
+
     @Test fun mediaPollingResumesAfterReplacingAnUnansweredQuery()=withPreview { model, _ ->
         val oldStarted=CompletableDeferred<Unit>()
         val nextStarted=CompletableDeferred<Unit>()
