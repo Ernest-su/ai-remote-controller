@@ -1,0 +1,1913 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Android AI 遥控器、目标设备 runtime 与开发文档">
+      
+      
+      
+        <link rel="canonical" href="https://Ernest-su.github.io/ai-remote-controller/development/visual-guidelines/">
+      
+      
+        <link rel="prev" href="../architecture/">
+      
+      
+        <link rel="next" href="../build/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>视觉与交互约束 - AI 遥控 · AIRC</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#_1" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../.." title="AI 遥控 · AIRC" class="md-header__button md-logo" aria-label="AI 遥控 · AIRC" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            AI 遥控 · AIRC
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              视觉与交互约束
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="切换深色模式"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="切换深色模式" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="切换浅色模式"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="切换浅色模式" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Ernest-su/ai-remote-controller" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Ernest-su/ai-remote-controller
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="AI 遥控 · AIRC" class="md-nav__button md-logo" aria-label="AI 遥控 · AIRC" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    AI 遥控 · AIRC
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Ernest-su/ai-remote-controller" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Ernest-su/ai-remote-controller
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快速开始
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    使用指南
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    使用指南
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    连接设备
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/desktop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    桌面测试工具
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/remote/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    遥控与文字
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/screenshots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    设备截图
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    目标文件
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/media/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    媒体投送
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/gamepad/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    游戏手柄
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    应用缓存
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    模型配置
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/services/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    服务与更新
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/system/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    系统管理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    故障排查
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    参考
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    参考
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    设备端协议
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    工具
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发与贡献
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    开发与贡献
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    参与贡献
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    架构
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    视觉与交互约束
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    视觉与交互约束
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        官方参考与适配边界
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        颜色与字体
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="颜色与字体">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        外观模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        产品界面信息层级
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        尺寸与组件
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        导航与功能分配
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        手势、反馈与验收
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        系统管理确认
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        文件与应用管理
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        表单可用性与稳定布局
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    构建
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    测试
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../device-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    设备验证方法
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    签名与发布
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    文档维护
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    项目
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    项目
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../implementation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    实现概览
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        官方参考与适配边界
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        颜色与字体
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="颜色与字体">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        外观模式
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        产品界面信息层级
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        尺寸与组件
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        导航与功能分配
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        手势、反馈与验收
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        系统管理确认
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        文件与应用管理
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        表单可用性与稳定布局
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="_1">遥控应用视觉与交互约束<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
+<p>本文件是 AIRC Android 界面的约束来源，修改界面时必须遵循；仓库根目录 <code>AGENTS.md</code> 与贡献指南均指向本页。</p>
+<h2 id="_2">官方参考与适配边界<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<p>参考微信官方设计团队的 <a href="https://github.com/Tencent/weui">WeUI</a> 与 <a href="https://github.com/weui/WeUI-Design">WeUI-Design</a>，核对日期为 2026-10-12。WeUI 面向微信 Web/小程序；AIRC 使用原生 Android Compose 实现，因此下文的 dp、sp、触控区域和导航结构是项目适配约束，不代表微信官方 Android 应用规范或官方认证。</p>
+<p>官方事实源：</p>
+<ul>
+<li><a href="https://github.com/Tencent/weui/blob/master/src/style/base/theme/vars/light.less">浅色主题变量</a>：品牌绿、浅灰背景、白色内容层、黑色文字层级。</li>
+<li><a href="https://github.com/Tencent/weui/blob/master/src/style/base/variable/weui-grid.less">Grid 变量</a>与 <a href="https://github.com/Tencent/weui/blob/master/src/style/widget/weui-grid/weui-grid.less">Grid 样式</a>：三列、28px 图标、14px 标签及细边界。</li>
+<li><a href="https://github.com/Tencent/weui/blob/master/src/style/base/variable/weui-button.less">Button 变量</a>：48px 主按钮、17px 文字、8px 圆角。</li>
+<li><a href="https://github.com/Tencent/weui/blob/master/src/style/base/variable/weui-cell.less">Cell 变量</a>：16px 内边距、56px 行高基准及正文/提示层级。</li>
+</ul>
+<p>采用干净、克制的色彩与组件层级：页面背景承托 Surface 分组（亮色为浅灰/白色，暗色为深灰层级），绿色表示主要动作，红色只用于电源、停止和错误等明确语义。不要使用大面积渐变、重阴影、多色功能卡片或装饰性拟物效果。</p>
+<h2 id="_3">颜色与字体<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p>主题唯一代码入口为 <code>sharedUi/src/commonMain/kotlin/ernest/airc/RemoteTheme.kt</code>。禁止在页面中写死亮色背景或白色按钮文字。Android 与桌面共用语义色；系统栏、弹窗、菜单、输入框、禁用态随有效主题一起更新。</p>
+<h3 id="_4">外观模式<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<p>功能网格提供「设置」，其中「外观」为互斥单选：<strong>跟随系统（默认）／亮色／暗色</strong>。选择立即生效并保存在当前控制端，离线可修改；返回、旋转与重启后保留。跟随系统响应系统模式变化，手动选择不受系统变化影响。切换不重建导航或清除文字草稿、不触发设备连接；未知历史值回退跟随系统。</p>
+<p>深色中性层级参考 <a href="https://github.com/Tencent/weui/blob/master/src/style/base/theme/vars/dark.less">WeUI 深色变量</a>（2026-10-15 核对），具体文字与操作色为项目对比度适配，不直接反转位图。正文与所在背景、主按钮文字与填充的对比度目标至少 4.5:1；绿色状态点与可点击操作色分开。截图、应用图标和镜像内容保持原色。</p>
+<table>
+<thead>
+<tr>
+<th>语义变量</th>
+<th>亮色</th>
+<th>暗色</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Brand</td>
+<td><code>#07C160</code></td>
+<td><code>#07C160</code></td>
+<td>连接状态点、进度</td>
+</tr>
+<tr>
+<td>Header</td>
+<td><code>#EDEDED</code></td>
+<td><code>#111111</code></td>
+<td>顶部导航</td>
+</tr>
+<tr>
+<td>Background</td>
+<td><code>#F7F7F7</code></td>
+<td><code>#111111</code></td>
+<td>页面背景</td>
+</tr>
+<tr>
+<td>Surface</td>
+<td><code>#FFFFFF</code></td>
+<td><code>#1E1E1E</code></td>
+<td>分组、弹窗、按键</td>
+</tr>
+<tr>
+<td>Text</td>
+<td><code>#191919</code></td>
+<td><code>#E6E6E6</code></td>
+<td>正文</td>
+</tr>
+<tr>
+<td>Secondary</td>
+<td><code>#666666</code></td>
+<td><code>#ADADAD</code></td>
+<td>辅助文字</td>
+</tr>
+<tr>
+<td>Divider</td>
+<td><code>#E5E5E5</code></td>
+<td><code>#383838</code></td>
+<td>分隔线</td>
+</tr>
+<tr>
+<td>Fill</td>
+<td><code>#F2F2F2</code></td>
+<td><code>#292929</code></td>
+<td>中性填充</td>
+</tr>
+<tr>
+<td>Disabled</td>
+<td><code>#A3A3A3</code></td>
+<td><code>#737373</code></td>
+<td>禁用图标</td>
+</tr>
+<tr>
+<td>Action / OnAction</td>
+<td><code>#087B40</code> / <code>#FFFFFF</code></td>
+<td><code>#55D990</code> / <code>#092817</code></td>
+<td>主操作及其前景</td>
+</tr>
+<tr>
+<td>ActionContainer</td>
+<td><code>#E8F5EC</code></td>
+<td><code>#153D29</code></td>
+<td>次级强调</td>
+</tr>
+<tr>
+<td>Warning / OnWarning</td>
+<td><code>#C52B29</code> / <code>#FFFFFF</code></td>
+<td><code>#FF8585</code> / <code>#390B0B</code></td>
+<td>错误与停止</td>
+</tr>
+<tr>
+<td>Outline</td>
+<td><code>#808080</code></td>
+<td><code>#858585</code></td>
+<td>表单边框</td>
+</tr>
+</tbody>
+</table>
+<p>Activity 根据有效模式设置系统栏图标：亮色深图标、暗色浅图标。启动窗口提供日夜资源；Compose 首次显示前读取已保存模式，之后不以固定浅色覆盖用户选择。页面底色及 Material 组件的 surface/container 全部使用语义色，不引入默认紫色调。</p>
+<h3 id="_5">产品界面信息层级<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<ul>
+<li>主页面只显示当前任务、可用动作与下一步；连接状态统一在右上角，禁止在每个功能页顶部重复全局调试状态。</li>
+<li>功能页使用稳定标题、分组和一致的按钮层级。一次只有一个主要动作；列表先展示内容，高级配置、诊断与完整技术输出按需展开，不能占据默认首屏。</li>
+<li>没有数据时给出简明空态和下一步；错误紧邻相关动作显示且可重试；进行中反馈不挤动导航或输入区域。</li>
+<li>执行结果页保留完整可选择文本；其他页面仅保留折叠的操作详情，不把原始 JSON 或协议状态当主界面。安全确认仍显示具体目标及影响，不隐藏决策所需信息。</li>
+<li>停止服务需要说明会断开遥控并二次确认；取消不执行。主题设置无需确认、保存按钮或设备联网。</li>
+<li>设置图标沿用 24×24、1.7 单位线宽的矢量样式；单选项整行可点击、最少 56dp，提供单选语义，适配大字体换行。</li>
+</ul>
+<p>使用 Android 系统字体，不打包微信字体。页面标题 20sp，分组标题与正文 17sp，辅助说明和功能网格标签 14sp，小型反馈和按键标签 12sp；分别使用 28、24–25、20–21、18sp 行高。正文正常字重，标题 Medium；不用大量加粗制造层级。</p>
+<h2 id="_6">尺寸与组件<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<p>Android 应用图标使用 <code>androidApp/src/main/res/drawable/ic_ai_rc.xml</code> 的完整彩色矢量图，保留提供素材的绿色底板、电视与 AI 遥控器构图和原色，不应用页面图标的单色 tint 或主题反色；应用清单通过 <code>android:icon</code> 引用该资源。</p>
+<ul>
+<li>页面横向留白 16dp，分组间距 16dp，分组内部间距 12dp；紧凑遥控首页使用 8dp 间距，以保证基础按键与文字输入入口可见；使用 4/8/12/16/24dp 间距体系。</li>
+<li>顶部导航最小高度 56dp，普通可交互区域最小 48dp；支持系统字体放大，不以固定高度截断文字。</li>
+<li>分组、主按钮与描边按钮圆角 8dp；圆形仅用于方向盘、确认和遥控按键。</li>
+<li>功能网格固定三列，最后一行按实际入口数量排列，每格最小 104dp 高；图标 28dp、标签 14sp、图标标签间隔 12dp、细分隔线 0.5dp。标签允许随系统字体换行，三列必须等宽。</li>
+<li>使用统一 24×24 viewport、约 1.7 单位线宽的矢量图标。图标与文字组成完整可点击项，装饰图标不重复朗读；禁止 Unicode/emoji 图标。</li>
+<li>主动作使用 Action / OnAction 语义色和清晰按压反馈；次动作使用中性/描边按钮。离线动作显示禁用状态，必须同时禁止执行。</li>
+<li>表单与结果页可滚动、响应键盘与安全区；较宽屏幕将内容居中并限制在 560dp，不能把功能网格拉成巨大卡片。</li>
+</ul>
+<h2 id="_7">导航与功能分配<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<p>没有主导航 Tab 或底部 Tab。首页为遥控器，左上角功能网格菜单图标进入功能页；右上角连接状态始终可点击，无论已连接或未连接，都进入设备页。</p>
+<table>
+<thead>
+<tr>
+<th>功能网格位置</th>
+<th>功能</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第一行左</td>
+<td>应用管理</td>
+<td>刷新应用列表、搜索、点击启动与按包名打开应用</td>
+</tr>
+<tr>
+<td>第一行中</td>
+<td>文字指令</td>
+<td>发送自然语言任务、查看结果</td>
+</tr>
+<tr>
+<td>第一行右</td>
+<td>模型配置</td>
+<td>API 地址、密钥、模型</td>
+</tr>
+<tr>
+<td>第二行左</td>
+<td>服务管理</td>
+<td>发布源、版本、状态、安装/更新、重启/停止</td>
+</tr>
+<tr>
+<td>第二行中</td>
+<td>运行权限</td>
+<td>优先 root 开关与实际 UID 状态</td>
+</tr>
+<tr>
+<td>第二行右</td>
+<td>设备信息</td>
+<td>连接信息、只读系统与硬件摘要、手动刷新</td>
+</tr>
+<tr>
+<td>第三行左</td>
+<td>执行结果</td>
+<td>当前完整结果</td>
+</tr>
+<tr>
+<td>第三行中</td>
+<td>使用帮助</td>
+<td>使用说明</td>
+</tr>
+<tr>
+<td>第三行右</td>
+<td>设备截图</td>
+<td>截图与动态预览</td>
+</tr>
+<tr>
+<td>第四行左</td>
+<td>目标文件</td>
+<td>文件浏览与传输</td>
+</tr>
+<tr>
+<td>第四行中</td>
+<td>设置</td>
+<td>跟随系统、亮色与暗色外观</td>
+</tr>
+</tbody>
+</table>
+<p>遥控器参考 <code>AIVoice/AIVoiceClient/phoneRemoteApp</code> 的尺寸与排列：宽度最多 390dp，外边距 14dp，内部水平 24dp、垂直 22dp；方向盘 220dp，方向键 60dp，确认键 82dp，返回/主页/设备菜单圆键 58dp，媒体圆键 52dp，发送图标触控区 48dp。顶部电源和音量、中央弹性状态区、下部方向盘与返回/主页/设备菜单、底部文字输入框与发送图标依次排列。普通窗口只滚动状态文本，媒体三键单独布局保留完整标签；遥控按键区最小高度 600dp，确保播放文字与媒体按键不互相裁切；短窗口或大字体允许上方遥控按键区域滚动，底部输入区独立固定，避免挤压触控区域。保留 WeUI 语义颜色与 8dp 卡片圆角，不复制参考界面的渐变、深蓝卡片和重阴影。</p>
+<p>状态区默认显示实际播放状态和上一曲/播放暂停/下一曲。文字执行状态每次更新后，优先显示思考、工具调用、结果或错误，五秒无更新后回到播放，计时随新状态重新开始；媒体状态更新只更新底层播放数据，不抢占反馈。临时反馈期间隐藏媒体三键，静音与音量留在顶部。状态区高度保持弹性，状态切换不移动方向盘和文字输入区。反馈区可打开完整执行结果。</p>
+<p>服务端以请求关联的可选进度事件报告思考和工具调用，较早请求的进度/完成不能覆盖更新的操作反馈。阶段事件缺失时显示本地等待状态，最终响应到达后显示结果，不伪造中间进度。播放状态每三秒查询目标 MediaSession；查询失败显示不可用，不根据按键成功推断播放。</p>
+<p>文字输入框使用中性描边与 8dp 圆角，可输入 1–3 行，右侧发送图标使用主操作绿，触控区 48dp，提供“发送文字指令”的无障碍描述。点击图标和键盘发送键使用同一提交逻辑。空白、离线、未配置模型或请求进行中时禁止发送；被接受后清空草稿、收起键盘。非敏感草稿在切页和旋转后保留。键盘由 Activity 的 edge-to-edge / adjustResize 与最外层 safeDrawingPadding 统一处理，子页面不重复使用 imePadding；输入区放在按键滚动区域之外，键盘展开时底部仅保留 8dp，收起后恢复普通面板留白。不申请录音权限，不保留 ASR 状态或配置。</p>
+<p>服务管理以“管理服务”卡片展示服务端版本、GitHub 仓库链接与管理操作，完整输出通过“查看操作详情”按需展开。在线安装解析项目仓库最新 Release 的签名清单，不提供单独的清单 URL 表单或更新源保存按钮。</p>
+<p>设备页顶部使用中性设备图标、扫描状态与刷新按钮；历史记录、局域网服务和同网段 ADB 合并为一个白色细分隔列表，同一地址只显示一行。行内 24dp 设备图标、设备名/地址与 12sp 来源标签（小矢量图标 + 文字）；连接与更多操作触控区至少 48dp。扫描只探测 Wi-Fi IPv4 默认 ADB 5555，不自动配对、授权或部署；大于 1024 地址的网络限制为当前 /24 并说明。连接目标设备与网络诊断位于列表后。手动连接卡片默认折叠，点击标题展开/收起，旋转保留展开状态与非敏感草稿。</p>
+<p>设备页包含 TCP、配对码、二维码、发现和历史记录；连接方式的选择控件属于表单，不是主导航 Tab。设备页返回打开它的原页面；功能网格子页返回功能网格，功能网格返回遥控器。系统返回与顶部返回行为一致。旋转恢复当前页面和非敏感表单草稿，配对码不保存；API Key 仅保存在 Android Keystore 加密的 App 配置中，不进入 saved state。</p>
+<h2 id="_8">手势、反馈与验收<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<p>文字输入与发送图标可通过 TalkBack 和键盘操作；可点击项具有文字标签和 Button 语义。</p>
+<p>连接与长任务通过状态文字、进度条和结果区反馈；不得仅靠颜色区分连接、执行或禁用状态。执行结果维持当前业务行为，不虚构成功提示或未实现的功能。</p>
+<p>界面变更需检查：默认遥控器不含应用编辑/列表；状态入口在连接与未连接状态均可进入设备页；全部入口可进入对应页面；返回路径与旋转恢复一致；离线遥控按钮不可执行；首页文字发送、草稿恢复、键盘发送与禁用语义正确。通过 Android UI 测试及截图检查窄屏、大字体和键盘可用性，报告未覆盖的设备条件。</p>
+<p>触控板使用中性填充、细边框与 8dp 圆角，最小 240dp 高；手势结束后提交，单次拖动只发一条滑动，短点击延迟 300ms 用于识别双击。长按在松开时以实际按住时长（500–5000ms）提交。第二根手指介入时取消本次手势。发送期间、离线或服务缺少工具时禁用触控，保留文字说明与中心点击/长按的可访问按钮。数字键盘使用三列、最小 56dp 高按键，附频道、删除与静音操作，遵循已有颜色与字体。</p>
+<p>模型配置支持按 API 根地址保存与切换多套 App 本地配置、逐项删除、API Key 明文/密文切换、手动拉取并缓存模型列表以及手填/列表选择模型。密钥显隐状态默认密文，旋转后恢复密文；草稿由 ViewModel 内存承载。保存到 App 和更新到目标设备为独立动作，不自动同步；目标离线不影响本地管理或拉取列表。</p>
+<p>桌面 JVM 控制端使用 Compose 窗口，默认 390×844dp 的手机竖屏比例，窗口缩放时内容按可用空间居中并限制在手机宽度，保持同一 RemoteTheme、绿色图标、三列菜单和 48dp 触控区域；Escape 对应页面返回。桌面连接使用宿主机 adb，不复制 Android NSD/摄像头实现。</p>
+<p>设备显示名使用共享编辑对话框：单行输入、保存与取消，说明仅作用于本应用；空白、超过 64 字符或控制字符禁止保存。</p>
+<p>截图通过三列功能网格进入，使用统一线条相机矢量图标。预览保持原比例，最高 360dp；获取按钮离线或工具不支持时禁用。显示获取进度、错误与保存结果，保存和分享只在预览可用时出现。不自动捕获，不宣称实时投屏。</p>
+<p>网络诊断在设备页使用Surface 分组卡片；显示实际地址、阶段名称、文字状态、耗时与处理建议。未检查、失败和通过必须用文字区分。输入不完整或运行中禁用启动，运行时提供进度与取消。</p>
+<p>目标文件页使用统一线条文件夹图标，默认 Downloads，可切换服务收件箱和确认后的全盘范围。这些选择是页内范围控件，不是主导航。上传使用系统文件选择器；覆盖与删除对话框展示目标路径、当前大小和不可恢复的影响，需逐项确认；进度显示字节或删除项数并提供取消。目录项用Surface 分组和懒加载列表，进入新目录或显示属性时滚动到顶部；范围选择与条目操作在窄屏或大字体时自动换行，各动作至少 48dp。明确区分空目录、尚未读取、加载中、错误与不支持访问的符号链接，离线禁用实际请求。</p>
+<p>文件页的“媒体打开”先查询目标支持的播放器，再在Surface 分组展示文件路径、类型、来源与可选包名，用户点击明确的打开按钮后执行。没有支持的播放器时说明限制，不显示虚假播放成功；启动结果与实际播放状态区分。私有媒体流提供手动释放入口，不把投送称为实时投屏。</p>
+<p>私有媒体可选择“本地播放副本”或“HTTP 媒体流”，切换后重新查询对应播放器。创建本地副本前显示 Downloads 的公开可读范围、占用空间和原文件保留说明，再由用户确认；显示副本准备/校验进度及取消。释放副本只删除服务创建的副本，不影响原文件。</p>
+<p>文件媒体分组提供“查看保留的播放副本”：手动读取服务记录，显示准确的 Downloads 路径和大小，逐项释放；不自动清理播放中的副本，不自动重新播放恢复记录。</p>
+<p>媒体播放器查询结果属于系统声明能力；界面说明实际解码需核对，播放失败可选择其他播放器，不以列表匹配或 Activity 启动报告成功。</p>
+<p>应用管理支持查看包名、版本、当前 Android 用户及类型；仅用户应用显示卸载动作。卸载对话框展示准确包名、版本、用户与删除数据的影响，确认后才提交；提交后显示不可撤销的处理中状态，不提供虚假的取消/恢复。模型提案通过独立待确认入口展示，禁止自动执行。</p>
+<p>APK 文件条目提供“APK 信息”，共享信息分组展示路径、包名、版本、大小、摘要和声明证书指纹。明确区分解析与签名验证，不以成功色暗示可信或已安装。</p>
+<p>APK 摘要阶段显示字节进度和至少 48dp 的“取消 APK 解析”按钮，取消后说明原文件保留。</p>
+<p>APK 安装以独立“准备安装此 APK”按钮启动，覆盖安装须显式勾选。确认对话框可滚动，展示包名、当前/目标版本、Android 用户、摘要、声明证书与跨用户程序代码/数据迁移影响；准备阶段可取消，提交后显示不可取消状态。</p>
+<p>目标文件页提供只读“存储分析”分组，主动分析当前目录，显示分析范围、扫描项数、取消、逻辑大小与文件块统计。报告按后缀归类、最多二十个大文件；不完整报告用文字说明，不以统计量暗示可回收空间，不提供隐式清理按钮。</p>
+<p>Android 遥控器类型选择页提供“播放控制”，复用媒体矢量图标；子页返回类型选择，设备页返回来源页。标准会话选择、报告位置/时长、毫秒输入和提交/刷新各自明确显示；缺少定位接口或播放器不支持定位时禁止提交，提交请求与实际位置观察区分。位置草稿在导航和旋转后保留。</p>
+<p>游戏手柄原型放在功能网格第五行第二项，使用统一线条手柄矢量图标。共享页面提供方向键、A/B/X/Y、肩键、Start/Select、按钮组合、归一化 X/Y 滑条和时长选择；滑条与组合选择只编辑草稿，显式发送后注入有限时长输入并自动释放/回中。运行中禁用重复发送，提供独立“释放按钮并回中”；离线所有实际动作禁用。组合及滑条/时长草稿在导航与旋转后保留。页面说明是输入原型，不承诺硬件手柄识别或低延迟游戏兼容。</p>
+<p>应用管理中的“清理缓存”与卸载分开呈现，只对用户应用提供。独立确认对话框展示包名、版本、Android 用户，以及缓存可能包含离线下载/需要重新生成的影响；只用缓存接口，未支持时拒绝。显示等待确认和不可取消的提交阶段，不展示虚构的释放空间，不将清理缓存显示为删除应用数据。模型提案通过独立待确认缓存入口审核，页面导航保持不变。</p>
+<p>持续虚拟手柄位于既有手柄页的独立Surface 分组，明确 root/uinput 条件与游戏兼容性限制。
+用户手动开始/停止，按住按钮发送按下、松开或取消手势释放；键盘按下/抬起等价，
+无障碍点击发送100ms有限按压。左右二维摇杆为132dp中性触控区，松开/取消回中，
+另有独立“全部释放并回中”动作。所有按钮至少48dp、窄屏自动换行，复用统一主题。
+活动输入、会话与画面不进入saved state；离页、旋转、Android后台或断线停止，手动重启。
+持续会话期间禁用有限输入提交，避免两种输入同时作用。</p>
+<h2 id="_9">系统管理确认<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
+<p>系统管理复用设备信息页的Surface 分组，不新增主导航。准备锁屏、重启或关机不会直接执行；确认弹窗必须显示当前目标名称、操作、root 权限与连接/任务影响。确认文字使用 Warning 色，确认与取消触控区域至少 48dp；等待确认期间禁用重复准备。断线或切换设备清空旧提案；若已尝试提交，保留明确标为先前目标的核对提示，离线时仍可阅读。提交反馈区分请求已提交与实际状态验证，不将断线显示为成功。</p>
+<p>设备信息页的只读电源/锁屏状态使用现有Surface 分组和 InfoRow；未知布尔值显示未知，false 显示否，不解释为关机完成。刷新只在连接且非忙时可用，连接变化清空旧观察值。</p>
+<p>系统观察分组明确显示最近一次快照及控制端收到时间，使用现有辅助字号和 InfoRow；不暗示后台实时轮询。清理观察时一并清理时间标签。</p>
+<p>目录创建复用目标文件页分组，在刷新按钮下提供单行“新目录名称”与绿色“创建目录”；仅支持该工具的服务显示。名称草稿按根和目录区分并允许旋转恢复；离线、加载中、传输中或名称无效时禁用，创建后刷新当前目录，不切换导航。</p>
+<p>手机手柄页限定为可随横向传感器翻转的横屏；进入触发实际 Activity 方向变化，离开恢复先前方向策略。原策略可保存在页面 saved state，活跃手柄输入不保存；旋转、后台或离页继续释放输入，恢复页面后手动开始。</p>
+<p>触控区高度按页面可用高度减去 64dp 内边距预算计算，限制在 48–240dp；变量集中在 RemoteDimensions。横屏/短窗口允许缩小触控区，使整块可见并保留完整的 0–1 坐标映射，不只展示裁切片段。</p>
+<p>Android ascrcpy 动态预览保持目标比例，以 SurfaceView 显示；参数与 ascrcpy App 一致，默认最长边 1920、码率 8 Mbps、最高 60 fps，触控高度至少 48dp。状态区区分准备、连接、预览与错误。后台、离页、Surface 销毁或旋转重建停止会话，返回后手动开始；不引入新导航或自动全屏。</p>
+<p>Android 截图页的动态画面统一使用 ascrcpy，移除旧 PNG 连续预览和旧编码镜像参数控件。动态会话活跃时禁用单张截图，静止截图与视频共享原有页面入口。</p>
+<p>Android 动态预览停止或失败后替换承载视频缓冲的 SurfaceView，释放旧 Surface，清除最后一帧；新空白 Surface 允许再次手动开始。旧视图迟到的销毁回调不得停止新会话。</p>
+<p>持续手柄内容宽度至少 400dp 时将左摇杆与菱形主键并排，至少 520dp 时左右 132dp 摇杆与 A/B/X/Y 主按键同排，允许同时触摸；其他按键和方向帽继续换行。窄布局保持纵向排列。布局断点与摇杆尺寸集中在 RemoteDimensions，按钮仍至少 48dp，不改变背景释放规则。</p>
+<p>应用列表在名称旁显示目标包管理器提供的 40dp 图标（96×96 PNG），作为装饰图像，不重复朗读；读取失败保留名称与原操作，不阻塞列表。每次先显示 30 项，使用“显示更多应用”继续展开，搜索仍匹配完整列表。刷新或目标连接变化清除图标内存缓存。</p>
+<p>文件页的多包安装复用 APK 信息及确认分组：逐包解析后点击“加入多包安装”，展示 base/split 名称、路径、字节与摘要，提供至少 48dp 的移除按钮。必须包含一个 base、split 名称唯一、包名与版本一致；整组最多 32 个 APK、总量最多 4 GiB。覆盖安装仍显式勾选。最终确认展示整组文件，提交后不可取消；由同一个 Android 安装会话统一验证并提交。</p>
+<p>Android 遥控器右上角增加 48dp“切换遥控器类型”矢量图标，连接状态入口保持可点击。选择页以白色列表展示标准遥控器、触控板、数字键盘、播放控制和游戏手柄；当前项用文字“当前”标识。四种遥控类型不再进入功能网格。类型页返回选择页、选择页返回标准遥控器，设备页仍返回原页面；旋转保留页面与草稿。</p>
+<p>游戏手柄横屏内容可扩展至 960dp，页面外边距使用 8dp，主操作区不重复页面标题，保证普通横屏下 SELECT/START 可见。主操作区左侧圆形摇杆、右侧 Y/X/B/A 菱形圆键，右摇杆与原有肩键/方向帽保留，SELECT/START 居中。使用现有中性色和功能绿，不复制参考图的多色和重阴影。主键 56dp、菱形区 176dp，摇杆 132dp、摇杆触点直径 44dp，左右区至少 400dp 才并排，至少 520dp 时将右摇杆也放入同一主操作行，以保留多指同时操作；短屏允许纵向滚动，管理与说明不能挤占主操作区。</p>
+<h2 id="_10">文件与应用管理<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
+<p>两页采用列表优先的信息结构：16dp 外边距、白色连续列表、0.5dp 分隔线，40dp 文件/应用图标，行标题17sp、次行14sp、类型12sp，最小72dp 行高；按钮和更多菜单至少48dp。共享代码矢量图标统一24×24、1.7线宽，不增加装饰色。文件夹/应用用功能绿，危险菜单项用 Warning。搜索框、分类控件和排序属于页面工具，不是主导航。</p>
+<p>应用页展示总量与刷新、搜索和全部/用户/系统筛选；默认每次30项，搜索匹配全量缓存。点击条目查看操作，右侧提供启动与更多；详情、清理缓存、卸载按需进入管理对话框。按包名打开与模型待确认任务放在页内工具入口，列表不再逐项堆叠按钮，不默认展示原始执行结果。</p>
+<p>文件页提供根范围、可点击祖先路径、上一级、刷新、新建目录和操作/传输入口；文件夹优先，当前已加载条目可搜索、按名称或文件大小排序，分页未完明确显示“仅搜索已加载项目”。点击文件夹进入，文件默认查看属性，更多菜单提供下载/媒体/APK/删除；符号链接和特殊文件只说明不可访问，不提供删除或进入。新建目录使用对话框，目录草稿按根和路径保存；传输、媒体、存储分析与APK安装按需打开同一可滚动操作对话框，关闭不自动取消任务，有任务状态入口可重新打开。路径、搜索和筛选变化只调整展示，不能改变服务游标或扩大文件权限。</p>
+<p>管理对话框最大宽560dp、最大高640dp，标题与48dp关闭按钮固定，正文独立滚动。离线、读取中和不支持能力分别反馈；首次加载、空目录、无搜索结果、出错与已有缓存分别区分，重试保留可读列表。删除、覆盖、卸载、缓存清理和安装沿用服务确认对象及不可恢复影响，确认内容可滚动；不把点开菜单当作提交。</p>
+<p>文件操作窗口以传输、媒体、APK 安装和存储分析四个页内选项按需展示，关闭窗口保留非敏感表单草稿和后台任务；页面显示等待确认、任务进行、可保存、错误或已有结果入口。目录大小使用二进制 KiB/MiB/GiB，属性同时保留精确字节。刷新失败保留已有列表，文件排序不修改分页游标；路径点击仅允许当前根内的祖先目录。</p>
+<p>在线首次进入应用页或尚未加载的文件范围时自动读取，已有列表不重复读取；错误后由用户显式重试，不自动循环请求。</p>
+<p>文件路径栏将上一级图标、可换行的祖先路径与新建目录放在同一行；当前路径使用正文色，不以禁用灰弱化位置信息。分类控件换行后保留4dp行间距。</p>
+<h2 id="_11">表单可用性与稳定布局<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
+<ul>
+<li>开关与勾选项以整行作为唯一可切换区域，至少 56dp 高，合并说明与选中语义；标签允许换行，开关/勾选图形本身不重复接收点击。</li>
+<li>提交依赖连接、模型或接口支持时，在动作附近说明缺少的条件。已填入的无效数值提供具体校验说明，不让用户猜测禁用原因。</li>
+<li>顶部全局进度叠放在内容边缘，不因开始或结束任务改变页面可用高度。三列网格同一行的点击背景等高，标签随字体换行。</li>
+<li>系统操作、媒体副本及设备名称确认的正文可独立滚动，确认与取消保持可见；媒体来源选项在窄屏自动换行。</li>
+<li>文字编辑页保留简明提交状态和折叠操作详情，完整原始输出通过执行结果入口阅读。</li>
+</ul>
+<p>遥控器、触控板、数字键盘、播放控制与手柄的频繁动作使用页内状态反馈，不逐次弹出全局完成提示以遮挡底部控件；错误仍明确提示，收到响应不等同于目标实际操作成功。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../architecture/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 架构">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                架构
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../build/" class="md-footer__link md-footer__link--next" aria-label="下一页: 构建">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                构建
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "navigation.footer", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

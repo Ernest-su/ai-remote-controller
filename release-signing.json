@@ -1,0 +1,14 @@
+{
+  "repository": "Ernest-su/ai-remote-controller",
+  "keyAlias": "airc-release",
+  "androidCertificateSha256": "b8e17b545a7826540b2483bda2c562968f7a8ad3bd4902a8f0808bc2c74bec56",
+  "runtimePublicKeySha256": "d3a207c88e746bf03df994dd22214fee3472a49add55f6e9f42ec0f288df6687",
+  "githubSecrets": {
+    "ANDROID_SIGNING_KEYSTORE_BASE64": "android-keystore.base64",
+    "ANDROID_SIGNING_STORE_PASSWORD": "android-store-password.txt",
+    "ANDROID_SIGNING_KEY_ALIAS": "android-key-alias.txt",
+    "ANDROID_SIGNING_KEY_PASSWORD": "android-key-password.txt",
+    "RUNTIME_SIGNING_PRIVATE_KEY": "runtime-signing-private.pem",
+    "RUNTIME_SIGNING_KEY_PASSWORD": "runtime-key-password.txt"
+  }
+}

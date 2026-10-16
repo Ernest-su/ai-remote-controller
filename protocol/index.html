@@ -1,0 +1,2138 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Android AI 遥控器、目标设备 runtime 与开发文档">
+      
+      
+      
+        <link rel="canonical" href="https://Ernest-su.github.io/ai-remote-controller/protocol/">
+      
+      
+        <link rel="prev" href="../troubleshooting/">
+      
+      
+        <link rel="next" href="../reference/tools/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>设备端协议 - AI 遥控 · AIRC</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#v1" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href=".." title="AI 遥控 · AIRC" class="md-header__button md-logo" aria-label="AI 遥控 · AIRC" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            AI 遥控 · AIRC
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              设备端协议
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="切换深色模式"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="切换深色模式" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue-grey" data-md-color-accent="teal"  aria-label="切换浅色模式"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="切换浅色模式" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Ernest-su/ai-remote-controller" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Ernest-su/ai-remote-controller
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="AI 遥控 · AIRC" class="md-nav__button md-logo" aria-label="AI 遥控 · AIRC" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    AI 遥控 · AIRC
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Ernest-su/ai-remote-controller" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Ernest-su/ai-remote-controller
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快速开始
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    使用指南
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    使用指南
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/connections/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    连接设备
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/desktop/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    桌面测试工具
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/remote/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    遥控与文字
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/screenshots/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    设备截图
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/files/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    目标文件
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/media/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    媒体投送
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/gamepad/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    游戏手柄
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/cache/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    应用缓存
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    模型配置
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/services/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    服务与更新
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/system/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    系统管理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    故障排查
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    参考
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    参考
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    设备端协议
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    设备端协议
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        发现
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#http" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTTP
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#websocket" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WebSocket
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WebSocket">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        可选进度事件
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        后台管理
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        媒体状态快照
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        截图二进制资源
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        文件管理与流式传输
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        媒体打开工具
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        本地媒体发布
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        应用管理确认
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        APK 元信息
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apk_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        APK 安装确认
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        存储分析长任务
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        标准媒体定位
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        应用标签来源
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#screen-preview-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        低帧率预览流 v1
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#screen-mirror-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AVC 镜像流 v1
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        持续虚拟手柄会话原型
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        系统管理能力探测
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        只读系统状态
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        文本任务的工具范围
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型 Shell 与结构化文字输入
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型工具调用组校验
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    工具
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发与贡献
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    开发与贡献
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    参与贡献
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    架构
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/visual-guidelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    视觉与交互约束
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    构建
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    测试
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../device-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    设备验证方法
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    签名与发布
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    文档维护
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    项目
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    项目
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../implementation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    实现概览
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        发现
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#http" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTTP
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#websocket" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WebSocket
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WebSocket">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        可选进度事件
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        后台管理
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        媒体状态快照
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        截图二进制资源
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        文件管理与流式传输
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        媒体打开工具
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        本地媒体发布
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        应用管理确认
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        APK 元信息
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#apk_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        APK 安装确认
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        存储分析长任务
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        标准媒体定位
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        应用标签来源
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#screen-preview-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        低帧率预览流 v1
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#screen-mirror-stream" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AVC 镜像流 v1
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        持续虚拟手柄会话原型
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        系统管理能力探测
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        只读系统状态
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        文本任务的工具范围
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型 Shell 与结构化文字输入
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        模型工具调用组校验
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="v1">设备端协议 v1<a class="headerlink" href="#v1" title="Permanent link">&para;</a></h1>
+<p>App 与 runtime 按同一版本配套分发。目标文件与待部署版本不一致时升级目标程序，不以历史二进制兼容作为继续保留旧文件的依据。</p>
+<h2 id="_1">发现<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<p>目标端发布 <code>_airc._tcp.local.</code>，Android NSD 发现类型 <code>_airc._tcp.</code>。TXT 包含：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>id</td>
+<td>保存在目标状态目录的 UUID，重启和更新保持不变</td>
+</tr>
+<tr>
+<td>name</td>
+<td><code>ro.product.model</code> 或默认设备名称</td>
+</tr>
+<tr>
+<td>protocol</td>
+<td><code>1</code></td>
+</tr>
+<tr>
+<td>version</td>
+<td>设备程序版本</td>
+</tr>
+<tr>
+<td>path</td>
+<td><code>/ws</code></td>
+</tr>
+</tbody>
+</table>
+<p>当前 HTTP/WebSocket 监听 IPv4，因此广播仅发布可通过 IPv4 访问的地址。无线 ADB 的 <code>_adb-tls-pairing._tcp.</code>、<code>_adb-tls-connect._tcp.</code> 属于独立的安装通道，与遥控器设备发现无关。</p>
+<p>配对码连接默认按 GUID 发现 TLS 连接服务，也可指定无线调试首页的连接端口；指定时直接连接该端口。历史重连仍优先发现当前端口，找不到时才尝试保存的旧端点。</p>
+<h2 id="http">HTTP<a class="headerlink" href="#http" title="Permanent link">&para;</a></h2>
+<p><code>GET /status</code> 返回 version、protocol、deviceId、name、tools、modelConfigured、uid（进程有效用户 ID，<code>0</code> 为 root，<code>2000</code> 为 Android shell）；不返回模型密钥。</p>
+<h2 id="websocket">WebSocket<a class="headerlink" href="#websocket" title="Permanent link">&para;</a></h2>
+<p>连接 <code>/ws</code>，文本帧的请求和响应通过 id 关联。</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="s2">"request-1"</span><span class="p">,</span><span class="nt">"protocol"</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span><span class="nt">"type"</span><span class="p">:</span><span class="s2">"tool"</span><span class="p">,</span><span class="nt">"tool"</span><span class="p">:</span><span class="s2">"remote.key"</span><span class="p">,</span><span class="nt">"arguments"</span><span class="p">:{</span><span class="nt">"key"</span><span class="p">:</span><span class="s2">"up"</span><span class="p">}}</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="s2">"request-1"</span><span class="p">,</span><span class="nt">"protocol"</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span><span class="nt">"ok"</span><span class="p">:</span><span class="kc">true</span><span class="p">,</span><span class="nt">"result"</span><span class="p">:</span><span class="s2">""</span><span class="p">,</span><span class="nt">"error"</span><span class="p">:</span><span class="kc">null</span><span class="p">}</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>type</th>
+<th>字段与行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>tool</td>
+<td>tool + arguments；直接调用 <code>remote.key</code>、<code>apps.list</code>、<code>apps.open</code>、<code>device.info</code>、<code>device.shell</code></td>
+</tr>
+<tr>
+<td>text</td>
+<td>text；由模型决定工具调用，执行结果回填模型，最多 16 轮</td>
+</tr>
+<tr>
+<td>configure</td>
+<td>arguments 包含 baseUrl、apiKey、model；保存目标端配置</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_2">可选进度事件<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
+<p>请求可添加 <code>"progress":true</code>。新版服务在 <code>text</code> 执行期间发送同 id 的事件：</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="s2">"request-1"</span><span class="p">,</span><span class="nt">"protocol"</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span><span class="nt">"type"</span><span class="p">:</span><span class="s2">"assistant.state"</span><span class="p">,</span><span class="nt">"phase"</span><span class="p">:</span><span class="s2">"thinking"</span><span class="p">,</span><span class="nt">"text"</span><span class="p">:</span><span class="s2">""</span><span class="p">}</span>
+</code></pre></div>
+<p>tool 阶段可附带可选 <code>tool</code> 字段，例如 <code>"tool":"files.mkdir"</code>，表示准备尝试的已注册工具，不表示执行成功。该事件不包含工具参数、结果或 API Key；tool 阶段的 text 保持为空。该字段未提供时按空值处理。</p>
+<p>phase 为 thinking 或 tool，text 可为空。最终仍返回原有 ok/result/error 响应。事件不是最终响应，不能完成 pending request；未知事件应忽略。进度事件为尽力发送，不代替最终响应。未请求 progress 的客户端只收到最终响应。中间事件缺失时继续等待最终响应，不伪造思考或工具执行阶段。</p>
+<p>当前版本仅支持文字与工具请求，不再接受 audio.start / audio.stop / audio.cancel 或二进制音频。旧模型配置中的 transcriptionModel 字段读取时忽略，保存时移除；文字配置与现有设备记录保持兼容。</p>
+<p>工具命令以独立参数执行；只有明确的 <code>device.shell</code> 工具接受 shell 文本。遥控按键支持 up/down/left/right/ok/back/home/menu/power/volume_up/volume_down/mute/play_pause/media_previous/media_next。应用启动参数为 <code>package</code>，shell 参数为 <code>command</code>。</p>
+<p>每条工具命令最长 30 秒，每路输出最多 256 KiB；整体请求最长 170 秒。模型执行期间 WebSocket 仍处理心跳。请求缓冲有限制，防止长任务阻塞连接或无限积累内存。</p>
+<p>直接 <code>tool</code> 和文字/配置请求分别使用 FIFO 队列。模型 HTTP 请求进行中仍可执行遥控工具；文字决策共用会话历史并串行执行。响应可能跨队列交错，客户端必须按 id 匹配。断开连接时取消全部工作队列及在途执行。</p>
+<h2 id="_3">后台管理<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code>airc-runtime<span class="w"> </span>service<span class="w"> </span>start<span class="w"> </span>--state-dir<span class="w"> </span>/data/local/tmp/airc/state<span class="w"> </span>--port<span class="w"> </span><span class="m">9876</span>
+airc-runtime<span class="w"> </span>service<span class="w"> </span>status<span class="w"> </span>--state-dir<span class="w"> </span>/data/local/tmp/airc/state
+airc-runtime<span class="w"> </span>service<span class="w"> </span>stop<span class="w"> </span>--state-dir<span class="w"> </span>/data/local/tmp/airc/state
+</code></pre></div>
+<p>后台启动使用新 session 并脱离 ADB 的标准输入/输出，日志写入私有状态目录。管理操作通过文件锁串行化。进程记录包含 PID、<code>/proc</code> 启动时间和实际可执行文件路径；停止前核对身份，避免误杀复用 PID 的其他程序。</p>
+<p>安装器按照目标 ABI 列表选择资产，验证文件的大小与 SHA-256，并比较目标文件摘要。摘要和运行权限均相同时不推送或重启；摘要或 root/shell 权限变化时推送到 <code>.next</code>，核验后停止原服务并原子替换。</p>
+<p>候选先执行 <code>--version</code>，与清单不一致时保留原服务。提交脚本备份旧程序、记住原服务端口及实际运行用户，替换后启动候选并等待 ready；失败时恢复旧文件，原服务此前运行则以原权限在原端口重新启动。成功后移除备份。提交阶段暂缓协程取消，避免停掉旧程序后手机直接退出；脚本也对 EXIT/HUP/INT/TERM 注册恢复处理。ADB 断链、SIGKILL 或断电可能中断恢复处理，需要重新核对目标文件与服务状态。</p>
+<p>App 的 root 开关默认关闭；开启后优先检测当前 root adbd，其次验证 <code>su</code>，不可用时回退 shell。部署和管理命令按已验证权限执行；root 服务通过 <code>.root-mode</code> 标记供后续提权管理，关闭时停止旧服务后恢复 shell 所有权，不放宽状态文件权限。详细设置与切换限制见<a href="../guide/connections/">连接设备</a>。</p>
+<p>发布源默认为 APK 内资产，服务管理从项目 GitHub 仓库最新 Release 获取在线 HTTPS 清单。在线清单沿用 version/protocol/assets，并支持 minAppVersionCode、maxAppVersionCode；每个资产增加 url。清单 URL 的路径增加 <code>.sig</code> 后缀为原始二进制签名文件（保留查询参数），使用 APK 内固定公钥和 SHA256withRSA 验证清单原始字节，验签后才解析与使用资产 URL/摘要。缺少签名、错误身份、畸形签名或内容篡改均拒绝，不回退到未签名发布。</p>
+<p>在线下载按 SHA-256 缓存，缓存命中时再次校验大小与摘要，不保存未验证或部分文件。签名覆盖版本、协议、应用兼容范围及所有 ABI 的资产 URL/大小/摘要；私钥不打包进应用。</p>
+<p>在线查询和下载支持协程取消：直接关闭在途 HTTP 请求，清除未完成的下载文件并释放下载锁；等待响应头或数据读取不会继续等待正常网络超时。</p>
+<p><code>device.info</code> 使用空参数对象，成功时 <code>result</code> 包含 JSON 编码的只读设备信息。字段及缺失值规则见<a href="../reference/tools/#device-info">工具参考</a>。原有响应 envelope 和协议版本保持兼容。</p>
+<p><code>apps.list</code> 成功响应的 <code>result</code> 现在包含 JSON 编码的 <code>apps</code> 数组，字段见<a href="../reference/tools/#apps-list">应用列表</a>。调用方按结构化 JSON 字段解码；响应 envelope 保持不变。</p>
+<p>坐标工具 <code>remote.tap</code>、<code>remote.swipe</code>、<code>remote.long_press</code> 采用归一化坐标，直接调用和模型函数共用校验与注入层，详见<a href="../reference/tools/#gestures">坐标输入</a>。<code>remote.key</code> 增加数字、频道和删除键枚举，旧按键语义不变。</p>
+<p><code>remote.tap</code> 新增可选 <code>count</code>（1/2，默认 1）支持双击，旧调用方未传时语义不变。控制端触控板根据 <code>/status.tools</code> 决定启用状态；数字键盘使用现有 <code>remote.key</code> 枚举。</p>
+<h2 id="_4">媒体状态快照<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<p><code>media.status</code> 接收空参数对象，返回 <code>{"sessions":[...]}</code>。每个会话含 <code>packageName</code>、<code>active</code>、<code>state</code>、<code>positionMs</code>、<code>durationMs</code>、<code>updatedAtElapsedMs</code>、<code>seekSupported</code> 和 <code>description</code>。状态数字使用 Android PlaybackState 值；位置为系统报告的毫秒快照，不自动推算。未知字段为 null。时长仅在系统 dump 明确提供标准 duration 键时返回，常见系统输出不提供时长。</p>
+<p><code>seekSupported</code> 表示播放器声明了 ACTION_SEEK_TO（256），不表示当前 runtime 已能执行 seek。读取权限失败返回工具错误。该工具也通过 <code>media_status</code> 函数提供给大模型。现有播放按键保持可用，精确 seek 尚未实现。</p>
+<h2 id="_5">截图二进制资源<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<p><code>device.screenshot</code> 接收空参数对象，执行固定命令 <code>screencap -p</code>，返回 JSON 描述而非图片文本：</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="s2">"随机 UUID"</span><span class="p">,</span><span class="nt">"path"</span><span class="p">:</span><span class="s2">"/artifacts/UUID"</span><span class="p">,</span><span class="nt">"mimeType"</span><span class="p">:</span><span class="s2">"image/png"</span><span class="p">,</span><span class="nt">"sizeBytes"</span><span class="p">:</span><span class="mi">12345</span><span class="p">,</span><span class="nt">"width"</span><span class="p">:</span><span class="mi">1920</span><span class="p">,</span><span class="nt">"height"</span><span class="p">:</span><span class="mi">1080</span><span class="p">,</span><span class="nt">"expiresInSeconds"</span><span class="p">:</span><span class="mi">60</span><span class="p">}</span>
+</code></pre></div>
+<p>控制端从同一目标的 <code>GET /artifacts/{id}</code> 下载 PNG。响应采用 <code>Cache-Control: no-store</code>、附件文件名和 <code>nosniff</code>，资源不存在、过期或被淘汰返回 404。服务限制截图输出 16 MiB、单次捕获并发为 1，内存最多保留四张；新的截图可能提前淘汰旧链接。60 秒后不再允许下载，过期内存项在下次资源操作时清理，进程退出后全部丢弃。不创建目标临时图片文件，不接受任意文件路径。</p>
+<p>大模型函数名为 <code>device_screenshot</code>，获得同一资源描述；当前并未将图像注入多模态模型。<code>client/</code> 下载器仅允许匹配资源 ID 的路径，禁用重定向，校验 MIME、PNG 标识与长度，超过描述长度即拒绝。手机和桌面已提供截图预览和保存页面，手机支持系统分享。预览有解码失败反馈，下载描述和 PNG 头的尺寸必须一致，像素数量上限为 32 Mi。这是单张截图，不是实时投屏。</p>
+<h2 id="_6">文件管理与流式传输<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
+<p><code>files.list</code> / <code>files_list</code> 与 <code>files.stat</code> / <code>files_stat</code> 接收 <code>root</code>（<code>downloads</code> 默认、<code>inbox</code> 服务私有收件箱、<code>full</code> 文件系统 <code>/</code>）及相对 <code>path</code>。拒绝绝对路径、<code>..</code> 和符号链接穿越；权限沿用服务身份。列表额外接收 <code>limit</code>（1–100，默认 50）与 <code>cursor</code>；返回 root/path/entries/nextCursor，按文件名排序，最多扫描 4096 项。stat 返回 kind 与普通文件 sizeBytes。</p>
+<p><code>task.start</code> / <code>task_start</code> 的 <code>direction=download</code> 配合 root/path 创建流式下载，轮询 <code>task.progress</code> / <code>task_progress</code> 等待 ready，读取其 sha256 和 <code>dataPath=/transfers/{id}/data</code>，随后 GET 该路径。上传使用 direction=upload、sizeBytes、sha256，再 PUT 原始二进制到 dataPath。GET/PUT 的 MIME 为 application/octet-stream，禁止缓存；固定 64 KiB 缓冲，单文件最大 1 TiB。上传长度/摘要必须匹配，fsync 后原子提交；默认 RENAME_NOREPLACE，不支持时明确失败。最多两个活动任务，最多保留 16 条记录；终态记录可提前淘汰，空闲记录在新任务时按 15 分钟清理。任务不跨进程重启恢复。</p>
+<p><code>task.progress</code> 返回 id/direction/root/name/sizeBytes/bytesTransferred/phase/sha256/error/unit/dataPath。phase 包含 hashing、ready、awaiting_upload、uploading、downloading、committing、deleting、completed、failed、cancelled。unit 通常是 bytes，删除任务是 items。<code>task.cancel</code> / <code>task_cancel</code> 与 <code>DELETE /transfers/{id}</code> 可取消未提交任务，已提交文件保留；递归删除的已删除项无法恢复。</p>
+<p><code>files.mkdir</code> / <code>files_mkdir</code> 接收 <code>root</code>（downloads/inbox/full）及必填相对 <code>path</code>，创建单个新目录并返回 <code>{root,path,created:true}</code>。父目录必须存在；不创建父目录、不覆盖文件/目录/链接、不跟随符号链接，不接受递归或权限参数。使用 mkdirat 按打开的父目录执行，权限沿用服务身份，新目录请求模式为 0700，实际模式由文件系统策略决定。</p>
+<p><code>files.delete</code> / <code>files_delete</code> 接收 root/path/recursive，仅创建待确认提案，不立即删除。<code>files.prepare_overwrite</code> / <code>files_prepare_overwrite</code> 接收 root/path，返回覆盖提案。提案含 id/kind/root/path/exists/directory/sizeBytes/recursive/approvalRequired，15 分钟过期，最多 32 项。<code>files.pending</code> / <code>files_pending</code> 可查询尚未确认提案。控制端必须核对目标并让用户确认，再发送独立请求 <code>type=approve, arguments={id}</code>；<code>{id,accepted:false}</code> 丢弃提案。模型工具没有 approve。删除确认返回 task 描述；覆盖确认返回单次 token，随后 task.start 上传携带 overwriteToken。覆盖前重新核对目标信息，变化时失败；允许覆盖时使用原子替换。递归删除不跟随链接、不跨挂载点、最多 128 层；枚举子项和进入子项时均检查文件系统设备号，用户直接选中的顶层目录可以自身位于挂载点。</p>
+<p><code>files.download</code> / <code>files_download</code> 保留小文件快照接口，最大 16 MiB，返回短期 FileArtifact（id/path/name/mimeType/sizeBytes/sha256/expiresInSeconds）。GET <code>/artifacts/{id}</code> 下载，60 秒过期，与截图共享四项资源容量；大文件应使用 task.start。界面所有文件下载均采用流式任务。详见<a href="../guide/files/">目标文件</a>。</p>
+<h2 id="_7">媒体打开工具<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
+<p><code>media.players</code> / <code>media_players</code> 接收 root/path 与可选 mimeType，读取文件属性并查询目标 ACTION_VIEW 处理器。返回 root/path/mimeType/transport/packages；Downloads 使用 file URI，inbox/full 使用目标 loopback HTTP 地址。排除 frameworkpackagestubs 占位处理器。<code>media.open</code> / <code>media_open</code> 使用同样参数与可选 package（必须来自查询结果）启动播放器；返回 launched、playbackVerified=false、可选 resourceId 和 Android 启动结果。它不证明解码/播放成功，不接受任意外部 URI 或 shell 参数。</p>
+<p><code>media.release</code> / <code>media_release</code> 接收 resource id，撤销 HTTP 资源及其在途读取，不删除源文件，也不向播放器注入停止命令。GET/HEAD <code>/media/{id}</code> 提供真实媒体 MIME、Accept-Ranges、Content-Length、no-store；单段 bytes 范围返回 206 与 Content-Range，不可满足的范围返回 416，多段或畸形范围回退完整响应。If-Range 因没有提供验证器而回退完整响应。分段语义参考 <a href="https://www.rfc-editor.org/rfc/rfc9110.html#name-range">RFC 9110</a>。资源固定文件描述符，逐块核对文件元数据，文件改变返回 409 或中止流；读缓冲 64 KiB，最大文件 1 TiB。最多四份资源、每份四个读取、24 小时闲置过期，重启不恢复。</p>
+<h2 id="_8">本地媒体发布<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h2>
+<p><code>media.publish</code> / <code>media_publish</code> 接收 root/path，为本地播放器创建服务拥有的 Downloads 副本，返回长任务描述。<code>task.progress</code> 终态 completed 的 result 为 <code>{id,root:"downloads",path,sizeBytes,sha256}</code>。通过 <code>media.open</code> 打开该路径，使用 <code>media.release</code> 删除该 id 对应副本。原文件保留。<code>media.players</code> 可额外选择 transport=local-copy，仅查询未来 file URI 的处理器，不创建副本；查询返回 sizeBytes。</p>
+<p>发布采用独立 UUID 目录、O_EXCL 创建文件、64 KiB 缓冲、源变化检测、fsync 和副本 SHA-256 回读校验；未完成文件不会发送给播放器，失败或取消按创建时的 inode 清理本次文件，不覆盖或递归删除用户路径。<code>.nomedia</code> 限制媒体扫描，但不会隐藏文件系统访问。最多四份准备/保留副本，长任务共用两个活动名额，保留 16 MiB 存储余量。task.progress 增加可选 result，方向 media_publish、阶段 publishing；单位仍为 bytes。副本记录持久化在服务私有 media-publications 目录，记录 UUID、目录/文件 dev+inode、创建时间及完成结果，每次写入采用原子替换、0600 权限及 fsync。进程启动时恢复未过期的完成副本，清理有记录的中断/过期副本；身份不匹配或损坏记录保留并报告。<code>media.publications</code> / <code>media_publications</code> 查询恢复及当前保留的副本，<code>media.release</code> 逐项释放。任务本身和 HTTP 媒体资源仍不跨重启恢复。</p>
+<h2 id="_9">应用管理确认<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
+<p><code>apps.info</code> / <code>apps_info</code> 查询当前用户应用信息；<code>apps.uninstall</code> / <code>apps_uninstall</code> 只生成提案，<code>apps.pending</code> / <code>apps_pending</code> 列出尚未确认的提案。详细字段与限制见<a href="../reference/tools/#app-uninstall">工具参考</a>。</p>
+<p>控制端核对包名、版本、用户和数据删除影响后，发送 <code>{"id":"request-id","protocol":1,"type":"approve_app","arguments":{"id":"proposal-id"}}</code>。accepted=false 拒绝。确认请求不作为模型函数暴露，提案只能使用一次。成功提交返回后台任务，task.progress 返回 committing/completed/failed；提交后不支持 task.cancel。失败可能包含包管理器超时，不能据此推断应用数据未改变，应重新查询状态。</p>
+<h2 id="apk">APK 元信息<a class="headerlink" href="#apk" title="Permanent link">&para;</a></h2>
+<p><code>apps.apk_info</code> / <code>apps_apk_info</code> 对目标 root/path 指定的 APK 启动只读解析长任务，通过 task.progress 读取进度与最终 result。结果见<a href="../reference/tools/#apk-info">工具参考</a>。它不生成安装提案或提交安装；signatureVerified 始终 false，指纹只表示读取到的声明证书，不能代表签名有效。</p>
+<h2 id="apk_1">APK 安装确认<a class="headerlink" href="#apk_1" title="Permanent link">&para;</a></h2>
+<p>apps.install / apps_install 准备匿名 APK 副本与人工确认提案，apps.install_pending / apps_install_pending 列出提案。准备返回 direction=apk_prepare、phase=preparing 的任务，支持 task.cancel；完成 result 的结构见<a href="../reference/tools/#apk-install">安装工具</a>。</p>
+<p>用户核对包名、版本、用户、摘要、签名声明和覆盖影响后发送 <code>{"id":"request","protocol":1,"type":"approve_install","arguments":{"id":"proposal-id"}}</code>。accepted=false 拒绝。接受后返回 direction=app_install 的 committing 任务，task.progress 读取结果，提交后 task.cancel 不取消安装。签名有效性由包管理器在提交时验证；声明信息解析与安装验证保持区别。</p>
+<h2 id="_10">存储分析长任务<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
+<p>storage.analyze / storage_analyze 对所选目录启动只读 storage_scan 任务，task.progress 读取项数进度与最终 result，task.cancel 取消。sizeBytes 是扫描项数上限，unit=items；报告的逻辑字节和文件块字段见<a href="../reference/tools/#storage-analysis">工具参考</a>。未识别应用缓存，也不返回可回收空间或隐式执行删除。</p>
+<h2 id="_11">标准媒体定位<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
+<p>media.status 的标准桥接结果增加 seekAvailable/source/userId 与 sessionTag，保留原 sessions 字段兼容旧客户端。桥接失败回退 dumpsys，明确 seekAvailable=false。media.seek / media_seek 使用 package、positionMs 与可选 sessionTag 提交绝对定位，请求响应的 submitted 与 playbackVerified=false 不等于播放器已完成跳转。详细限制见<a href="../reference/tools/#media-seek">工具参考</a>。</p>
+<h2 id="_12">应用标签来源<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h2>
+<p>apps.list 保持 apps 数组兼容旧控制端，增加 source、labelsAvailable、userId 与 labelErrors。标准包管理器读取失败回退 pm，未知 label=null；完整字段与限额见<a href="../reference/tools/#app-labels">工具参考</a>。</p>
+<p>标准媒体会话可包含 <code>customActions:[{id,name}]</code>；顶层 <code>customActionAvailable</code> 表示标准动作通道可用。直接工具 <code>media.custom_action</code> 及模型 <code>media_custom_action</code> 仅接受当前活动会话声明的动作 ID，执行时重新核对会话唯一性和声明；不传私有 Bundle。响应 <code>submitted:true</code> 只表示送出请求，<code>playbackVerified:false</code> 保留；界面刷新会话并要求核对实际结果。</p>
+<h2 id="screen-preview-stream">低帧率预览流 v1<a class="headerlink" href="#screen-preview-stream" title="Permanent link">&para;</a></h2>
+<p><code>screen.preview_start</code> 返回一次性 <code>{id,path,mimeType:"application/x-airc-preview",format:"airc-png-v1",intervalMs,durationSeconds,claimWithinSeconds:30,maxFrameBytes:16777216}</code>。通过 <code>GET /preview/{id}</code> 在三十秒内领取一次；后续领取返回 409 或已释放后的 404。只有 HTTP 读取时捕获。预览与截图共用捕获锁；全局一个待领取或读取中的会话。<code>screen.preview_stop {id}</code> 停止指定会话，未知 UUID 返回 <code>stopped:false</code>，不停止其他媒体。</p>
+<p>流首部为 ASCII <code>AIRCPRV1</code>，后续每条记录是大端 <code>sequence:u32,width:u32,height:u32,length:u32,elapsedMs:u64</code>（24 字节），紧跟 length 字节的 PNG。序号从 1 开始递增；elapsedMs 是服务端本次流的单调经过时间，每帧尺寸以当前截图为准。宽高为零时，length=0 表示正常结束，length&gt;0 是最多 1024 字节的 UTF-8 错误。结束记录序号为已经生成的帧数，截断不算正常结束。HTTP 无整流 Content-Length，带 no-store/nosniff；不通过 WebSocket 传帧或 Base64。</p>
+<p>单帧最多 16 MiB、32M 像素，边长最多 16384；间隔 500..5000 毫秒、时长 10..120 秒。无历史帧队列，不追赶补帧；实际间隔包含捕获和消费耗时。捕获失败终止流；停止/断开取消命令进程组并释放读取资源。恶意或停滞的读取者可能延迟资源释放，需关闭旧读取连接再开始；服务重启清空所有会话，无自动续流。</p>
+<p><code>gamepad.pulse {buttons?,x?,y?,holdMs?}</code> 是 10..2000 毫秒的有限输入事务，默认100，按钮最多四个、轴值 -1..1。<code>gamepad.reset {}</code> 提交全部受控合成按键抬起与零轴。工具响应包含 <code>operation:pulse|reset,submitted,released,sourceGamepad:1025,sourceJoystick:16777232,elapsedMs,gameVerified:false</code>；released 只确认系统队列接受释放。请求中止不取消已接受的在途事务，按钮/轴状态不落盘。输入拒绝或释放失败返回错误；服务强制终止不保证释放。详见<a href="../reference/tools/#gamepad">手柄工具</a>。</p>
+<p>应用缓存清理为独立提案/确认流程：<code>apps.clear_cache {package}</code> 返回 <code>{id,kind:app_cache_clear,app,approvalRequired:true,cacheOnly:true,mode:package_manager_cache_only}</code>；模型只能准备或查询 <code>apps.cache_pending</code>。人工 <code>approve_cache</code> 拒绝或提交不可取消的缓存长任务。<code>apps.cache_capabilities</code> 只读探测；未明确声明 cache-only、缺少 INTERNAL_DELETE_CACHE_FILES 或 UID 不适用时拒绝，不执行数据清除 fallback。任务结果不提供回收字节，不宣称全面的数据保留验证。</p>
+<h2 id="screen-mirror-stream">AVC 镜像流 v1<a class="headerlink" href="#screen-mirror-stream" title="Permanent link">&para;</a></h2>
+<p><code>screen.mirror_start</code> 接受width/height/bitrate/durationSeconds，返回一次性id与<code>/mirror/{id}</code>，mimeType <code>application/x-airc-avc</code>、format <code>airc-avc-v1</code>、请求尺寸/码率/期限、claimWithinSeconds=30、maxChunkBytes=65536、maxStreamBytes=134217728、audio=false。单会话单读取者，与截图共用捕获锁。准备只保留名额，HTTP领取才启动固定screenrecord命令。宽/高160..1280/90..1280且为偶数，像素量≤921600；码率250000..8000000，期限10..120秒。</p>
+<p>流首部ASCII <code>AIRCMIR1</code>，记录是大端kind:u32,length:u32，再紧跟length字节。kind=1为1..65536字节的Annex-B H.264数据，kind=0/length=0为正常结束，kind=2为≤1024字节UTF-8错误。网络EOF不替代结束记录；错误/截断不报告正常完成。总编码数据≤128MiB，固定缓冲/backpressure，无帧历史队列或Base64/WebSocket图像。<code>screen.mirror_stop {id}</code>取消指定会话；HTTP关闭/超时释放编码进程组与捕获锁，不恢复旧流。</p>
+<h2 id="_13">持续虚拟手柄会话原型<a class="headerlink" href="#_13" title="Permanent link">&para;</a></h2>
+<p><code>gamepad.virtual_capabilities {}</code> 返回 root/uinput 支持与原因；
+<code>gamepad.virtual_open {}</code> 返回 <code>id</code>、<code>deviceName</code>、轴映射和超时。
+<code>gamepad.virtual_update {"id":"会话 UUID","sequence":1,"state":{"buttons":["a"],"leftX":0.5,"rightY":-1,"hatX":1}}</code>
+提交完整快照，棒轴 -1..1、帽轴整数 -1/0/1，缺省归零。
+<code>gamepad.virtual_close {"id":"会话 UUID"}</code> 释放并销毁。</p>
+<p>会话绑定发起 WebSocket，序号为 1..4294967295 且严格递增。
+两秒无更新尝试回中，三十秒闲置关闭，一小时总期限；断线自动销毁。
+<code>submitted</code>/<code>registered</code> 表示设备写入/注册，<code>gameVerified:false</code> 不表示游戏消费成功。
+操作仅使用固定 uinput，共享手柄页提供手动开始/停止与按住/松开交互。</p>
+<p>H.264镜像票据绑定创建它的WebSocket连接。<code>screen.mirror_stop</code>须从同一连接提交；
+另一连接即使知道ID也会拒绝。连接断开移除未领取票据并通知活动读取器取消，
+活动读取器销毁前仍占用单流槽位，避免同时启动两个编码器。
+HTTP仍使用票据的随机路径读取，未更改二进制帧格式；重连需要新建票据。</p>
+<p>H.264生产者独立于HTTP body轮询运行，内部队列最多两个固定大小记录（另有一个工作块）。
+断线/停止取消可打断等待发送；等待发送也受编码期限加五秒余量限制。
+body销毁会中止生产者并释放编码器/捕获许可。背压取消可能无法发送结束记录，
+接收端必须继续按原规则将缺少结束记录报告为中断，不能当作完整录制。</p>
+<p><code>device.info.screen</code>增加可选<code>source</code>：优先使用<code>active_viewport</code>，尺寸来自当前活动默认显示器的逻辑frame，
+与触控坐标换算一致；无法读取时回退<code>wm_size</code>，该值是自然/覆盖尺寸，不能据此保证当前旋转方向。
+source 未提供时客户端保留 null，宽高字段按响应读取。</p>
+<h2 id="_14">系统管理能力探测<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h2>
+<p><code>device.system_capabilities {}</code> 为只读工具，返回runtimeUid/rootRuntime、DEVICE_POWER/REBOOT权限，
+lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
+当前<code>executionImplemented=true</code>、<code>supported=false</code>、<code>approvalRequired=true</code>。执行端已实现，但尚未完成物理设备动作验收，接口存在不代表实测可用。</p>
+<p><code>device.system_action {"action":"lock|reboot|shutdown"}</code> 仅准备提案，<code>device.system_pending {}</code> 查看当前连接提案。提案绑定连接、120 秒过期；断线删除。独立请求 <code>type=approve_system</code> 必须明确传入 <code>id</code> 和布尔值 <code>accepted</code>，模型工具不提供确认入口。执行前重新核对 root、权限及接口，通过固定框架调用执行，不接受命令或重启原因参数。拒绝、过期及已使用提案不会执行。响应仅表示 <code>submitted=true</code>、<code>completed=false</code>；断线或超时不证明动作成功，需观察目标最终状态。
+接口存在与权限检查不等于设备实际操作验收；探测不授予权限、不锁屏、不重启或关机。</p>
+<p>系统提案的 <code>expiresInSeconds</code> 是查询时剩余有效秒数（向上取整），不是每次查询重新获得 120 秒。服务端仍以创建时间核验到期；过期确认消费提案并拒绝执行。断线只移除所属连接提案，不影响其他连接。</p>
+<p>镜像客户端可选择连续续流，正常且已收到画面的片段结束后先调用 stop 清理，再申请全新票据，最多三十段。每段沿用原连接所有者，重新查询所选目标比例；不复用旧 HTTP 路径。异常、旋转、取消或连接变化不续接，不等同于流内旋转或自动重连。</p>
+<p>连续续流与方向恢复都须确认旧票据清理响应包含匹配的 id 和布尔 stopped。stopped=false 可表示票据已释放；响应缺失、格式错误或请求失败时停止并提示，不创建下一段。</p>
+<h2 id="_15">只读系统状态<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h2>
+<p><code>device.system_state {}</code> 返回 userId=0 的 Android 框架观察值：interactive、keyguardLocked、deviceLocked、deviceSecure，以及 elapsedRealtimeMs、runtimeUid、readOnly、available 和 source。字段读取失败为 null，errors 标出失败类型；框架桥接不可用时 available=false，不伪造 false。只接受空参数，不改变电源、锁屏或凭据。观察不能单独证明此前动作完成，断线也不是关机成功证据。</p>
+<h2 id="_16">文本任务的工具范围<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h2>
+<p>新版 <code>/status</code> 返回 <code>textToolScope: true</code>。该字段缺失时客户端按 false 处理；需要强制工具范围的调用方不得把未显式声明此能力的目标当作已支持。</p>
+<p><code>type: "text"</code> 请求可在 <code>arguments.allowedTools</code> 中传入非空的规范工具名数组，例如 <code>["device.info"]</code>。省略时保持原有注册工具集合；显式 null、空数组、非字符串、未知名称、模型下划线别名或重复项均拒绝。范围只能缩小现有白名单，不增加工具或人工确认 API。服务先过滤发给提供商的 schema，再检查每次返回的规范工具名，越界调用返回工具错误且不执行、不产生执行进度事件。</p>
+<p>受限请求清空旧会话历史后独立开始，避免先前较宽范围的工具结果进入本次任务。范围是单次请求约束，不改变直接工具权限、模型配置或高影响动作的控制端确认机制。</p>
+<h2 id="shell">模型 Shell 与结构化文字输入<a class="headerlink" href="#shell" title="Permanent link">&para;</a></h2>
+<p><code>remote.text</code> / <code>remote_text</code> 接收仅含 text 的对象，提交焦点字段可打印 ASCII，返回 <code>{submitted:true,characters,contentVerified:false}</code>。长度一至二千零四十八，字面 <code>%s</code> 最多八处，非 ASCII 明确拒绝；内容校验和输入法兼容不由提交成功保证。</p>
+<p><code>device.shell</code> 直接请求保持专家 shell 文本语义；模型 alias device_shell 仅固定诊断白名单，直接参数执行，不调用 sh -c。模型不能用该入口删除文件、pm clear、修改显示设置或执行重启等动作，必须使用已有结构化工具和独立确认。包含后续 device.ui_hierarchy 在内，当前工具总数五十三项。</p>
+<p><code>device.ui_hierarchy</code> / <code>device_ui_hierarchy</code> 仅接受空对象，通过固定 UIAutomator 参数读取默认显示器当前界面，输出 <code>{readOnly:true,atomicSnapshot:false,source:"android_uiautomator",xml}</code>。最多 128 KiB UTF-8 XML，未知参数、符号链接、超限或不完整输出拒绝；不提供任意路径、输入或点击。工具数现五十三项。</p>
+<h2 id="_17">模型工具调用组校验<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
+<p>提供商一次返回多条工具调用时，runtime 在记录该组调用或执行其中任何工具前，校验所有调用具有非空白字符串 ID，且组内 ID 唯一。缺失、类型错误、空白或重复 ID 均拒绝整组，以免留下无法与工具结果对应的历史。调用还必须声明 type=function、非空白 function.name 和字符串 function.arguments；缺失参数不得默认为 {} 执行。参数字符串内的 JSON 或工具参数错误仍作为对应工具结果返回。该校验不替代各工具参数、请求范围及人工确认校验。</p>
+<p>模型提供商 message.role 必须为 assistant；tool_calls 只接受缺省、null 或数组。错误类型不能降级为正文答案，避免畸形调用消息进入会话历史。</p>
+<p>模型 remote_key 不允许 power，即使请求 allowedTools 包含 remote.key 也拒绝该参数；模型应通过系统提案和 App 确认处理锁屏/重启/关机。直接工具 remote.key 的用户手动电源键仍保持原能力。此检查仅约束该明确的按键入口，不是目标 GUI 行为的通用权限隔离。</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="页脚" >
+        
+          
+          <a href="../troubleshooting/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 故障排查">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                上一页
+              </span>
+              <div class="md-ellipsis">
+                故障排查
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../reference/tools/" class="md-footer__link md-footer__link--next" aria-label="下一页: 工具">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                下一页
+              </span>
+              <div class="md-ellipsis">
+                工具
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "navigation.footer", "content.code.copy", "search.suggest", "search.highlight"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
