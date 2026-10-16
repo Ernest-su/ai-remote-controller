@@ -65,6 +65,7 @@ private val LocalRemotePalette = staticCompositionLocalOf { LightRemotePalette }
 object RemoteColors {
     val Brand: Color @Composable get() = LocalRemotePalette.current.Brand
     val Action: Color @Composable get() = LocalRemotePalette.current.Action
+    val ActionContainer: Color @Composable get() = LocalRemotePalette.current.ActionContainer
     val OnAction: Color @Composable get() = LocalRemotePalette.current.OnAction
     val Background: Color @Composable get() = LocalRemotePalette.current.Background
     val Header: Color @Composable get() = LocalRemotePalette.current.Header
@@ -84,6 +85,7 @@ object RemoteDimensions {
     val SettingRowHeight = 56.dp
     val ManagementWidth = 560.dp
     val ManagementDialogHeight = 640.dp
+    val FileGridHeight = 144.dp
     val ManagementRowHeight = 72.dp
     val ManagementFileIcon = 40.dp
     val ApplicationIcon = 40.dp

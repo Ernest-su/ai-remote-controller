@@ -30,6 +30,52 @@ class ManagementUiTest {
         file.outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
+    @Test fun gridAndCategoryFilterOnlyLoadedEntriesWithoutRequests() {
+        var requests=0
+        compose.setContent { RemoteTheme { FileBrowserPanel(FileBrowserState(entries=entries,loaded=true,nextCursor="shortcut"),true,
+            {requests++},{},{requests++},{},{}) } }
+        compose.onNodeWithTag("files-view").performClick()
+        compose.onNodeWithTag("files-page").performScrollToNode(hasTestTag("files-category"))
+        compose.onNodeWithTag("files-category").performClick()
+        compose.onNodeWithTag("files-category-video").performClick()
+        compose.onNodeWithTag("files-page").performScrollToNode(hasTestTag("file-row-movie.mp4"))
+        compose.onNodeWithTag("file-row-movie.mp4").assertIsDisplayed()
+        compose.onNodeWithTag("file-row-Photos").assertDoesNotExist()
+        compose.onNodeWithTag("files-view").assertContentDescriptionEquals("切换列表视图")
+        assertEquals(0,requests)
+        compose.onNodeWithTag("files-page").performScrollToNode(hasText("加载下一页"))
+        compose.onNodeWithText("加载下一页").performClick()
+        assertEquals(1,requests)
+    }
+
+    @Test fun longPressSelectsWithoutSubmittingAndContextActionTargetsSelectedFile() {
+        var deleted="";var inspected=""
+        compose.setContent { RemoteTheme { FileBrowserPanel(FileBrowserState(entries=entries,loaded=true),true,{},{},{},{},{inspected=it.name},onDelete={deleted=it.name}) } }
+        compose.onNodeWithTag("files-page").performScrollToNode(hasTestTag("file-row-notes.txt"))
+        compose.onNodeWithText("notes.txt").performTouchInput { longClick() }
+        compose.onNodeWithTag("files-clear-selection").assertIsDisplayed()
+        assertEquals("",deleted);assertEquals("",inspected)
+        compose.onNodeWithText("删除").performClick()
+        assertEquals("notes.txt",deleted)
+        compose.onNodeWithTag("files-tools-dialog-close").performClick()
+        compose.onNodeWithTag("files-clear-selection").performClick()
+        compose.onNodeWithText("上传文件").assertIsDisplayed()
+    }
+
+    @Test fun hiddenFilesAndGridPreferenceSurviveRestoration() {
+        val restoration=StateRestorationTester(compose)
+        restoration.setContent { RemoteTheme { FileBrowserPanel(FileBrowserState(entries=entries+TargetFileEntry(".config","file",10),loaded=true),true,{},{},{},{},{}) } }
+        compose.onNodeWithTag("file-row-.config").assertDoesNotExist()
+        compose.onNodeWithTag("files-view").performClick()
+        compose.onNodeWithTag("files-page").performScrollToNode(hasTestTag("files-category"))
+        compose.onNodeWithTag("files-category").performClick()
+        compose.onNodeWithText("显示隐藏文件").performScrollTo().performClick()
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithTag("files-view").assertContentDescriptionEquals("切换列表视图")
+        compose.onNodeWithTag("files-page").performScrollToNode(hasTestTag("file-row-.config"))
+        compose.onNodeWithTag("file-row-.config").assertIsDisplayed()
+    }
+
     @Test fun fileListPrioritizesFoldersAndKeepsActionsInMenu() {
         var entered = ""; var deleted = ""
         compose.setContent { RemoteTheme { Surface(color = RemoteColors.Background) {
@@ -153,12 +199,13 @@ class ManagementUiTest {
     }
 
     @Test fun managementScreenshotsAndLargeTextRemainUsable() {
+        val dark = mutableStateOf(false)
         val files = mutableStateOf(false)
         val large = mutableStateOf(false)
         compose.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, if (large.value) 1.6f else 1f)) {
-                RemoteTheme { Surface(color = RemoteColors.Background, modifier = Modifier.fillMaxSize()) {
+                RemoteTheme(dark.value) { Surface(color = RemoteColors.Background, modifier = Modifier.fillMaxSize()) {
                     Column(Modifier.widthIn(max = if (large.value) 320.dp else 360.dp)) {
                         Text(if (files.value) "目标文件" else "应用管理", Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge)
                         if (files.value) FileBrowserPanel(FileBrowserState(entries = entries, loaded = true), true, {}, {}, {}, {}, {}, onRoot = {}, onCreateDirectory = {})
@@ -182,5 +229,10 @@ class ManagementUiTest {
         compose.onNodeWithText("查看属性").assertIsDisplayed().performClick()
         compose.onNodeWithTag("files-properties-dialog-close").assertIsDisplayed().performClick()
         screenshot("management-files-large")
+        compose.onNodeWithTag("files-view").performClick()
+        compose.onNodeWithTag("files-page").performScrollToNode(hasTestTag("file-row-movie.mp4"))
+        screenshot("management-files-grid-large")
+        compose.runOnIdle { dark.value=true }
+        screenshot("management-files-grid-large-dark")
     }
 }

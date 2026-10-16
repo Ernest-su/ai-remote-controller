@@ -65,3 +65,5 @@ debug APK 输出为 `androidApp/build/outputs/apk/debug/androidApp-debug.apk`，
 桌面联调可从项目目录运行 `./gradlew :desktopApp:run --no-daemon`，使用宿主机 adb；操作与限制见[桌面指南](guide/desktop.md)。遇到问题先阅读[故障排查](troubleshooting.md)。
 
 Android 动态预览可直接触摸操作目标，通过“全屏预览”放大画面并展开悬浮遥控；两种模式均保持原比例。详见[设备截图与动态预览](guide/screenshots.md#screen-mirror)。
+
+“目标文件”提供列表/网格、目录内搜索与分类、长按选择和底部快捷操作；上传及删除沿用独立确认与任务进度。详见[目标文件管理](guide/files.md)。

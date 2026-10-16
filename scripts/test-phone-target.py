@@ -15,7 +15,7 @@ SUITES = {
     "remote-haptics-ui": ("ernest.airc.RemoteHapticsUiTest", 1),
     "lan-connection-ui": ("ernest.airc.LanConnectionUiTest", 2),
     "appearance": ("ernest.airc.AppearanceUiTest", 2),
-    "management-ui": ("ernest.airc.ManagementUiTest", 9),
+    "management-ui": ("ernest.airc.ManagementUiTest", 12),
     "app-packages-ui": ("ernest.airc.AppPackagesUiTest", 2),
     "profile-isolation": ("ernest.airc.EncryptedProfilesIsolationTest", 3),
     "product-pages": ("ernest.airc.ProductPagesUiTest", 1),
