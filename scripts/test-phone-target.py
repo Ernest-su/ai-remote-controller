@@ -17,7 +17,7 @@ SUITES = {
     "lan-connection-ui": ("ernest.airc.LanConnectionUiTest", 4),
     "appearance": ("ernest.airc.AppearanceUiTest", 2),
     "app-details-ui": ("ernest.airc.AppDetailsUiTest,ernest.airc.AppDetailsLayoutUiTest", 2),
-    "management-ui": ("ernest.airc.ManagementUiTest", 13),
+    "management-ui": ("ernest.airc.ManagementUiTest", 15),
     "file-preview-ui": ("ernest.airc.FilePreviewUiTest", 3),
     "app-packages-ui": ("ernest.airc.AppPackagesUiTest", 3),
     "profile-isolation": ("ernest.airc.EncryptedProfilesIsolationTest", 3),

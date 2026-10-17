@@ -12,6 +12,8 @@ import kotlinx.coroutines.*
 
 @Composable
 internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
+    val download by model.urlDownloads.state.collectAsState()
+    val downloadDirectory by model.downloadDirectories.state.collectAsState()
     val storage by model.storageAnalysis.state.collectAsState()
     val files by model.files.state.collectAsState()
     val installation by model.appInstallation.state.collectAsState()
@@ -77,10 +79,10 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
         unavailableMessage=if (!state.connected) "设备未连接，连接后即可浏览和管理文件。" else if (state.busy) "设备正在执行操作，请稍后重试。" else "当前服务不支持文件浏览，请更新目标服务。",
         operationMessage=when {
             transfer.proposal != null || installation.proposal != null -> "有文件操作等待确认"
-            transfer.running || apk.busy || installation.busy || media.busy || storage.busy -> "文件任务正在进行，可查看进度"
+            download.busy || transfer.running || apk.busy || installation.busy || media.busy || storage.busy -> "文件任务正在进行，可查看进度"
             transfer.readyToSave -> "文件已下载，可保存到本机"
-            transfer.error != null || apk.error != null || installation.error != null || media.error != null || storage.error != null -> "文件任务遇到问题，请查看详情"
-            transfer.phase != "idle" || installation.message != null || media.message != null || storage.report != null -> "有文件任务结果可查看"
+            download.error != null || transfer.error != null || apk.error != null || installation.error != null || media.error != null || storage.error != null -> "文件任务遇到问题，请查看详情"
+            download.phase != "idle" || transfer.phase != "idle" || installation.message != null || media.message != null || storage.report != null -> "有文件任务结果可查看"
             else -> null
         },
         onApk=if(available && !apk.busy && "apps.apk_info" in state.tools) ({entry -> model.apkInspection.inspect(files.root,path(entry.name),available)}) else null,
@@ -93,6 +95,22 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
         thumbnail={entry,modifier -> AndroidFileThumbnail(entry,modifier,thumbnails,files.root,path(entry.name),available && (if(entry.name.endsWith(".apk",true)) "apps.apk_icon" else "files.preview") in state.tools)},
         previewContent=if("files.preview" in state.tools) ({entry -> AndroidFilePreview(entry,model.filePreviews,files.root,path(entry.name))}) else null,
         transfer={ section ->
+            if(section == "url") {
+                UrlDownloadPanel(download, available && listOf("files.download_url", "task.progress", "task.cancel").all { it in state.tools },
+                    validDownloadUrl(download.url), model.urlDownloads::editUrl, model.urlDownloads::editName,
+                    { model.urlDownloads.start(available) }, model.urlDownloads::cancel,
+                    { model.urlDownloads.directory("downloads", "") }) { selected ->
+                    LaunchedEffect(available, downloadDirectory.root) {
+                        if(available && !downloadDirectory.loaded && !downloadDirectory.loading && downloadDirectory.error == null) model.downloadDirectories.refresh(true)
+                    }
+                    FileBrowserPanel(downloadDirectory, available, { model.downloadDirectories.refresh(available) },
+                        { model.downloadDirectories.parent(available) }, { model.downloadDirectories.more(available) },
+                        { model.downloadDirectories.enter(it, available) }, {},
+                        onRoot=model.downloadDirectories::selectRoot,
+                        onNavigate={ model.downloadDirectories.ancestor(it, available) },
+                        onSelectDirectory={ model.urlDownloads.directory(downloadDirectory.root, downloadDirectory.path); selected() })
+                }
+            }
             if (section == "storage") {
             if("storage.analyze" in state.tools) StorageAnalysisPanel(storage, available && "task.progress" in state.tools && "task.cancel" in state.tools,
                 { model.storageAnalysis.analyze(files.root,files.path,available) }, model.storageAnalysis::cancel)

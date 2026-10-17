@@ -18,6 +18,7 @@ pub(super) struct UploadTarget {
     pub(super) destination: std::ffi::CString,
     pub(super) committed: bool,
     pub(super) overwrite: bool,
+    pub(super) copy_commit: bool,
     pub(super) expected: Option<std::fs::Metadata>,
 }
 impl Drop for UploadTarget {

@@ -34,6 +34,7 @@ pub const TOOLS: &[&str] = &[
     "task.progress",
     "task.cancel",
     "files.mkdir",
+    "files.download_url",
     "files.pending",
     "files.delete",
     "files.prepare_overwrite",
@@ -200,6 +201,9 @@ pub async fn execute(tool: &str, args: &Value) -> Result<String> {
     }
     if tool == "media.publish" {
         return crate::media_publications::start(args);
+    }
+    if tool == "files.download_url" {
+        return crate::transfers::download_url(args);
     }
     if tool == "files.mkdir" {
         return file_directories::execute(args);

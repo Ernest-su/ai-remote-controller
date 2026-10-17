@@ -33,6 +33,7 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
     unavailableMessage: String = "请连接支持文件工具的目标服务。", operationMessage: String? = null,
     thumbnail: (@Composable (TargetFileEntry, Modifier) -> Unit)? = null,
     previewContent: (@Composable (TargetFileEntry) -> Unit)? = null,
+    onSelectDirectory: (() -> Unit)? = null,
     transfer: @Composable ColumnScope.(String) -> Unit = {}) {
     var previewName by rememberSaveable(state.root, state.path) { mutableStateOf<String?>(null) }
     var fullConfirmation by remember { mutableStateOf(false) }
@@ -51,8 +52,8 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
     var inspectedName by rememberSaveable(state.root, state.path) { mutableStateOf<String?>(null) }
     val drafts = rememberSaveableStateHolder()
     val enabled = available && !state.loading
-    val entries = remember(state.entries, query, sort,category,showHidden) {
-        state.entries.filter { it.name.contains(query.trim(), ignoreCase = true) &&
+    val entries = remember(state.entries, query, sort,category,showHidden,onSelectDirectory) {
+        state.entries.filter { (onSelectDirectory == null || it.kind == "directory") && it.name.contains(query.trim(), ignoreCase = true) &&
             (showHidden || !it.name.startsWith(".")) && (category==FileCategory.ALL || fileCategory(it)==category) }
             .sortedWith(compareBy<TargetFileEntry> { it.kind != "directory" }
                 .thenBy { if (sort == "size") -(it.sizeBytes ?: -1) else 0L }
@@ -87,7 +88,7 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
     }
     if (showTools) ManagementDialog("文件操作与任务", "files-tools-dialog", { showTools = false }) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf("transfer" to "传输", "media" to "媒体", "apk" to "APK 安装", "storage" to "存储分析").forEach { (value, label) ->
+            listOf("url" to "网址下载", "transfer" to "传输", "media" to "媒体", "apk" to "APK 安装", "storage" to "存储分析").forEach { (value, label) ->
                 FilterChip(toolSection == value, { toolSection = value }, label = { Text(label, style = MaterialTheme.typography.bodyMedium) },
                     modifier = Modifier.heightIn(min = 48.dp).testTag("files-tool-$value"))
             }
@@ -120,7 +121,7 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                 }
                 ManagementIconButton(ManagementIcons.Refresh,"刷新目录",enabled,"files-refresh",onRefresh)
                 ManagementIconButton(if(grid) ManagementIcons.List else ManagementIcons.Apps,if(grid) "切换列表视图" else "切换网格视图",tag="files-view") { grid=!grid }
-                ManagementIconButton(ManagementIcons.Transfer,"文件操作与任务",tag="files-tools") { showTools=true }
+                if(onSelectDirectory == null) ManagementIconButton(ManagementIcons.Transfer,"文件操作与任务",tag="files-tools") { showTools=true }
             }
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("files-page"), state = list, contentPadding = PaddingValues(16.dp)) {
@@ -213,7 +214,9 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
         Surface(color=RemoteColors.Surface,shadowElevation=0.dp) {
             Column(Modifier.fillMaxWidth().padding(horizontal=8.dp)) {
                 HorizontalDivider(color=RemoteColors.Divider,thickness=0.5.dp)
-                if(selected!=null) {
+                if(onSelectDirectory != null) {
+                    ActionButton("选择此目录", enabled && state.loaded && state.error == null, onSelectDirectory)
+                } else if(selected!=null) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
                         Text(selected.name,Modifier.weight(1f).padding(8.dp),maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodyMedium)
                         ManagementIconButton(ManagementIcons.Close,"取消选择",tag="files-clear-selection") {selectedName=null}

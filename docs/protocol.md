@@ -127,6 +127,8 @@ App 的 root 开关默认关闭；开启后优先检测当前 root adbd，其次
 
 `files.mkdir` / `files_mkdir` 接收 `root`（downloads/inbox/full）及必填相对 `path`，创建单个新目录并返回 `{root,path,created:true}`。父目录必须存在；不创建父目录、不覆盖文件/目录/链接、不跟随符号链接，不接受递归或权限参数。使用 mkdirat 按打开的父目录执行，权限沿用服务身份，新目录请求模式为 0700，实际模式由文件系统策略决定。
 
+`files.download_url` / `files_download_url` 接收必填 HTTP(S) `url`，可选 `root`（默认 downloads）、相对目录 `directory`（默认空）与 `name`（默认网址末段，无末段时 download.bin）。不允许嵌入用户名/密码，仅跟随 HTTP(S) 重定向，最多十次。复用文件管理的 no-follow 路径访问与上传临时文件；优先原子不覆盖重命名，存储卡不支持时在下载完成后独占创建目标并流式复制，仍不覆盖同名文件。复制保存阶段可能暂时显示未完成目标文件，异常退出可能留下该文件；常规失败会清理。返回 `direction=url_download` 的后台任务，使用 `task.progress`/`task.cancel` 查询或取消；阶段为 connecting、downloading、committing、completed、failed、cancelled。`bytesTransferred` 为已写字节，`sizeBytes=0`，实际总长度从 `result.totalBytes` 读取（未知时 null），`result.path` 为目标相对路径。完成时 totalBytes 为最终字节数并提供 SHA-256。最多 1 TiB，与其他传输共享活动任务限额；错误或取消清理临时文件，不覆盖现有文件，无断点续传或重启恢复。
+
 `files.delete` / `files_delete` 接收 root/path/recursive，仅创建待确认提案，不立即删除。`files.prepare_overwrite` / `files_prepare_overwrite` 接收 root/path，返回覆盖提案。提案含 id/kind/root/path/exists/directory/sizeBytes/recursive/approvalRequired，15 分钟过期，最多 32 项。`files.pending` / `files_pending` 可查询尚未确认提案。控制端必须核对目标并让用户确认，再发送独立请求 `type=approve, arguments={id}`；`{id,accepted:false}` 丢弃提案。模型工具没有 approve。删除确认返回 task 描述；覆盖确认返回单次 token，随后 task.start 上传携带 overwriteToken。覆盖前重新核对目标信息，变化时失败；允许覆盖时使用原子替换。递归删除不跟随链接、不跨挂载点、最多 128 层；枚举子项和进入子项时均检查文件系统设备号，用户直接选中的顶层目录可以自身位于挂载点。
 
 `files.download` / `files_download` 保留小文件快照接口，最大 16 MiB，返回短期 FileArtifact（id/path/name/mimeType/sizeBytes/sha256/expiresInSeconds）。GET `/artifacts/{id}` 下载，60 秒过期，与截图共享四项资源容量；大文件应使用 task.start。界面所有文件下载均采用流式任务。详见[目标文件](guide/files.md)。

@@ -3,6 +3,8 @@ package ernest.airc
 import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -25,9 +27,61 @@ class ManagementUiTest {
     private val entries = listOf(TargetFileEntry("notes.txt", "file", 24), TargetFileEntry("Photos", "directory"),
         TargetFileEntry("movie.mp4", "file", 7_340_032), TargetFileEntry("shortcut", "symlink"))
     private val apps = listOf(InstalledApp("example.music", "音乐", false), InstalledApp("example.settings", "设置", true))
-    private fun screenshot(name: String) {
-        val file = java.io.File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "$name.png")
+    private fun screenshot(name: String, export: Boolean = false) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val directory = if(export) checkNotNull(context.getExternalFilesDir(null)) else context.filesDir
+        val file = java.io.File(directory, "$name.png")
         file.outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    @Test fun urlDownloadDraftDirectorySelectionAndOfflineSubmission() {
+        val restoration = StateRestorationTester(compose)
+        var state by mutableStateOf(UrlDownloadState())
+        var available by mutableStateOf(true)
+        var submissions = 0
+        restoration.setContent { RemoteTheme {
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                UrlDownloadPanel(state, available, state.url.startsWith("https://"),
+                    { state = state.copy(url = it) }, { state = state.copy(name = it) }, { submissions++ }, {},
+                    { state = state.copy(root = "downloads", directory = "") }) { selected ->
+                    FileBrowserPanel(FileBrowserState(entries = entries, loaded = true), available, {}, {}, {}, {}, {},
+                        onSelectDirectory = { state = state.copy(directory = "Photos"); selected() })
+                }
+            }
+        } }
+        compose.onNodeWithTag("url-download-address").performTextInput("https://example.org/file.bin")
+        compose.onNodeWithTag("url-download-name").performTextInput("custom.bin")
+        compose.onNodeWithText("选择保存目录").performScrollTo().performClick()
+        compose.onNodeWithTag("file-row-notes.txt").assertDoesNotExist()
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithText("选择此目录").performScrollTo().performClick()
+        compose.onNodeWithTag("url-download-name").assertTextContains("custom.bin")
+        compose.onNodeWithText("Downloads/Photos").assertExists()
+        compose.onNodeWithText("开始下载").performScrollTo().performClick()
+        assertEquals(1, submissions)
+        compose.runOnIdle { available = false }
+        compose.onNodeWithText("开始下载").assertIsNotEnabled()
+    }
+
+    @Test fun urlDownloadProgressAndFailureUseTextInNarrowDarkLayout() {
+        var state by mutableStateOf(UrlDownloadState(phase = "downloading", busy = true, bytes = 25, total = 100, destination = "Downloads/file.bin"))
+        compose.setContent { RemoteTheme(darkTheme = true) {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.5f)) {
+                Surface(Modifier.width(320.dp).fillMaxHeight(), color = RemoteColors.Background) {
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+                        UrlDownloadPanel(state, true, true, {}, {}, {}, {}, {}) { }
+                    }
+                }
+            }
+        } }
+        compose.onNodeWithTag("url-download-status").performScrollTo().assertTextEquals("正在下载")
+        compose.onNodeWithText("25% · 25 B / 100 B").assertExists()
+        compose.onNodeWithText("取消下载").performScrollTo().assertIsEnabled()
+        screenshot("url-download-dark-large", export = true)
+        compose.runOnIdle { state = state.copy(phase = "failed", busy = false, error = "下载地址返回 HTTP 404") }
+        compose.onNodeWithText("重试下载").performScrollTo().assertIsEnabled()
+        compose.onNodeWithText("下载地址返回 HTTP 404").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun previewRestoresAndSeparatesControllerPlaybackFromTargetAndApkInstall() {

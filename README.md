@@ -68,4 +68,4 @@ Android 控制端与 JVM 桌面测试工具，共享协议与设备记录位于 
 
 签名与 GitHub Actions 配置见[发布指南](docs/development/releasing.md)。`v*` 标签触发检查、生产签名 APK 与三 ABI runtime 清单签名，产物上传到草稿 Release；维护者核对后公开。公钥和 APK 证书指纹随源码提供，私钥仅存于仓库外及 GitHub Actions Secrets。
 
-文件管理支持图片、音视频、文本缩略图与预览，明确区分主控设备播放和被控设备播放；APK 可显示包内图标、预览信息并经确认在被控设备安装。使用方法与平台差异见[文件管理](docs/guide/files.md#file-preview)。
+文件管理可输入网址下载到被控设备，默认存储卡 Download，支持选择保存目录、文件名与查看进度。文件管理支持图片、音视频、文本缩略图与预览，明确区分主控设备播放和被控设备播放；APK 可显示包内图标、预览信息并经确认在被控设备安装。使用方法与平台差异见[文件管理](docs/guide/files.md#file-preview)。

@@ -12,6 +12,8 @@ use std::{
     time::{Duration, Instant},
 };
 mod http;
+mod url_download;
+pub(crate) use url_download::start as download_url;
 mod state;
 #[cfg(test)]
 mod tests;
@@ -26,6 +28,14 @@ fn create(args: &Value) -> Result<Arc<Transfer>> {
 }
 
 fn create_at(args: &Value, root: &std::path::Path) -> Result<Arc<Transfer>> {
+    create_at_impl(args, root, false)
+}
+
+fn create_at_impl(
+    args: &Value,
+    root: &std::path::Path,
+    allow_copy_commit: bool,
+) -> Result<Arc<Transfer>> {
     let object = args
         .as_object()
         .context("task arguments must be an object")?;
@@ -150,14 +160,21 @@ fn create_at(args: &Value, root: &std::path::Path) -> Result<Arc<Transfer>> {
                     )
                 }
             };
-            if renamed != 0 {
-                let error = std::io::Error::last_os_error();
+            let rename_error = std::io::Error::last_os_error();
+            let copy_commit = renamed != 0
+                && allow_copy_commit
+                && matches!(
+                    rename_error.raw_os_error(),
+                    Some(libc::EINVAL | libc::ENOSYS | libc::EOPNOTSUPP)
+                );
+            if renamed != 0 && !copy_commit {
+                let error = rename_error;
                 unsafe {
                     libc::unlinkat(parent.as_raw_fd(), temporary.as_ptr(), 0);
                 }
                 bail!("directory does not support safe atomic no-replace commit; choose service inbox: {error}");
             }
-            let restored = if overwrite {
+            let restored = if overwrite || copy_commit {
                 0
             } else {
                 unsafe {
@@ -186,6 +203,7 @@ fn create_at(args: &Value, root: &std::path::Path) -> Result<Arc<Transfer>> {
                     destination: target,
                     committed: false,
                     overwrite,
+                    copy_commit,
                     expected,
                 }),
                 size,
