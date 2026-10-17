@@ -27,6 +27,7 @@ class DesktopController(
     val files = FileBrowserController(scope,runtime)
     val mediaControl = MediaControlController(scope, runtime)
     val virtualGamepad = VirtualGamepadController(scope, runtime)
+    val remoteKeys = RemoteKeyController(scope, runtime, ::message)
     val gamepad = GamepadController(scope, runtime)
     val storageAnalysis = StorageAnalysisController(scope, runtime)
     val appIcons = AppIconController(scope, runtime)
@@ -48,7 +49,7 @@ class DesktopController(
     init {
         scope.launch {
             runtime.session.collectLatest { session ->
-                if (session == null) { appIcons.clear(); screenshots.clear(); files.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); mutable.update { it.copy(connected = false, apps = emptyList(), appsLoading = false, appsError = null, deviceInfo = null, tools = emptyList(), media = "未连接设备") } }
+                if (session == null) { appIcons.clear(); screenshots.clear(); files.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll(); mutable.update { it.copy(connected = false, apps = emptyList(), appsLoading = false, appsError = null, deviceInfo = null, tools = emptyList(), media = "未连接设备") } }
                 else while (true) {
                     if (runtime.session.value != session) return@collectLatest
                     val send = runCatching { runtime.toolWriter() }.getOrNull() ?: return@collectLatest
@@ -97,7 +98,7 @@ class DesktopController(
     }
     private suspend fun attach(host: String, port: Int, serial: String?, runtimePort: Int = port) {
         generation++; feedbackGeneration++
-        appIcons.clear(); screenshots.clear(); files.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear()
+        appIcons.clear(); screenshots.clear(); files.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll()
         runtime.disconnect()
         mutable.update { it.copy(connected = false, apps = emptyList(), appsLoading = false, appsError = null, deviceInfo = null, status = "正在连接服务…", touchBusy = false) }
         val release = bundledRelease()

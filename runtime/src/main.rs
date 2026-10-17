@@ -227,6 +227,7 @@ async fn connection(socket: WebSocket, state: Arc<AppState>, language: i18n::Lan
     let _ = worker.await;
     let _ = control_worker.await;
     let _ = key_worker.await;
+    remote_input::disconnect(&owner).await;
     virtual_gamepad::disconnect(&owner);
     screen_mirror::disconnect(&owner);
     system_actions::disconnect(&owner);

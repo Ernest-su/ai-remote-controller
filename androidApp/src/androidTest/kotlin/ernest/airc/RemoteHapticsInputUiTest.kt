@@ -3,6 +3,7 @@ package ernest.airc
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.*
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.ViewModelProvider
@@ -10,8 +11,8 @@ import android.os.SystemClock
 import android.view.InputDevice
 import android.view.MotionEvent
 import androidx.test.platform.app.InstrumentationRegistry
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.*
+import java.util.concurrent.CopyOnWriteArrayList
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okhttp3.mockwebserver.Dispatcher
@@ -33,15 +34,24 @@ class RemoteHapticsInputUiTest {
         override fun startHold(key: Any) { held.add(key); starts++; real.startHold(key) }
         override fun stopHold(key: Any) { held.remove(key); real.stopHold(key) }
     }
-    private fun withRemote(action: (SemanticsNodeInteraction, ObservedHaptics) -> Unit) {
+    private fun withRemote(label: String = "向下", requests: MutableList<JsonObject> = CopyOnWriteArrayList(), action: (SemanticsNodeInteraction, ObservedHaptics) -> Unit) {
         val server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
                 "/status" -> MockResponse().setBody(alignedRuntimeStatusFixture("""{"version":"fixture","protocol":1,"deviceId":"haptics-input-fixture","tools":[],"modelConfigured":false}"""))
                 "/ws" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                     override fun onMessage(socket: WebSocket, text: String) {
-                        val id = Json.parseToJsonElement(text).jsonObject.getValue("id")
-                        socket.send("""{"id":$id,"protocol":1,"ok":true,"result":"fixture"}""")
+                        val request = Json.parseToJsonElement(text).jsonObject
+                        val id = request.getValue("id")
+                        val args = request["arguments"]?.jsonObject ?: buildJsonObject {}
+                        val result = if (request["tool"]?.jsonPrimitive?.content == "remote.key") {
+                            requests.add(args)
+                            buildJsonObject {
+                                put("operation", args["action"] ?: JsonPrimitive("key")); put("pressId", args["pressId"] ?: JsonNull)
+                                put("submitted", true); put("released", args["action"]?.jsonPrimitive?.content in listOf(null, "up", "cancel"))
+                            }.toString()
+                        } else "fixture"
+                        socket.send(buildJsonObject { put("id", id); put("protocol", 1); put("ok", true); put("result", result) }.toString())
                     }
                 })
                 else -> MockResponse().setResponseCode(404)
@@ -64,7 +74,7 @@ class RemoteHapticsInputUiTest {
         try {
             compose.runOnUiThread { model.discovered(DiscoveredService("Haptics fixture", "127.0.0.1", server.port, emptyMap())) }
             compose.waitUntil(10000) { model.state.value.connected && !model.state.value.busy }
-            val key = compose.onNodeWithContentDescription("向下")
+            val key = if (label == "设备菜单" || label == "主页" || label == "返回") compose.onNodeWithText(label) else compose.onNodeWithContentDescription(label)
             key.performScrollTo()
             action(key, observed)
         } finally {
@@ -73,6 +83,43 @@ class RemoteHapticsInputUiTest {
             DeviceStore(compose.activity).remove("haptics-input-fixture")
         }
     }
+    @Test fun menuSendsDownBeforeReleaseAndKeepsTheSameGesture() {
+        val requests = CopyOnWriteArrayList<JsonObject>()
+        withRemote("设备菜单", requests) { key, _ ->
+            key.performTouchInput { down(center) }
+            compose.waitUntil(3000) { requests.any { it["action"]?.jsonPrimitive?.content == "keep" } }
+            assertEquals("down", requests.first()["action"]!!.jsonPrimitive.content)
+            assertTrue(requests.none { it["action"]?.jsonPrimitive?.content == "up" })
+            key.performTouchInput { up() }
+            compose.waitUntil(3000) { requests.lastOrNull()?.get("action")?.jsonPrimitive?.content == "up" }
+            assertEquals(1, requests.count { it["action"]?.jsonPrimitive?.content == "down" })
+            assertEquals(1, requests.mapNotNull { it["pressId"]?.jsonPrimitive?.content }.distinct().size)
+        }
+    }
+    @Test fun cancellingDirectionSendsCancelledUpAndAccessibilityRemainsOneTap() {
+        val requests = CopyOnWriteArrayList<JsonObject>()
+        withRemote(requests = requests) { key, _ ->
+            key.performTouchInput { down(center) }
+            compose.waitUntil(3000) { requests.isNotEmpty() }
+            key.performTouchInput { cancel() }
+            compose.waitUntil(3000) { requests.lastOrNull()?.get("action")?.jsonPrimitive?.content == "cancel" }
+            val size = requests.size
+            key.performSemanticsAction(SemanticsActions.OnClick) { it() }
+            compose.waitUntil(3000) { requests.size > size }
+            assertNull(requests.last()["action"])
+        }
+    }
+    @Test fun leavingRemoteCancelsItsHoldWithoutWaitingForFingerRelease() {
+        val requests = CopyOnWriteArrayList<JsonObject>()
+        withRemote(requests = requests) { key, _ ->
+            key.performTouchInput { down(center) }
+            compose.waitUntil(3000) { requests.isNotEmpty() }
+            compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+            compose.waitUntil(3000) { requests.lastOrNull()?.get("action")?.jsonPrimitive?.content == "cancel" }
+            compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+        }
+    }
+
     @Test fun rapidDownKeyTapsNeverLeaveHeldFeedback() = withRemote { key, feedback ->
         repeat(100) {
             key.performTouchInput { down(center); advanceEventTime(if (it % 2 == 0) 1 else 35); up() }

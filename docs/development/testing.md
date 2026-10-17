@@ -159,3 +159,12 @@ python3 scripts/test-phone-target.py --phone <自有模拟器序列号> --suite 
 ```sh
 uv run --with websockets python runtime/app_control_target_test.py --serial <自有模拟器序列号> --binary androidApp/src/main/assets/runtime/airc-runtime-x86_64
 ```
+
+标准遥控长按使用 `RemoteKeyControllerTest` 与 Rust `remote_input::tests` 验证串行边沿、手势归属、快速短按、无自动重放、断线与超时释放。`remote-haptics-input-ui` 同时检查真实界面的按下先于松开、菜单保活、取消和后台释放，服务为控制端回环 fixture。独立 Android 接收端可验证实际 KeyEvent：
+
+```sh
+./gradlew :inputFixture:assembleDebug :androidApp:assembleDebug --no-daemon
+uv run --with websockets python runtime/remote_key_hold_target_test.py --serial <自有目标序列号> --binary androidApp/src/main/assets/runtime/airc-runtime-<匹配ABI> --receiver-apk inputFixture/build/outputs/apk/debug/inputFixture-debug.apk
+```
+
+专项只安装原先不存在的接收 fixture，并创建 UUID runtime 目录与临时 ADB 转发；校验方向、菜单、确认、返回、数字及删除的 downTime、重复次数、长按标记、取消与断线释放。短暂暂停经路径验证的自建 runtime，核对 Java 桥接的独立超时释放，随后恢复并清理。接收 fixture 通过只读、要求 shell DUMP 权限的 provider 暴露自身日志，不依赖目标支持 run-as。测试不操作电源/音量，也不证明厂商系统键或第三方应用的最终长按动作。

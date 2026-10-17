@@ -124,6 +124,20 @@ class RemoteLayoutUiTest {
         }
         compose.onNodeWithTag("remote-dpad").performScrollTo().assertWidthIsEqualTo(220.dp)
         compose.onNodeWithTag("remote-command-input").performTextInput("打开设置")
+        // This case checks the fixed short viewport; the two IME cases above cover the keyboard.
+        // Text input can asynchronously open IME, so finish that transition before navigation.
+        compose.waitUntil(10_000) {
+            ViewCompat.getRootWindowInsets(compose.activity.window.decorView)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+        }
+        compose.waitForIdle()
+        compose.runOnUiThread {
+            compose.activity.currentFocus?.clearFocus()
+            WindowInsetsControllerCompat(compose.activity.window, compose.activity.window.decorView).hide(WindowInsetsCompat.Type.ime())
+        }
+        compose.waitUntil(10_000) {
+            ViewCompat.getRootWindowInsets(compose.activity.window.decorView)?.isVisible(WindowInsetsCompat.Type.ime()) == false
+        }
+        compose.waitForIdle()
         compose.onNodeWithTag("remote-send-command").assertIsDisplayed().assertWidthIsEqualTo(48.dp).assertIsNotEnabled()
         compose.onNodeWithTag("open-menu").performClick()
         compose.onNodeWithTag("feature-model").performScrollTo().performClick()

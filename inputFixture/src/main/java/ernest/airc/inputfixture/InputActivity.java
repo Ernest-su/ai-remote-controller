@@ -33,6 +33,7 @@ public final class InputActivity extends Activity {
         try(FileOutputStream out=new FileOutputStream(journal,true)) {
             JSONObject data=new JSONObject().put("code",event.getKeyCode()).put("action",event.getAction())
                 .put("source",event.getSource()).put("repeat",event.getRepeatCount())
+                .put("flags",event.getFlags()).put("longPress",event.isLongPress()).put("canceled",event.isCanceled())
                 .put("downTime",event.getDownTime()).put("eventTime",event.getEventTime()).put("receivedTime",SystemClock.uptimeMillis());
             out.write((data.toString()+"\n").getBytes(StandardCharsets.UTF_8));
         } catch(Exception error) { throw new IllegalStateException(error); }

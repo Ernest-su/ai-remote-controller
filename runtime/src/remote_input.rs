@@ -1,7 +1,14 @@
-//! Bounded, runtime-owned input actor. Caller cancellation never interrupts a down/up pair.
+//! Bounded input actor with connection-owned holds and independent bridge deadman release.
 use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
-use std::{ffi::OsString, path::PathBuf, process::Stdio, sync::OnceLock, time::Duration};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ffi::OsString,
+    path::PathBuf,
+    process::Stdio,
+    sync::OnceLock,
+    time::{Duration, Instant},
+};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     process::{Child, ChildStdin, ChildStdout, Command},
@@ -80,9 +87,18 @@ impl Bridge {
         }
     }
     async fn request(&mut self, sequence: u64, operation: &str, code: u32) -> Result<()> {
+        self.request_edge(sequence, operation, code, None).await
+    }
+    async fn request_edge(
+        &mut self,
+        sequence: u64,
+        operation: &str,
+        code: u32,
+        press_id: Option<&str>,
+    ) -> Result<()> {
         let bytes = format!(
             "{}\n",
-            json!({"id":sequence,"operation":operation,"code":code})
+            json!({"id":sequence,"operation":operation,"code":code,"pressId":press_id})
         );
         tokio::time::timeout(DEADLINE, async {
             self.stdin.write_all(bytes.as_bytes()).await?;
@@ -90,7 +106,7 @@ impl Bridge {
             let reply = self.read_frame().await?;
             if reply["id"].as_u64() != Some(sequence)
                 || reply["ok"] != true
-                || reply["released"] != true
+                || reply["released"] != matches!(operation, "key" | "release" | "up" | "cancel")
             {
                 bail!("input bridge rejected or did not release key: {reply}");
             }
@@ -118,14 +134,37 @@ impl Bridge {
     }
 }
 
+#[derive(Clone, Debug)]
+struct Hold {
+    owner: String,
+    press_id: String,
+    code: u32,
+    action: String,
+}
+enum WorkKind {
+    Warmup,
+    Tap(u32),
+    Hold(Hold),
+    Disconnect(String),
+}
 struct Work {
-    code: Option<u32>,
+    kind: WorkKind,
     reply: oneshot::Sender<Result<String>>,
+}
+struct Lease {
+    owner: String,
+    press_id: String,
+    touched: Instant,
 }
 struct Manager {
     sender: mpsc::Sender<Work>,
     shutdown: watch::Sender<bool>,
     finished: watch::Receiver<bool>,
+}
+fn hold_reply(hold: &Hold) -> String {
+    json!({"operation":hold.action,"keyCode":hold.code,"pressId":hold.press_id,
+        "submitted":true,"released":matches!(hold.action.as_str(), "up" | "cancel"),"source":257})
+    .to_string()
 }
 impl Manager {
     fn start(spec: Spec) -> Self {
@@ -135,63 +174,166 @@ impl Manager {
         tokio::spawn(async move {
             let mut bridge: Option<Bridge> = None;
             let mut sequence = 0;
-            let mut uncertain = None;
+            let mut uncertain = BTreeSet::new();
+            let mut leases: BTreeMap<u32, Lease> = BTreeMap::new();
+            let mut timer = tokio::time::interval(Duration::from_millis(100));
             loop {
                 let work = tokio::select! {
                     biased;
                     _ = stop.changed() => break,
+                    _ = timer.tick() => {
+                        let expired: Vec<_> = leases.iter().filter(|(_, lease)| lease.touched.elapsed() >= Duration::from_millis(1500))
+                            .map(|(code, _)| *code).collect();
+                        for code in expired {
+                            let lease = leases.remove(&code).unwrap();
+                            if let Some(child) = bridge.as_mut() {
+                                sequence += 1;
+                                if child.request_edge(sequence, "cancel", code, Some(&lease.press_id)).await.is_err() {
+                                    uncertain.insert(code);
+                                }
+                            }
+                        }
+                        continue;
+                    },
                     next = incoming.recv() => match next { Some(work) => work, None => break },
                 };
-                if work.reply.is_closed() {
+                // Releases are accepted even when their caller goes away; DOWN is not.
+                let terminal = match &work.kind {
+                    WorkKind::Disconnect(_) => true,
+                    WorkKind::Hold(hold) => matches!(hold.action.as_str(), "up" | "cancel"),
+                    _ => false,
+                };
+                if work.reply.is_closed() && !terminal {
                     continue;
+                }
+                if let WorkKind::Tap(code) = &work.kind {
+                    if leases.contains_key(code) {
+                        let _ = work
+                            .reply
+                            .send(Err(anyhow::anyhow!("remote key already held")));
+                        continue;
+                    }
+                }
+                if let WorkKind::Hold(hold) = &work.kind {
+                    let active = leases.get(&hold.code);
+                    let valid = if hold.action == "down" {
+                        active.is_none()
+                    } else {
+                        active.is_some_and(|lease| {
+                            lease.owner == hold.owner && lease.press_id == hold.press_id
+                        })
+                    };
+                    if !valid {
+                        // Duplicate terminal edges are harmless, but never release a newer gesture.
+                        let result = if active.is_none()
+                            && matches!(hold.action.as_str(), "up" | "cancel")
+                        {
+                            Ok(hold_reply(hold))
+                        } else {
+                            Err(anyhow::anyhow!("remote key press expired, already held or belongs to another gesture"))
+                        };
+                        let _ = work.reply.send(result);
+                        continue;
+                    }
                 }
                 let mut result: Result<String> = async {
                     if bridge.is_none() {
                         bridge = Some(Bridge::start(&spec).await?);
                     }
                     let child = bridge.as_mut().unwrap();
-                    if let Some(code) = uncertain {
+                    for code in uncertain.clone() {
                         sequence += 1;
                         child.request(sequence, "release", code).await?;
-                        uncertain = None;
+                        uncertain.remove(&code);
                     }
-                    if let Some(code) = work.code {
-                        // Startup/recovery can outlive the caller. Recheck immediately
-                        // before accepting a DOWN, not just before starting the helper.
-                        if work.reply.is_closed() {
-                            return Ok(String::new());
+                    match &work.kind {
+                        WorkKind::Warmup => Ok("ready".into()),
+                        WorkKind::Tap(code) => {
+                            if work.reply.is_closed() {
+                                return Ok(String::new());
+                            }
+                            uncertain.insert(*code);
+                            sequence += 1;
+                            let started = Instant::now();
+                            child.request(sequence, "key", *code).await?;
+                            uncertain.remove(code);
+                            Ok(json!({"operation":"key","keyCode":code,"submitted":true,
+                                "released":true,"source":257,"bridgePid":child.child.id(),
+                                "injectionMicros":started.elapsed().as_micros() as u64})
+                            .to_string())
                         }
-                        // Record before writing: losing the reply does not prove the key was not sent.
-                        uncertain = Some(code);
-                        sequence += 1;
-                        let started = std::time::Instant::now();
-                        child.request(sequence, "key", code).await?;
-                        uncertain = None;
-                        Ok(json!({"operation":"key","keyCode":code,"submitted":true,
-                            "released":true,"source":257,"bridgePid":child.child.id(),
-                            "injectionMicros":started.elapsed().as_micros() as u64})
-                        .to_string())
-                    } else {
-                        Ok("ready".into())
+                        WorkKind::Hold(hold) => {
+                            if hold.action == "down" && work.reply.is_closed() {
+                                return Ok(String::new());
+                            }
+                            uncertain.insert(hold.code);
+                            sequence += 1;
+                            child
+                                .request_edge(
+                                    sequence,
+                                    &hold.action,
+                                    hold.code,
+                                    Some(&hold.press_id),
+                                )
+                                .await?;
+                            uncertain.remove(&hold.code);
+                            if matches!(hold.action.as_str(), "up" | "cancel") {
+                                leases.remove(&hold.code);
+                            } else {
+                                leases.insert(
+                                    hold.code,
+                                    Lease {
+                                        owner: hold.owner.clone(),
+                                        press_id: hold.press_id.clone(),
+                                        touched: Instant::now(),
+                                    },
+                                );
+                            }
+                            Ok(hold_reply(hold))
+                        }
+                        WorkKind::Disconnect(owner) => {
+                            let codes: Vec<_> = leases
+                                .iter()
+                                .filter(|(_, lease)| &lease.owner == owner)
+                                .map(|(code, _)| *code)
+                                .collect();
+                            for code in codes {
+                                let lease = leases.remove(&code).unwrap();
+                                uncertain.insert(code);
+                                sequence += 1;
+                                child
+                                    .request_edge(sequence, "cancel", code, Some(&lease.press_id))
+                                    .await?;
+                                uncertain.remove(&code);
+                            }
+                            Ok("released".into())
+                        }
                     }
                 }
                 .await;
                 if result.is_err() {
+                    uncertain.extend(leases.keys().copied());
+                    leases.clear();
                     if let Err(error) = &result {
                         eprintln!("persistent input bridge failed: {error:#}");
                     }
-                    if uncertain.is_some() {
+                    if !uncertain.is_empty() {
                         result = result.map_err(|error| error.context("input key outcome uncertain; no automatic replay; release recovery attempted"));
                     }
                     if let Some(child) = bridge.take() {
                         child.stop().await;
                     }
-                    // Recovery releases only. The failed DOWN is never automatically replayed.
-                    if let Some(code) = uncertain {
+                    // Recover every possibly held key by sending only UP; never replay a DOWN.
+                    if !uncertain.is_empty() {
                         if let Ok(mut child) = Bridge::start(&spec).await {
-                            sequence += 1;
-                            if child.request(sequence, "release", code).await.is_ok() {
-                                uncertain = None;
+                            for code in uncertain.clone() {
+                                sequence += 1;
+                                if child.request(sequence, "release", code).await.is_err() {
+                                    break;
+                                }
+                                uncertain.remove(&code);
+                            }
+                            if uncertain.is_empty() {
                                 bridge = Some(child);
                             } else {
                                 child.stop().await;
@@ -199,7 +341,7 @@ impl Manager {
                         }
                     }
                 }
-                let result = if uncertain.is_some() {
+                let result = if !uncertain.is_empty() {
                     Err(anyhow::anyhow!(
                         "input key outcome uncertain; release recovery pending; no automatic retry"
                     ))
@@ -209,7 +351,6 @@ impl Manager {
                 let _ = work.reply.send(result);
             }
             incoming.close();
-            // Complete any in-flight transaction above before shutting down the child.
             if let Some(child) = bridge {
                 child.stop().await;
             }
@@ -221,15 +362,19 @@ impl Manager {
             finished,
         }
     }
-    async fn call(&self, code: Option<u32>) -> Result<String> {
+    async fn submit(&self, kind: WorkKind) -> Result<String> {
         let (reply, result) = oneshot::channel();
         self.sender
-            .try_send(Work { code, reply })
+            .try_send(Work { kind, reply })
             .map_err(|error| match error {
                 mpsc::error::TrySendError::Full(_) => anyhow::anyhow!(BUSY),
                 mpsc::error::TrySendError::Closed(_) => anyhow::anyhow!("input service stopped"),
             })?;
         result.await.context("input service stopped")?
+    }
+    async fn call(&self, code: Option<u32>) -> Result<String> {
+        self.submit(code.map_or(WorkKind::Warmup, WorkKind::Tap))
+            .await
     }
     async fn stop(&self) {
         let _ = self.shutdown.send(true);
@@ -239,6 +384,44 @@ impl Manager {
                 break;
             }
         }
+    }
+}
+
+pub(crate) async fn edge(args: &Value, owner: &str) -> Result<String> {
+    let fields = args
+        .as_object()
+        .context("remote key arguments must be object")?;
+    if fields.len() != 3
+        || fields
+            .keys()
+            .any(|key| !["key", "action", "pressId"].contains(&key.as_str()))
+    {
+        bail!("remote key edges require only key, action and pressId");
+    }
+    let code =
+        crate::tools::remote_key_code(args["key"].as_str().context("remote.key requires key")?)?;
+    let action = args["action"]
+        .as_str()
+        .filter(|action| ["down", "keep", "up", "cancel"].contains(action))
+        .context("unsupported remote key action")?;
+    let press_id = args["pressId"]
+        .as_str()
+        .context("remote key pressId must be UUID")?;
+    uuid::Uuid::parse_str(press_id).context("remote key pressId must be UUID")?;
+    INPUT
+        .get()
+        .context("persistent input bridge unavailable")?
+        .submit(WorkKind::Hold(Hold {
+            code,
+            action: action.into(),
+            press_id: press_id.into(),
+            owner: owner.into(),
+        }))
+        .await
+}
+pub(crate) async fn disconnect(owner: &str) {
+    if let Some(input) = INPUT.get() {
+        let _ = input.submit(WorkKind::Disconnect(owner.into())).await;
     }
 }
 

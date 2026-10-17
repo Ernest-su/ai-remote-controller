@@ -115,6 +115,9 @@ pub fn command_for(tool: &str, args: &Value) -> Result<(String, Vec<String>)> {
 }
 
 pub async fn execute_owned(tool: &str, args: &Value, owner: &str) -> Result<String> {
+    if tool == "remote.key" && args.get("action").is_some() {
+        return crate::remote_input::edge(args, owner).await;
+    }
     if matches!(tool, "device.system_action" | "device.system_pending") {
         return crate::system_actions::execute(tool, args, owner).await;
     }

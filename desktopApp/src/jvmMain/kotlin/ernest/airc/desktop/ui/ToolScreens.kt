@@ -43,7 +43,10 @@ fun DesktopApplications(state: DesktopState, controller: DesktopController, onDe
 }
 
 @Composable
-fun DesktopKeypad(state: DesktopState, controller: DesktopController) = KeypadPanel(state.connected, state.output, controller::key)
+fun DesktopKeypad(state: DesktopState, controller: DesktopController) = androidx.compose.runtime.CompositionLocalProvider(LocalRemoteKeySender provides controller.remoteKeys) {
+    DesktopRemoteKeyLifecycle(controller.remoteKeys)
+    KeypadPanel(state.connected, state.output, controller::key)
+}
 
 @Composable
 fun DesktopTouchpad(state: DesktopState, controller: DesktopController) =

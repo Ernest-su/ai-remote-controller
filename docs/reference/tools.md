@@ -4,7 +4,7 @@
 
 | 协议工具 | 模型函数名 | 参数 | Android 行为 |
 | --- | --- | --- | --- |
-| `remote.key` | `remote_key` | `key` | 常驻输入桥接提交一次按下/抬起 |
+| `remote.key` | `remote_key` | `key`，按住时加 `action`, `pressId` | 一次短按，或连接独占的按下/保活/抬起/取消 |
 | `remote.text` | `remote_text` | `text` | 固定参数注入焦点字段 ASCII 文本，字面 `%s` 保留 |
 | `remote.tap` | `remote_tap` | `x`, `y`, 可选 `count` | 归一化坐标点击 |
 | `remote.swipe` | `remote_swipe` | `startX`, `startY`, `endX`, `endY`, 可选 `durationMs` | 受控滑动 |
@@ -252,3 +252,11 @@ remote.key 的 power 参数仅供直接手动控制；模型别名 remote_key �
 ## 应用详情操作
 
 `apps.control_info` 与 `apps.prepare_control` 为控制端应用详情提供只读快照和用户待确认操作；模型可读取状态或准备提案，独立确认接口不向模型暴露，不能自动执行。接口、能力字段、确认和结果语义见[协议](../protocol.md#app-controls)，使用步骤见[应用管理](../guide/apps.md)。
+
+### 遥控按键按住
+
+`remote.key` 只提供 `key` 时提交一次完整短按。按住请求必须且只包含 `key`、`action`、`pressId` 三个字段，`pressId` 是每次手势新建的 UUID；`action` 为 `down`、`keep`、`up` 或 `cancel`。`down` 注册按住，控制端每250ms发送 `keep`，正常松开使用 `up`，取消使用 `cancel`。同一按键同时只能由一个连接的一次手势持有；其他连接或旧 UUID 不得释放新手势，失效后的 `keep` 不会重新发送 DOWN。
+
+目标桥接使用 `SOURCE_KEYBOARD`，首次 DOWN 的重复次数为0；按系统长按阈值产生首次重复 DOWN（重复次数1、`FLAG_LONG_PRESS`），之后按系统重复间隔继续递增重复次数，均保留初始 `downTime`。UP 的重复次数为0，取消 UP 带 `FLAG_CANCELED`。不会通过多次 DOWN/UP 模拟连续点击。目标应用和系统策略决定最终行为。
+
+断线释放所属连接的按键。桥接线程独立于 RPC 计时，1500ms无保活或按住120秒即取消释放；服务退出时关闭桥接并释放剩余按键。出错后仅尝试抬起，不自动重放 DOWN。边沿响应包含 `operation`、`pressId`、`keyCode`、`submitted`、`released` 和 `source`；`down`/`keep` 的 `released` 为false，`up`/`cancel` 为true，提交成功不代表目标应用已经消费事件。

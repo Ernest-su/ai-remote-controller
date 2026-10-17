@@ -18,7 +18,7 @@ if fault=='slow-ready': time.sleep(.15)
 print(json.dumps(dict(ready=True,pid=os.getpid(),uid=os.getuid()+(1 if fault=='wrong-uid' else 0))),flush=True)
 for line in sys.stdin:
  r=json.loads(line);code=r['code'];operation=r['operation']
- if operation=='key':
+ if operation in ('key','down'):
   log('down',code)
   if fault and not (root/'fault').exists():
    (root/'fault').touch()
@@ -31,9 +31,10 @@ for line in sys.stdin:
     print(json.dumps(dict(id=-1,ok=True,released=True)),flush=True)
     continue
   if code==19: time.sleep(0.1)
-  log('up',code)
+  if operation=='key': log('up',code)
+ elif operation=='keep': log('keep',code)
  else: log('up',code)
- print(json.dumps(dict(id=r['id'],ok=True,released=True)),flush=True)
+ print(json.dumps(dict(id=r['id'],ok=True,released=operation not in ('down','keep'))),flush=True)
 "#;
         let manager = Manager::start(Spec {
             program: "python3".into(),
@@ -111,7 +112,7 @@ async fn cancellation_completes_started_pair_and_discards_unstarted_keys() {
         .manager
         .sender
         .try_send(Work {
-            code: Some(20),
+            kind: WorkKind::Tap(20),
             reply,
         })
         .unwrap();
@@ -189,7 +190,7 @@ async fn queue_is_bounded_and_excess_requests_are_rejected() {
             .manager
             .sender
             .try_send(Work {
-                code: Some(20),
+                kind: WorkKind::Tap(20),
                 reply,
             })
             .unwrap();
@@ -210,4 +211,127 @@ async fn queue_is_bounded_and_excess_requests_are_rejected() {
     fixture.manager.call(None).await.unwrap();
     assert_eq!(fixture.journal(), ["down:19", "up:19"]);
     fixture.manager.stop().await;
+}
+
+fn hold(owner: &str, id: &str, code: u32, action: &str) -> WorkKind {
+    WorkKind::Hold(Hold {
+        owner: owner.into(),
+        press_id: id.into(),
+        code,
+        action: action.into(),
+    })
+}
+#[tokio::test]
+async fn holds_preserve_identity_ownership_and_only_repeat_via_the_bridge() {
+    let f = Fixture::new("");
+    f.manager
+        .submit(hold("a", "first", 82, "down"))
+        .await
+        .unwrap();
+    f.manager
+        .submit(hold("a", "first", 82, "keep"))
+        .await
+        .unwrap();
+    assert!(f
+        .manager
+        .submit(hold("b", "first", 82, "cancel"))
+        .await
+        .is_err());
+    assert!(f.manager.call(Some(82)).await.is_err());
+    f.manager
+        .submit(hold("a", "first", 82, "up"))
+        .await
+        .unwrap();
+    f.manager
+        .submit(hold("a", "second", 82, "down"))
+        .await
+        .unwrap();
+    assert!(f
+        .manager
+        .submit(hold("a", "first", 82, "up"))
+        .await
+        .is_err());
+    f.manager
+        .submit(hold("a", "second", 82, "up"))
+        .await
+        .unwrap();
+    assert_eq!(
+        f.journal(),
+        ["down:82", "keep:82", "up:82", "down:82", "up:82"]
+    );
+    f.manager.stop().await;
+}
+#[tokio::test]
+async fn disconnect_releases_only_owner_and_deadman_does_not_replay_down() {
+    let f = Fixture::new("");
+    f.manager
+        .submit(hold("a", "first", 82, "down"))
+        .await
+        .unwrap();
+    f.manager
+        .submit(hold("b", "other", 20, "down"))
+        .await
+        .unwrap();
+    f.manager
+        .submit(WorkKind::Disconnect("a".into()))
+        .await
+        .unwrap();
+    assert_eq!(f.journal(), ["down:82", "down:20", "up:82"]);
+    tokio::time::sleep(Duration::from_millis(1750)).await;
+    assert_eq!(f.journal(), ["down:82", "down:20", "up:82", "up:20"]);
+    assert!(f
+        .manager
+        .submit(hold("b", "other", 20, "keep"))
+        .await
+        .is_err());
+    f.manager.stop().await;
+}
+#[tokio::test]
+async fn recovery_before_holds_and_disconnect_do_not_replay_any_down() {
+    let f = Fixture::new("bad-ack");
+    // Consume the injected one-time failure first, then create multiple holds.
+    assert!(f.manager.call(Some(21)).await.is_err());
+    f.manager
+        .submit(hold("a", "one", 82, "down"))
+        .await
+        .unwrap();
+    f.manager
+        .submit(hold("a", "two", 20, "down"))
+        .await
+        .unwrap();
+    // Stopping the actor closes stdin; the actual bridge's EOF cleanup is tested on Android.
+    f.manager
+        .submit(WorkKind::Disconnect("a".into()))
+        .await
+        .unwrap();
+    assert_eq!(
+        f.journal(),
+        ["down:21", "up:21", "down:82", "down:20", "up:20", "up:82"]
+    );
+    f.manager.stop().await;
+}
+
+#[tokio::test]
+async fn malformed_edges_are_rejected_before_accessing_the_bridge() {
+    for (args, expected) in [
+        (
+            json!({"key":"menu","action":"down","pressId":"bad"}),
+            "UUID",
+        ),
+        (
+            json!({"key":"menu","action":"repeat","pressId":uuid::Uuid::new_v4().to_string()}),
+            "unsupported remote key action",
+        ),
+        (json!({"key":"menu","action":"down"}), "require only"),
+        (
+            json!({"key":"19;reboot","action":"down","pressId":uuid::Uuid::new_v4().to_string()}),
+            "unsupported remote key",
+        ),
+    ] {
+        assert!(edge(&args, "owner")
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains(expected));
+    }
 }

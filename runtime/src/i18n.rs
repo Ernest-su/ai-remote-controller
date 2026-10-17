@@ -209,6 +209,21 @@ const MESSAGES: &[(&str, &str)] = &[
         "常驻输入桥接不可用，请检查设备端服务与输入权限",
     ),
     ("input service stopped", "输入服务已停止，请重新连接设备"),
+    ("remote key already held", "此按键正在按住，请先松开"),
+    (
+        "remote key press expired, already held or belongs to another gesture",
+        "按键已超时、正在被按住或属于其他手势，请松开后重试",
+    ),
+    (
+        "remote key arguments must be object",
+        "遥控按键参数必须是对象",
+    ),
+    (
+        "remote key edges require only key, action and pressId",
+        "按住操作必须且只提供 key、action 和 pressId",
+    ),
+    ("unsupported remote key action", "不支持此按键边沿操作"),
+    ("remote key pressId must be UUID", "按键手势标识必须是 UUID"),
     (
         "input key outcome uncertain; no automatic replay; release recovery attempted",
         "按键执行结果不确定，已尝试释放按键；不会自动重复执行",

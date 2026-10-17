@@ -54,6 +54,8 @@ fun DesktopRemoteScreen(state: DesktopState, model: DesktopController, showResul
     val density = LocalDensity.current
     val fontScale = density.fontScale.coerceAtLeast(1f)
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
+    DesktopRemoteKeyLifecycle(model.remoteKeys)
+    CompositionLocalProvider(LocalRemoteKeySender provides model.remoteKeys) {
     Box(Modifier.fillMaxSize().testTag("remote-page").padding(
         start = RemoteDimensions.OuterPadding, end = RemoteDimensions.OuterPadding,
         top = RemoteDimensions.OuterPadding, bottom = if (imeVisible) 0.dp else RemoteDimensions.OuterPadding,
@@ -73,15 +75,15 @@ fun DesktopRemoteScreen(state: DesktopState, model: DesktopController, showResul
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                IconButton({ model.key("power") }, enabled = state.connected,
+                                RemoteIconButton({ model.key("power") }, enabled = state.connected, debugName = "power",
                                     modifier = Modifier.size(48.dp).background(RemoteColors.Surface, CircleShape)) {
                                     Icon(painterResource("drawable/ic_power.xml"), "电源", Modifier.size(24.dp),
                                         tint = if (state.connected) RemoteColors.Warning else RemoteColors.Disabled)
                                 }
                                 Row {
-                                    IconButton({ model.key("volume_down") }, enabled = state.connected) { Icon(painterResource("drawable/ic_volume_down.xml"), "音量 −") }
-                                    IconButton({ model.key("mute") }, enabled = state.connected) { Icon(painterResource("drawable/ic_mute.xml"), "静音") }
-                                    IconButton({ model.key("volume_up") }, enabled = state.connected) { Icon(painterResource("drawable/ic_volume_up.xml"), "音量 +") }
+                                    RemoteIconButton({ model.key("volume_down") }, enabled = state.connected, debugName = "volume_down") { Icon(painterResource("drawable/ic_volume_down.xml"), "音量 −") }
+                                    RemoteIconButton({ model.key("mute") }, enabled = state.connected, debugName = "mute") { Icon(painterResource("drawable/ic_mute.xml"), "静音") }
+                                    RemoteIconButton({ model.key("volume_up") }, enabled = state.connected, debugName = "volume_up") { Icon(painterResource("drawable/ic_volume_up.xml"), "音量 +") }
                                 }
                             }
                             Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -103,15 +105,15 @@ fun DesktopRemoteScreen(state: DesktopState, model: DesktopController, showResul
                                 }
                                 if (!feedbackVisible) {
                                     Row(Modifier.fillMaxWidth().testTag("remote-media-controls"), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                        RemoteKey("drawable/ic_previous.xml", "上一曲", state.connected, size = 52.dp) { model.key("media_previous") }
-                                        RemoteKey("drawable/ic_play_pause.xml", "播放 / 暂停", state.connected, size = 52.dp) { model.key("play_pause") }
-                                        RemoteKey("drawable/ic_next.xml", "下一曲", state.connected, size = 52.dp) { model.key("media_next") }
+                                        RemoteKey("drawable/ic_previous.xml", "上一曲", state.connected, size = 52.dp, key = "media_previous") { model.key("media_previous") }
+                                        RemoteKey("drawable/ic_play_pause.xml", "播放 / 暂停", state.connected, size = 52.dp, key = "play_pause") { model.key("play_pause") }
+                                        RemoteKey("drawable/ic_next.xml", "下一曲", state.connected, size = 52.dp, key = "media_next") { model.key("media_next") }
                                     }
                                 }
                             }
                             Box(Modifier.size(RemoteDimensions.Dpad).testTag("remote-dpad").background(RemoteColors.Surface, CircleShape).border(0.5.dp, RemoteColors.Divider, CircleShape)) {
                                 @Composable fun Direction(icon: String, label: String, key: String, alignment: Alignment, padding: PaddingValues) {
-                                    IconButton({ model.key(key) }, enabled = state.connected, modifier = Modifier.align(alignment).padding(padding).size(60.dp)) {
+                                    RemoteIconButton({ model.key(key) }, enabled = state.connected, modifier = Modifier.align(alignment).padding(padding).size(60.dp), debugName = key) {
                                         Icon(painterResource(icon), label, Modifier.size(28.dp))
                                     }
                                 }
@@ -119,15 +121,16 @@ fun DesktopRemoteScreen(state: DesktopState, model: DesktopController, showResul
                                 Direction("drawable/ic_down.xml", "向下", "down", Alignment.BottomCenter, PaddingValues(bottom = 8.dp))
                                 Direction("drawable/ic_left.xml", "向左", "left", Alignment.CenterStart, PaddingValues(start = 8.dp))
                                 Direction("drawable/ic_right.xml", "向右", "right", Alignment.CenterEnd, PaddingValues(end = 8.dp))
-                                Button({ model.key("ok") }, enabled = state.connected, shape = CircleShape,
-                                    modifier = Modifier.size(RemoteDimensions.Confirm).align(Alignment.Center), contentPadding = PaddingValues(0.dp)) {
-                                    Text("OK", fontSize = 20.sp)
+                                Box(Modifier.size(RemoteDimensions.Confirm).align(Alignment.Center)
+                                    .background(if (state.connected) RemoteColors.Action else RemoteColors.Disabled, CircleShape)
+                                    .remoteKeyInput("ok", state.connected) { model.key("ok") }, contentAlignment = Alignment.Center) {
+                                    Text("OK", fontSize = 20.sp, color = RemoteColors.OnAction)
                                 }
                             }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                RemoteKey("drawable/ic_back.xml", "返回", state.connected, size = 58.dp) { model.key("back") }
-                                RemoteKey("drawable/ic_home.xml", "主页", state.connected, size = 58.dp) { model.key("home") }
-                                RemoteKey("drawable/ic_device_menu.xml", "设备菜单", state.connected, size = 58.dp) { model.key("menu") }
+                                RemoteKey("drawable/ic_back.xml", "返回", state.connected, size = 58.dp, key = "back") { model.key("back") }
+                                RemoteKey("drawable/ic_home.xml", "主页", state.connected, size = 58.dp, key = "home") { model.key("home") }
+                                RemoteKey("drawable/ic_device_menu.xml", "设备菜单", state.connected, size = 58.dp, key = "menu") { model.key("menu") }
                             }
                         }
                     }
@@ -154,12 +157,13 @@ fun DesktopRemoteScreen(state: DesktopState, model: DesktopController, showResul
             }
         }
     }
+    }
 }
 
 @Composable
-internal fun RemoteKey(icon: String, label: String, enabled: Boolean, tint: Color = RemoteColors.Text, size: androidx.compose.ui.unit.Dp = 48.dp, action: () -> Unit) {
+internal fun RemoteKey(icon: String, label: String, enabled: Boolean, tint: Color = RemoteColors.Text, size: androidx.compose.ui.unit.Dp = 48.dp, key: String = label, action: () -> Unit) {
     Column(
-        Modifier.widthIn(min = 64.dp).clickable(enabled = enabled, role = Role.Button, onClick = action)
+        Modifier.widthIn(min = 64.dp).remoteKeyInput(key, enabled, action)
             .semantics(mergeDescendants = true) {}.padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -168,4 +172,19 @@ internal fun RemoteKey(icon: String, label: String, enabled: Boolean, tint: Colo
         }
         Text(label, style = MaterialTheme.typography.bodySmall, color = if (enabled) RemoteColors.Text else RemoteColors.Disabled)
     }
+}
+
+@Composable
+private fun RemoteIconButton(onClick: () -> Unit, enabled: Boolean, modifier: Modifier = Modifier, debugName: String = "remote-key", content: @Composable () -> Unit) {
+    Box(modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).remoteKeyInput(debugName, enabled, onClick),
+        contentAlignment = Alignment.Center) {
+        CompositionLocalProvider(LocalContentColor provides if (enabled) RemoteColors.Text else RemoteColors.Disabled) { content() }
+    }
+}
+
+@Composable
+internal fun DesktopRemoteKeyLifecycle(sender: RemoteKeySender) {
+    val focused = androidx.compose.ui.platform.LocalWindowInfo.current.isWindowFocused
+    LaunchedEffect(focused) { if (!focused) sender.cancelAll() }
+    DisposableEffect(sender) { onDispose { sender.cancelAll() } }
 }
