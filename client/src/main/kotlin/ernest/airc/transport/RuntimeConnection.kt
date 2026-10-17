@@ -229,6 +229,12 @@ class RuntimeConnection(private val language: () -> String = { java.util.Locale.
         return requestOnSocket(destination, "approve_app", null, arguments, null, null)
     }
 
+    internal suspend fun approveAppControlAt(target: RuntimeTransferTarget, arguments: JsonObject): String {
+        val destination = checkNotNull(socket) { "请先连接设备" }
+        checkTransferTarget(target)
+        return requestOnSocket(destination, "approve_app_control", null, arguments, null, null)
+    }
+
     internal suspend fun approveInstallAt(target: RuntimeTransferTarget, arguments: JsonObject): String {
         val destination = checkNotNull(socket) { "请先连接设备" }
         checkTransferTarget(target)

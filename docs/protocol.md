@@ -269,3 +269,11 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 `files.preview` / `files_preview` 接收 `{root,path}`，只打开选定根中的普通文件，不跟随符号链接，返回 `{id,root,path,sizeBytes,dataPath}`；`dataPath` 为 `/media/{id}`，支持 HTTP GET/HEAD 与单范围 Range。范围响应携带精确 Content-Range 与长度，文件发生变化时返回409。最多八个预览资源、闲置五分钟失效，容量与目标播放资源分别计算。`files.preview_close` / `files_preview_close` 接收 `{id}` 释放预览，不能借此关闭目标播放资源。流不内联文件内容，不计算全文件摘要；需要完整校验的导出继续使用下载任务。
 
 `apps.apk_icon` / `apps_apk_icon` 接收 `{root,path}`（`.apk` 普通文件，最多4 GiB），从已固定的文件描述符经 Android 包资源解析获取96×96 PNG，单图最多128 KiB；返回 BinaryArtifact 加 `root`、`filePath`，`path` 仍为 `/artifacts/{id}`。客户端核对原根、文件路径、尺寸与长度后读取。此接口不安装 APK、不从同包名的已安装应用借用图标；split 缺少独立图标、无访问权限或资源无法解析时可能失败，界面保留占位。
+
+## 应用详情与管理 {#app-controls}
+
+`apps.control_info` 接收 `{package}`，返回 `{app,state}`；app 沿用 `apps.info` 的身份字段，state 含 package/userId、enabled/enabledSetting、stopped、capabilities(forceStop/setEnabled/clearData) 和 permissions(name/label/granted/runtime/mutable/reason)。读取来自当前 Android 用户的 PackageManager，stopped 为停止标记而非进程状态。特殊访问的 grant 结果不代表其 AppOps/设置已允许。
+
+`apps.prepare_control` 接收 package、action(force_stop/enable/disable/clear_data/grant/revoke)，grant/revoke 必须另有 permission。仅允许用户应用。返回 `{id,kind:"app_control",app,action,permission,approvalRequired:true,dataLoss,before}`，最多32份、15分钟有效。目标权限须由应用声明、属于可修改的运行时权限；系统/策略固定权限以及无法读取策略的权限拒绝修改。
+
+控制端独立 `type=approve_app_control`，arguments 为 id 和可选 accepted(false拒绝)，不向模型暴露确认函数。提案单次消费，确认时及后台任务执行前重新核对当前用户、应用安装身份和相关状态。固定 pm/am 参数明确指定用户；不接受任意 shell 或组件。返回 `task.progress` 格式、direction=app_control、unit=items、name=package，提交后不可取消。完成包含 package/userId/action/permission/completed/verifiedBy/state；权限、启停用和强停读取实际包状态核对，数据清除以包管理器 Success 和安装身份核对为准，不报告释放空间。控制端完成后再次读取详情。

@@ -130,6 +130,14 @@ pub(crate) async fn gamepad(operation: &str, arguments: &[String]) -> Result<Str
 pub(crate) async fn apps(arguments: &[String]) -> Result<String> {
     invoke_class("ernest.airc.bridge.AppsBridge", "list", arguments).await
 }
+pub(crate) async fn app_control(user: u32, package: &str) -> Result<String> {
+    invoke_class(
+        "ernest.airc.bridge.AppControlBridge",
+        "details",
+        &[user.to_string(), package.to_owned()],
+    )
+    .await
+}
 pub(crate) async fn app_icon(user: u32, package: &str) -> Result<String> {
     invoke_class(
         "ernest.airc.bridge.AppsBridge",

@@ -7,6 +7,7 @@ use std::{
 };
 mod apk;
 pub(crate) mod cache;
+pub(crate) mod control;
 mod info;
 pub(crate) mod install;
 #[cfg(test)]
@@ -25,6 +26,9 @@ fn preview(p: &Proposal) -> Value {
     json!({"id":p.id,"kind":"app_uninstall","app":p.info,"approvalRequired":true,"dataLoss":true})
 }
 pub async fn execute(tool: &str, args: &Value) -> Result<String> {
+    if matches!(tool, "apps.control_info" | "apps.prepare_control") {
+        return control::execute(tool, args).await;
+    }
     if matches!(
         tool,
         "apps.cache_capabilities" | "apps.cache_pending" | "apps.clear_cache"

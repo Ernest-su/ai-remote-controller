@@ -24,7 +24,7 @@ fun ApplicationsPanel(apps: List<InstalledApp>, connected: Boolean, loading: Boo
     onRefresh: () -> Unit, onOpen: (String) -> Unit, onInspect: ((String) -> Unit)? = null,
     onUninstall: ((String) -> Unit)? = null, onClearCache: ((String) -> Unit)? = null,
     management: @Composable ColumnScope.() -> Unit = {}, icon: @Composable (String) -> Unit = {},
-    actionsBusy: Boolean = false, operationMessage: String? = null) {
+    actionsBusy: Boolean = false, operationMessage: String? = null, onDetails: ((String) -> Unit)? = null) {
     var packageName by rememberSaveable { mutableStateOf("") }
     var query by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf("all") }
@@ -106,8 +106,8 @@ fun ApplicationsPanel(apps: List<InstalledApp>, connected: Boolean, loading: Boo
             }
         }
         items(matches.take(visibleCount), key = { it.packageName }) { app ->
-            ApplicationManagementRow(app, enabled, { selectedPackage = app.packageName }, { launchApp(app.packageName) },
-                onInspect?.let { action -> { manage(app.packageName, action) } },
+            ApplicationManagementRow(app, enabled, { if (onDetails != null) onDetails(app.packageName) else selectedPackage = app.packageName }, { launchApp(app.packageName) },
+                if (onDetails != null) { { onDetails(app.packageName) } } else onInspect?.let { action -> { manage(app.packageName, action) } },
                 if (app.system == false) onClearCache?.let { action -> { manage(app.packageName, action) } } else null,
                 if (app.system == false) onUninstall?.let { action -> { manage(app.packageName, action) } } else null,
                 { icon(app.packageName) })

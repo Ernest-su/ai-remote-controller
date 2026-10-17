@@ -120,6 +120,7 @@ async fn dispatch(
         "approve_system" => crate::system_actions::approve(&request.arguments, owner).await,
         "approve_cache" => crate::app_actions::cache::approve(&request.arguments).await,
         "approve_install" => crate::app_actions::install::approve(&request.arguments).await,
+        "approve_app_control" => crate::app_actions::control::approve(&request.arguments).await,
         "approve_app" => crate::app_actions::approve(&request.arguments).await,
         "approve" => crate::file_actions::approve(&request.arguments).await,
         "configure" => {
@@ -201,7 +202,7 @@ async fn connection(socket: WebSocket, state: Arc<AppState>, language: i18n::Lan
                             _ => (String::new(), String::new(), None),
                         };
                         let queue = if kind == "tool" && tool.as_deref() == Some("remote.key") { &keys }
-                            else if kind == "tool" || kind == "approve" || kind == "approve_app" || kind == "approve_install" || kind == "approve_cache" || kind == "approve_system" { &controls } else { &requests };
+                            else if kind == "tool" || kind == "approve" || kind == "approve_app" || kind == "approve_app_control" || kind == "approve_install" || kind == "approve_cache" || kind == "approve_system" { &controls } else { &requests };
                         match queue.try_send(frame) {
                             Ok(()) => {},
                             Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {

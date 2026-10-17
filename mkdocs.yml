@@ -54,6 +54,7 @@ nav:
       - 文件管理: guide/files.md
       - 媒体投送: guide/media.md
       - 游戏手柄: guide/gamepad.md
+      - 应用管理: guide/apps.md
       - 应用缓存: guide/cache.md
       - 模型配置: guide/models.md
       - 服务与更新: guide/services.md

@@ -36,6 +36,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
     val state by model.state.collectAsState()
     val gamepad by model.virtualGamepad.state.collectAsState()
     val gamepadEnabled = gamepadAvailable(state.connected, state.tools)
+    var appDetailsPackage by rememberSaveable { mutableStateOf("") }
     var pageName by rememberSaveable { mutableStateOf(RemotePage.REMOTE.name) }
     var deviceOriginName by rememberSaveable { mutableStateOf(RemotePage.REMOTE.name) }
     val page = RemotePage.valueOf(pageName)
@@ -127,7 +128,8 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                         RemotePage.REMOTE -> RemoteControls(state, model) { navigate(RemotePage.RESULTS) }
                         RemotePage.DEVICES -> Devices(state, model)
                         RemotePage.MENU -> FeatureMenu(::navigate)
-                        RemotePage.APPS -> Applications(state, model)
+                        RemotePage.APPS -> Applications(state, model) { name -> appDetailsPackage = name; navigate(RemotePage.APP_DETAILS) }
+                        RemotePage.APP_DETAILS -> ApplicationDetails(appDetailsPackage, state, model) { navigate(RemotePage.APPS) }
                         RemotePage.TEXT -> TextCommands(state, model)
                         RemotePage.MODEL -> ModelSettings(state, model)
                         RemotePage.SERVICE -> ServiceSettings(state, model)

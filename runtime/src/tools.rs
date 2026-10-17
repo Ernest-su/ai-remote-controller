@@ -47,6 +47,8 @@ pub const TOOLS: &[&str] = &[
     "apps.icon",
     "apps.apk_icon",
     "apps.info",
+    "apps.control_info",
+    "apps.prepare_control",
     "apps.cache_capabilities",
     "apps.cache_pending",
     "apps.clear_cache",
@@ -180,6 +182,8 @@ pub async fn execute(tool: &str, args: &Value) -> Result<String> {
     if matches!(
         tool,
         "apps.info"
+            | "apps.control_info"
+            | "apps.prepare_control"
             | "apps.cache_capabilities"
             | "apps.cache_pending"
             | "apps.clear_cache"

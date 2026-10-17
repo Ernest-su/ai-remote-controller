@@ -147,3 +147,15 @@ uv run --with websockets python runtime/virtual_gamepad_target_test.py --serial 
 ```
 
 运行前构建匹配 ABI 的 runtime 和 `:mediaFixture:assembleDebug`，不要向其他 ABI 的设备推送 x86_64 文件。专项只创建 UUID 服务和原先未安装的接收 fixture，验证同连接重开、外连接拒绝、内核设备回收、按键边沿及回中，结束清理自建资源。
+
+应用详情 UI 使用控制端回环协议 fixture，验证页面返回、旋转、权限确认与离线禁用，以及 320dp、1.5 倍字体的亮暗布局：
+
+```sh
+python3 scripts/test-phone-target.py --phone <自有模拟器序列号> --suite app-details-ui
+```
+
+被控端应用操作使用 UUID 包名、临时签名 APK 与独立 runtime 状态目录；脚本创建相机运行时权限、普通网络权限和私有标记数据，验证拒绝/重复确认、权限授予撤销、状态改变后确认拒绝、强停、启停用及数据清除。只在显式选择的自有模拟器或专用目标执行，不操作已有应用的数据，结束卸载自建 APK、停止自建服务并移除自己的转发和目录。先构建配套 ABI：
+
+```sh
+uv run --with websockets python runtime/app_control_target_test.py --serial <自有模拟器序列号> --binary androidApp/src/main/assets/runtime/airc-runtime-x86_64
+```

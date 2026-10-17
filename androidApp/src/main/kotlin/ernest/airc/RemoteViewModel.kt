@@ -75,6 +75,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     val apkInspection = ApkInspectionController(viewModelScope, runtime)
     val filePreviews = FilePreviewClient(runtime)
     val fileMedia = FileMediaController(viewModelScope,runtime)
+    val appControl = AppControlController(viewModelScope,runtime)
     val appManagement = AppManagementController(viewModelScope,runtime)
     val systemObservation = SystemObservationController(viewModelScope,runtime)
     val systemActions = SystemActionController(viewModelScope,runtime,systemObservation::clear)
@@ -133,7 +134,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     private val mediaMonitor = viewModelScope.launch {
         runtime.session.collectLatest { session ->
             if (session == null) {
-                appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear()
+                appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear()
                 mutable.update { it.copy(mediaStatus = "未连接设备") }
             } else while (true) {
                 if (runtime.session.value != session) return@collectLatest
@@ -275,7 +276,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private suspend fun attachRuntime(host: String, port: Int, method: ConnectionMethod?, adbPort: Int?, guid: String?, model: String?, previousId: String? = null, expectedRelease: RuntimeRelease? = null) {
-        appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear()
+        appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear()
         val status = runtime.connect(host, port, expectedRelease ?: withContext(Dispatchers.IO) { installer.bundledRelease() })
         val previous = state.value.history.find { it.id == status.deviceId }
         val record = RememberedDevice(status.deviceId, model?.ifBlank { null } ?: previous?.name ?: status.name ?: "AI 设备",

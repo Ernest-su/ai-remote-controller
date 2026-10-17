@@ -37,6 +37,7 @@ fun DesktopApp(controller: DesktopController, navigation: DesktopNavigation = re
     val state by controller.state.collectAsState()
     val gamepad by controller.virtualGamepad.state.collectAsState()
     val gamepadEnabled = gamepadAvailable(state.connected, state.tools)
+    var appDetailsPackage by rememberSaveable { mutableStateOf("") }
     val pages = rememberSaveableStateHolder()
     val snackbar = remember { SnackbarHostState() }
     var lastGamepadError by rememberSaveable { mutableStateOf(gamepad.error) }
@@ -87,7 +88,8 @@ fun DesktopApp(controller: DesktopController, navigation: DesktopNavigation = re
                             RemotePage.REMOTE -> DesktopRemoteScreen(state, controller) { navigation.navigate(RemotePage.RESULTS) }
                             RemotePage.MENU, RemotePage.REMOTE_TYPES -> DesktopMenu(navigation)
                             RemotePage.DEVICES -> DesktopDevices(state, controller)
-                            RemotePage.APPS -> DesktopApplications(state, controller)
+                            RemotePage.APPS -> DesktopApplications(state, controller) { name -> appDetailsPackage = name; navigation.navigate(RemotePage.APP_DETAILS) }
+                            RemotePage.APP_DETAILS -> DesktopApplicationDetails(appDetailsPackage, state, controller) { navigation.navigate(RemotePage.APPS) }
                             RemotePage.TEXT -> DesktopTextCommands(state, controller)
                             RemotePage.MODEL -> ModelProfileEditor(controller.profiles, state.connected && !state.busy, state.modelConfigured, controller::syncProfile)
                             RemotePage.SERVICE -> DesktopServices(state, controller)

@@ -10,7 +10,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun DesktopApplications(state: DesktopState, controller: DesktopController) {
+fun DesktopApplications(state: DesktopState, controller: DesktopController, onDetails: ((String) -> Unit)? = null) {
     androidx.compose.runtime.LaunchedEffect(state.connected) {
         if (state.connected && state.apps.isEmpty() && !state.appsLoading && state.appsError == null) controller.listApps()
     }
@@ -18,9 +18,11 @@ fun DesktopApplications(state: DesktopState, controller: DesktopController) {
     val installation by controller.appInstallation.state.collectAsState()
     val management by controller.appManagement.state.collectAsState()
     val cache by controller.appCache.state.collectAsState()
+    val control by controller.appControl.state.collectAsState()
     ApplicationsPanel(state.apps, state.connected, state.appsLoading, state.appsError, state.output,
         controller::listApps, controller::openApp,
-        actionsBusy = state.busy || state.submitting || management.busy || installation.busy || cache.busy,
+        onDetails = onDetails,
+        actionsBusy = control.busy || state.busy || state.submitting || management.busy || installation.busy || cache.busy,
         operationMessage = when {
             management.proposal != null || cache.proposal != null || installation.proposal != null -> "有应用操作等待确认"
             management.busy || installation.busy || cache.busy -> "应用任务正在进行，可查看进度"
@@ -28,7 +30,7 @@ fun DesktopApplications(state: DesktopState, controller: DesktopController) {
             management.message != null || cache.message != null || installation.message != null -> "有应用任务结果可查看"
             else -> null
         },
-        onInspect = { controller.appManagement.inspect(it, state.connected) },
+        onInspect = onDetails ?: { controller.appManagement.inspect(it, state.connected) },
         onUninstall = { controller.appManagement.uninstall(it, state.connected, controller::listApps) },
         onClearCache = if("apps.clear_cache" in state.tools) { { controller.appCache.prepare(it,state.connected && !management.busy && !installation.busy) } } else null,
         icon = { name -> androidx.compose.runtime.key(iconRevision) { ApplicationIcon(name, state.connected && "apps.icon" in state.tools, controller.appIcons.cached(name), controller.appIcons::load) } },
