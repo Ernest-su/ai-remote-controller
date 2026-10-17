@@ -14,6 +14,85 @@ class VirtualGamepadControllerTest {
         put("id", id); put("sequence", args["sequence"]!!); put("submitted", true); put("gameVerified", false)
     }.toString()
 
+    @Test fun typeSwitchWaitsForNeutralAckAndRejectsOldLayoutInput(): Unit = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val heldEntered = CompletableDeferred<Unit>()
+        val heldReply = CompletableDeferred<Unit>()
+        val neutralEntered = CompletableDeferred<Unit>()
+        val neutralReply = CompletableDeferred<Unit>()
+        var held = false
+        val updates = CopyOnWriteArrayList<JsonObject>()
+        val controller = VirtualGamepadController(scope, { tool, args -> when (tool) {
+            "gamepad.virtual_capabilities" -> capability
+            "gamepad.virtual_open" -> session
+            "gamepad.virtual_close" -> "{}"
+            else -> {
+                val input = args["state"]!!.jsonObject
+                updates += input
+                if (input["leftX"]!!.jsonPrimitive.double > 0) {
+                    held = true; heldEntered.complete(Unit); heldReply.await()
+                } else if (held) { neutralEntered.complete(Unit); neutralReply.await() }
+                response(args)
+            }
+        } })
+        try {
+            controller.start(true)
+            assertTrue(controller.replace(VirtualGamepadInput(leftX = 1.0, buttons = listOf("a"))))
+            withTimeout(2000) { heldEntered.await() }
+            controller.selectType(GamepadType.NES)
+            assertTrue(controller.state.value.switchingType)
+            assertEquals(VirtualGamepadInput(), controller.state.value.input)
+            assertFalse(controller.replace(VirtualGamepadInput(hatX = 1)))
+            heldReply.complete(Unit)
+            withTimeout(2000) { neutralEntered.await() }
+            assertTrue(controller.state.value.switchingType, "Old in-flight reply cannot enable new controls")
+            assertEquals(0.0, updates.last()["leftX"]!!.jsonPrimitive.double)
+            assertTrue(updates.last()["buttons"]!!.jsonArray.isEmpty())
+            neutralReply.complete(Unit)
+            withTimeout(2000) { controller.state.first { !it.switchingType } }
+            assertFalse(controller.change(GamepadType.DUAL_STICK) { it.copy(leftX = 1.0) })
+            assertTrue(controller.change(GamepadType.NES) { it.copy(hatX = 1, buttons = listOf("a")) })
+            withTimeout(2000) { while (updates.last()["hatX"]!!.jsonPrimitive.int != 1) delay(10) }
+            controller.stop()
+            withTimeout(2000) { controller.state.first { !it.stopping } }
+            assertEquals(GamepadType.NES, controller.state.value.type)
+            controller.start(true)
+            assertEquals(GamepadType.NES, controller.state.value.type)
+            assertEquals(VirtualGamepadInput(), controller.state.value.input)
+        } finally { heldReply.complete(Unit); neutralReply.complete(Unit); controller.stop(); scope.cancel() }
+    }
+
+    @Test fun nesSyntheticMapsDiagonalAndJumpToKeysAndSwitchesThroughReset(): Unit = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val calls = CopyOnWriteArrayList<Pair<String, JsonObject>>()
+        val controller = VirtualGamepadController(scope, { tool, args ->
+            if (tool == "gamepad.virtual_capabilities") """{"supported":false,"runtimeUid":2000,"mode":"uinput"}"""
+            else {
+                calls += tool to args
+                buildJsonObject {
+                    put("submitted", true); put("released", true); put("sourceGamepad", 1025)
+                    put("sourceJoystick", 16777232); put("operation", tool.substringAfter('.')); put("gameVerified", false)
+                }.toString()
+            }
+        })
+        try {
+            controller.selectType(GamepadType.NES)
+            controller.start(true, allowSynthetic = true)
+            assertTrue(controller.replace(VirtualGamepadInput(hatX = 1, hatY = -1, buttons = listOf("a"))))
+            withTimeout(2000) { while (calls.none { it.first == "gamepad.pulse" }) delay(10) }
+            val pulse = calls.first { it.first == "gamepad.pulse" }.second
+            assertEquals(listOf("a", "right", "up"), pulse["buttons"]!!.jsonArray.map { it.jsonPrimitive.content })
+            assertEquals(0.0, pulse["x"]!!.jsonPrimitive.double)
+            controller.selectType(GamepadType.DUAL_STICK)
+            assertFalse(controller.replace(VirtualGamepadInput(leftX = 1.0)))
+            withTimeout(2000) { controller.state.first { !it.switchingType } }
+            assertEquals("gamepad.reset", calls.last().first)
+            assertTrue(controller.replace(VirtualGamepadInput(leftX = 1.0)))
+            withTimeout(2000) { while (calls.last().second["x"]?.jsonPrimitive?.double != 1.0) delay(10) }
+            assertTrue(calls.last().second["buttons"]!!.jsonArray.isEmpty())
+        } finally { controller.stop(); scope.cancel() }
+    }
+
     @Test fun latestStateIsCoalescedWhileOneUpdateIsInFlightAndStopClosesLease(): Unit = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val release = CompletableDeferred<Unit>()

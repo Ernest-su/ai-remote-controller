@@ -42,9 +42,14 @@ class GamepadOrientationUiTest {
             assertTrue("$it must be fully visible in landscape", node.boundsInRoot.height >= node.size.height - 1)
         }
         assertEquals(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE,compose.activity.requestedOrientation)
+        compose.onNodeWithTag("gamepad-type-selector").performClick()
+        compose.onNodeWithTag("gamepad-type-NES").performClick()
+        compose.onNodeWithTag("gamepad-dpad").assertIsDisplayed()
         compose.activityRule.scenario.recreate()
         compose.waitForIdle()
         compose.onNodeWithTag("gamepad-page").assertIsDisplayed()
+        compose.onNodeWithTag("gamepad-dpad").assertIsDisplayed()
+        compose.onNodeWithTag("virtual-stick-left").assertDoesNotExist()
         assertEquals(Configuration.ORIENTATION_LANDSCAPE,compose.activity.resources.configuration.orientation)
         transition(originalOrientation,original){compose.onNodeWithTag("navigate-back").performClick()}
         compose.onNodeWithTag("remote-types-page").assertIsDisplayed()

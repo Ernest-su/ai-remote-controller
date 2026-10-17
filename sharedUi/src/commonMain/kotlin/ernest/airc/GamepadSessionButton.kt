@@ -2,7 +2,10 @@ package ernest.airc
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
@@ -39,5 +42,24 @@ fun GamepadSessionButton(state: VirtualGamepadState, available: Boolean, onStart
         if (busy || state.reconnecting) CircularProgressIndicator(Modifier.size(24.dp), color = RemoteColors.Brand, strokeWidth = 2.dp)
         else Icon(if (state.running) ManagementIcons.Stop else ManagementIcons.Play, null, Modifier.size(24.dp),
             tint = if (!available && !state.running) RemoteColors.Disabled else if (state.running) RemoteColors.Warning else RemoteColors.Action)
+    }
+}
+
+@Composable
+fun GamepadTypeSelector(state: VirtualGamepadState, onSelect: (GamepadType) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { expanded = true }, modifier = Modifier.heightIn(min = 48.dp)
+            .testTag("gamepad-type-selector").semantics {
+                contentDescription = "选择手柄类型"
+                stateDescription = state.type.label
+            }) { Text(state.type.shortLabel, color = RemoteColors.Action) }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            GamepadType.entries.forEach { type ->
+                DropdownMenuItem(text = { Text(type.label) }, modifier = Modifier
+                    .testTag("gamepad-type-${type.name}").semantics { selected = state.type == type },
+                    onClick = { expanded = false; onSelect(type) })
+            }
+        }
     }
 }

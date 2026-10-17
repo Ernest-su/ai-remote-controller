@@ -37,7 +37,7 @@ SUITES = {
     "pickers": ("ernest.airc.FilePickerTargetTest", 1),
     "picker-success": ("ernest.airc.FilePickerSuccessTargetTest", 1),
     "mirror": ("ernest.airc.ScreenMirrorLifecycleTargetTest", 2),
-    "gamepad-ui": ("ernest.airc.GamepadOrientationUiTest,ernest.airc.VirtualGamepadUiTest", 7),
+    "gamepad-ui": ("ernest.airc.GamepadOrientationUiTest,ernest.airc.VirtualGamepadUiTest,ernest.airc.GamepadTypeUiTest", 10),
 }
 
 

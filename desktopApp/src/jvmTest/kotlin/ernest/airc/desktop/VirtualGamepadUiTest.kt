@@ -75,10 +75,20 @@ class VirtualGamepadUiTest {
             compose.runOnIdle { viewport=value }
             val page=compose.onNodeWithTag("gamepad-page").fetchSemanticsNode().boundsInRoot
             controlTags.forEach {
-                val node = compose.onNodeWithTag(it).assertIsDisplayed().fetchSemanticsNode()
+                val node = compose.onNodeWithTag(it).assertIsDisplayed()
+                    .assertWidthIsAtLeast(64.dp).assertHeightIsAtLeast(64.dp).fetchSemanticsNode()
                 assertEquals("$it must be entirely visible", node.size.height.toFloat(), node.boundsInRoot.height, 1f)
                 assertTrue("$it must fit page width", node.boundsInRoot.left >= page.left && node.boundsInRoot.right <= page.right)
                 assertTrue("$it must remain at least 48dp", node.boundsInRoot.width >= 48f && node.boundsInRoot.height >= 48f)
+            }
+            val bounds = controlTags.associateWith { compose.onNodeWithTag(it).fetchSemanticsNode().boundsInRoot }
+            controlTags.forEachIndexed { index, tag ->
+                controlTags.drop(index + 1).forEach { other ->
+                    val a = bounds.getValue(tag); val b = bounds.getValue(other)
+                    val overlapWidth = minOf(a.right, b.right) - maxOf(a.left, b.left)
+                    val overlapHeight = minOf(a.bottom, b.bottom) - maxOf(a.top, b.top)
+                    assertTrue("$tag and $other touch targets must not overlap", overlapWidth <= 1f || overlapHeight <= 1f)
+                }
             }
             compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange)).assertCountEquals(0)
             compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.HorizontalScrollAxisRange)).assertCountEquals(0)

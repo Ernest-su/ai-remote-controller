@@ -103,8 +103,11 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                 }
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                     Text(page.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f, fill = false).padding(start = 4.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (page == RemotePage.GAMEPAD) GamepadSessionButton(gamepad, gamepadEnabled,
-                        { model.virtualGamepad.start(gamepadEnabled, allowSynthetic = true) }, { model.virtualGamepad.stop() })
+                    if (page == RemotePage.GAMEPAD) {
+                        GamepadSessionButton(gamepad, gamepadEnabled,
+                            { model.virtualGamepad.start(gamepadEnabled, allowSynthetic = true) }, { model.virtualGamepad.stop() })
+                        GamepadTypeSelector(gamepad, model.virtualGamepad::selectType)
+                    }
                 }
                 if (isRemoteType) IconButton({ navigate(RemotePage.REMOTE_TYPES) }, Modifier.size(48.dp).testTag("open-remote-types")) {
                     Icon(painterResource(R.drawable.ic_remote_types), "切换遥控器类型", Modifier.size(24.dp))

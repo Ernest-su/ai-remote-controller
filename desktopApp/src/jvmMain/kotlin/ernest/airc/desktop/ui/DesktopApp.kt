@@ -72,8 +72,11 @@ fun DesktopApp(controller: DesktopController, navigation: DesktopNavigation = re
                         }
                         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                             Text(navigation.page.title, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleLarge, maxLines = 1)
-                            if (navigation.page == RemotePage.GAMEPAD) GamepadSessionButton(gamepad, gamepadEnabled,
-                                { controller.virtualGamepad.start(gamepadEnabled, allowSynthetic = true) }, { controller.virtualGamepad.stop() })
+                            if (navigation.page == RemotePage.GAMEPAD) {
+                                GamepadSessionButton(gamepad, gamepadEnabled,
+                                    { controller.virtualGamepad.start(gamepadEnabled, allowSynthetic = true) }, { controller.virtualGamepad.stop() })
+                                GamepadTypeSelector(gamepad, controller.virtualGamepad::selectType)
+                            }
                         }
                         TextButton({ navigation.navigate(RemotePage.DEVICES) }, modifier = Modifier.heightIn(min = 48.dp).testTag("device-status")) {
                             Box(Modifier.size(7.dp).background(if (state.connected) RemoteColors.Brand else RemoteColors.Disabled, CircleShape))

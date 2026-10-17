@@ -16,7 +16,22 @@ data class VirtualGamepadInput(
 }
 val virtualGamepadButtons = listOf("a", "b", "x", "y", "l1", "r1", "l2", "r2", "select", "start", "thumb_l", "thumb_r")
 
+enum class GamepadType(val label: String, val shortLabel: String) {
+    DUAL_STICK("双摇杆手柄", "双摇杆"),
+    NES("NES 经典手柄", "NES"),
+}
+
+/** Synthetic input uses digital DPAD keys; uinput uses the snapshot's hat axes. */
+fun VirtualGamepadInput.toPulse(): GamepadPulse = GamepadPulse(
+    buttons = buttons + listOfNotNull(
+        "left".takeIf { hatX < 0 }, "right".takeIf { hatX > 0 },
+        "up".takeIf { hatY < 0 }, "down".takeIf { hatY > 0 }),
+    x = leftX, y = leftY, rightX = rightX, rightY = rightY,
+)
+
 data class VirtualGamepadState(
+    val type: GamepadType = GamepadType.DUAL_STICK,
+    val switchingType: Boolean = false,
     val running: Boolean = false,
     val starting: Boolean = false,
     val stopping: Boolean = false,

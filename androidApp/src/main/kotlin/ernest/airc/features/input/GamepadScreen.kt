@@ -15,5 +15,5 @@ internal fun GamepadScreen(state: RemoteUiState, model: RemoteViewModel) {
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
-    GamepadPanel(continuous, available, { transform -> model.virtualGamepad.change(transform) })
+    GamepadPanel(continuous, available, { transform -> model.virtualGamepad.change(continuous.type, transform) })
 }

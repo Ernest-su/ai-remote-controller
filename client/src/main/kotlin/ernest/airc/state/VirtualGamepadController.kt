@@ -18,23 +18,39 @@ class VirtualGamepadController(
     private val mutable = MutableStateFlow(VirtualGamepadState())
     val state = mutable.asStateFlow()
     private val lock = Any()
+    private var typeRevision = 0L
     private var generation = 0L
     private var job: Job? = null
     private val json = Json { encodeDefaults = true }
 
+    fun change(type: GamepadType, transform: (VirtualGamepadInput) -> VirtualGamepadInput): Boolean = synchronized(lock) {
+        if (type != state.value.type) false else change(transform)
+    }
+
     fun replace(input: VirtualGamepadInput): Boolean = change { input }
     fun change(transform: (VirtualGamepadInput) -> VirtualGamepadInput): Boolean = synchronized(lock) {
-        if (!state.value.running || state.value.starting || state.value.reconnecting || state.value.stopping) return false
+        if (!state.value.running || state.value.starting || state.value.reconnecting || state.value.stopping || state.value.switchingType) return false
         val input = transform(state.value.input)
         if (!input.valid()) return false
         mutable.update { it.copy(input = input.copy(buttons = input.buttons.toList())) }
         true
     }
 
+    fun selectType(type: GamepadType) = synchronized(lock) {
+        if (type != state.value.type) {
+            typeRevision++
+            mutable.update { it.copy(type = type, input = VirtualGamepadInput(), switchingType = it.running) }
+        }
+    }
+
+    private fun finishTypeSwitch(revision: Long) = synchronized(lock) {
+        if (revision == typeRevision) mutable.update { it.copy(switchingType = false) }
+    }
+
     fun start(available: Boolean, allowSynthetic: Boolean = false): Boolean = synchronized(lock) {
         if (!available || job != null) return false
         val token = ++generation
-        mutable.value = VirtualGamepadState(running = true, starting = true)
+        mutable.value = VirtualGamepadState(type = state.value.type, running = true, starting = true)
         job = scope.launch(start = CoroutineStart.LAZY) { run(token, allowSynthetic) }
         job!!.start()
         true
@@ -71,7 +87,7 @@ class VirtualGamepadController(
         } finally {
             synchronized(lock) {
                 job = null
-                mutable.update { it.copy(running = false, starting = false, reconnecting = false, stopping = false, input = VirtualGamepadInput()) }
+                mutable.update { it.copy(running = false, starting = false, reconnecting = false, stopping = false, switchingType = false, input = VirtualGamepadInput()) }
             }
         }
     }
@@ -113,10 +129,11 @@ class VirtualGamepadController(
                 while (true) {
                     currentCoroutineContext().ensureActive()
                     guard()
-                    val input = synchronized(lock) { state.value.input }
-                    val pulse = GamepadPulse(input.buttons, input.leftX, input.leftY, 100, input.rightX, input.rightY)
+                    val (snapshot, revision) = synchronized(lock) { state.value to typeRevision }
+                    val input = snapshot.input
+                    val pulse = input.toPulse()
                     val tool = if (pulse.valid()) "gamepad.pulse" else "gamepad.reset"
-                    if (pulse.valid() || input != sent) {
+                    if (pulse.valid() || input != sent || snapshot.switchingType) {
                         val args = if (tool == "gamepad.pulse") json.encodeToJsonElement(GamepadPulse.serializer(), pulse).jsonObject
                             else buildJsonObject {}
                         // Finish each finite transaction before cleanup or another snapshot.
@@ -130,6 +147,7 @@ class VirtualGamepadController(
                             reply["sourceJoystick"]?.jsonPrimitive?.int == 16777232 &&
                             reply["operation"]?.jsonPrimitive?.content == tool.substringAfter('.') &&
                             reply["gameVerified"]?.jsonPrimitive?.boolean == false) { "手柄输入响应不匹配或释放未确认" }
+                        finishTypeSwitch(revision)
                         healthy()
                         sent = input
                         sequence++
@@ -174,9 +192,10 @@ class VirtualGamepadController(
             while (true) {
                 currentCoroutineContext().ensureActive()
                 guard()
-                val input = synchronized(lock) { state.value.input }
+                val (snapshot, revision) = synchronized(lock) { state.value to typeRevision }
+                val input = snapshot.input
                 val now = System.nanoTime()
-                if (input != sent || now - sentAt >= 250_000_000L) {
+                if (input != sent || snapshot.switchingType || now - sentAt >= 250_000_000L) {
                     sequence++
                     val reply = try {
                         Json.parseToJsonElement(withTimeout(if (missedReplies == 0) 1000 else 500) {
@@ -201,6 +220,7 @@ class VirtualGamepadController(
                         reply["sequence"]?.jsonPrimitive?.long == sequence &&
                         reply["submitted"]?.jsonPrimitive?.boolean == true &&
                         reply["gameVerified"]?.jsonPrimitive?.boolean == false) { "虚拟手柄更新响应不匹配" }
+                    finishTypeSwitch(revision)
                     missedReplies = 0
                     recovering = false
                     healthy()
@@ -219,7 +239,8 @@ class VirtualGamepadController(
         } catch (error: CancellationException) { throw error }
         catch (error: Exception) {
             synchronized(lock) { if (token == generation) mutable.update {
-                it.copy(running = false, starting = false, stopping = true, input = VirtualGamepadInput())
+                it.copy(running = false, starting = false, stopping = true, input = VirtualGamepadInput(),
+                    error = error.message ?: "虚拟手柄失败")
             } }
             throw error
         } finally {
@@ -241,11 +262,11 @@ class VirtualGamepadController(
 
     fun stop() = synchronized(lock) {
         generation++
-        mutable.update { it.copy(running = false, starting = false, reconnecting = false, stopping = job != null, input = VirtualGamepadInput()) }
+        mutable.update { it.copy(running = false, starting = false, reconnecting = false, stopping = job != null, switchingType = false, input = VirtualGamepadInput()) }
         job?.cancel()
     }
     fun clear() = synchronized(lock) {
         stop()
-        mutable.value = VirtualGamepadState(stopping = job != null)
+        mutable.value = VirtualGamepadState(type = state.value.type, stopping = job != null)
     }
 }

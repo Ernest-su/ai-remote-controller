@@ -9,5 +9,5 @@ internal fun DesktopGamepad(state: DesktopState, controller: DesktopController) 
     LaunchedEffect(available) { if(!available) controller.virtualGamepad.stop() }
     val focused = androidx.compose.ui.platform.LocalWindowInfo.current.isWindowFocused
     LaunchedEffect(focused) { if(!focused) controller.virtualGamepad.stop() }
-    GamepadPanel(continuous, available, { transform -> controller.virtualGamepad.change(transform) })
+    GamepadPanel(continuous, available, { transform -> controller.virtualGamepad.change(continuous.type, transform) })
 }
