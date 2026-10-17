@@ -41,8 +41,11 @@ pub const TOOLS: &[&str] = &[
     "files.list",
     "files.stat",
     "files.download",
+    "files.preview",
+    "files.preview_close",
     "apps.list",
     "apps.icon",
+    "apps.apk_icon",
     "apps.info",
     "apps.cache_capabilities",
     "apps.cache_pending",
@@ -142,6 +145,9 @@ pub async fn execute(tool: &str, args: &Value) -> Result<String> {
         )?;
         return crate::remote_input::key(code).await;
     }
+    if tool == "apps.apk_icon" {
+        return app_icon::apk(args).await;
+    }
     if tool == "apps.icon" {
         return app_icon::execute(args).await;
     }
@@ -200,7 +206,10 @@ pub async fn execute(tool: &str, args: &Value) -> Result<String> {
     if matches!(tool, "task.start" | "task.progress" | "task.cancel") {
         return crate::transfers::execute(tool, args).await;
     }
-    if matches!(tool, "files.list" | "files.stat" | "files.download") {
+    if matches!(
+        tool,
+        "files.list" | "files.stat" | "files.download" | "files.preview" | "files.preview_close"
+    ) {
         return files::execute(tool, args).await;
     }
     if matches!(tool, "screen.mirror_start" | "screen.mirror_stop") {

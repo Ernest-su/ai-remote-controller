@@ -4,6 +4,7 @@ import android.provider.OpenableColumns
 import android.provider.DocumentsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
@@ -17,6 +18,8 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
     val apk by model.apkInspection.state.collectAsState()
     val media by model.fileMedia.state.collectAsState()
     val transfer by model.transfers.state.collectAsState()
+    val previewSession by model.filePreviews.session.collectAsState()
+    val thumbnails=remember(previewSession,files.root,files.path,files.contentRevision) {AndroidFileThumbnails(model.filePreviews)}
     val context=LocalContext.current.applicationContext
     val scope=rememberCoroutineScope()
     var message by remember { mutableStateOf<String?>(null) }
@@ -87,6 +90,8 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
             message=null
             model.transfers.download(files.root,path(entry.name),context.externalCacheDir ?: context.cacheDir,canTransfer)
         })else null,
+        thumbnail={entry,modifier -> AndroidFileThumbnail(entry,modifier,thumbnails,files.root,path(entry.name),available && (if(entry.name.endsWith(".apk",true)) "apps.apk_icon" else "files.preview") in state.tools)},
+        previewContent=if("files.preview" in state.tools) ({entry -> AndroidFilePreview(entry,model.filePreviews,files.root,path(entry.name))}) else null,
         transfer={ section ->
             if (section == "storage") {
             if("storage.analyze" in state.tools) StorageAnalysisPanel(storage, available && "task.progress" in state.tools && "task.cancel" in state.tools,
@@ -94,17 +99,23 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
             if ("storage.analyze" !in state.tools) Text("当前服务不支持存储分析。", color=RemoteColors.Secondary)
             }
             if (section == "apk") {
+            apk.info?.takeIf {it.root==files.root}?.let {info ->
+                val entry=TargetFileEntry(info.path.substringAfterLast('/'),"file",info.sizeBytes)
+                AndroidFileThumbnail(entry,androidx.compose.ui.Modifier.size(RemoteDimensions.FileGridThumbnail),thumbnails,info.root,info.path,available && "apps.apk_icon" in state.tools)
+            }
+            Text("APK 预览与被控设备安装",style=androidx.compose.material3.MaterialTheme.typography.titleMedium)
+            Text("安装将在当前连接的被控设备执行。",color=RemoteColors.Secondary)
             ApkInspectionPanel(apk, model.apkInspection::cancel)
             if("apps.install" in state.tools) AppInstallationPanel(installation, apk.info, available,
                 { update -> apk.info?.let { model.appInstallation.prepare(it,update,available) } },
                 model.appInstallation::confirm, model.appInstallation::cancel,
                 onAdd = { apk.info?.let(model.appInstallation::add) }, onRemove = model.appInstallation::remove,
-                onPrepareSet = { update -> model.appInstallation.prepareSelected(update, available) })
+                installLabel = "在被控设备安装此 APK", onPrepareSet = { update -> model.appInstallation.prepareSelected(update, available) })
             if (apk.info == null && !apk.busy && apk.error == null) Text("从 APK 文件的更多菜单选择 APK 信息，读取后可准备安装。", color=RemoteColors.Secondary)
             }
             if (section == "media") {
             FileMediaPanel(media,available,model.fileMedia::choose,{model.fileMedia.open(available)},{model.fileMedia.release(available)},onMode={local -> media.players?.let{model.fileMedia.inspect(it.root,it.path,available,local)}},onCancel=model.fileMedia::cancel,onRecover=if("media.publications" in state.tools) ({model.fileMedia.recover(available)})else null,onReleaseCopy={id -> model.fileMedia.releaseCopy(id,available)})
-            if (media.players == null && !media.busy) Text("从媒体文件的更多菜单选择媒体打开，选择播放器后再执行。", color=RemoteColors.Secondary)
+            if (media.players == null && !media.busy) Text("从媒体文件的更多菜单选择在被控设备播放，选择播放器后再执行。", color=RemoteColors.Secondary)
             }
             if (section == "transfer") {
             FileTransferPanel(transfer,files.root,files.path,canTransfer,{select.launch(arrayOf("*/*"))},

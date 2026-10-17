@@ -9,11 +9,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun AppInstallationPanel(state: AppInstallationState, apk: TargetApkInfo?, available: Boolean, onPrepare: (Boolean) -> Unit, onConfirm: (Boolean) -> Unit, onCancel: () -> Unit, onAdd: (() -> Unit)? = null, onRemove: ((TargetApkInfo) -> Unit)? = null, onPrepareSet: ((Boolean) -> Unit)? = null) {
+fun AppInstallationPanel(state: AppInstallationState, apk: TargetApkInfo?, available: Boolean, onPrepare: (Boolean) -> Unit, onConfirm: (Boolean) -> Unit, onCancel: () -> Unit, onAdd: (() -> Unit)? = null, onRemove: ((TargetApkInfo) -> Unit)? = null, onPrepareSet: ((Boolean) -> Unit)? = null, installLabel: String = "准备安装此 APK") {
     var replacement by remember(apk?.sha256) { mutableStateOf(false) }
     apk?.let {
         ToggleSettingRow("允许覆盖安装现有应用", replacement, !state.busy, checkbox = true) { replacement = it }
-        ActionButton("准备安装此 APK", available && !state.busy && it.split.isNullOrEmpty()) { onPrepare(replacement) }
+        ActionButton(installLabel, available && !state.busy && it.split.isNullOrEmpty()) { onPrepare(replacement) }
     }
     if(apk != null && onAdd != null) ActionButton("加入多包安装", available && !state.busy, onAdd)
     if(state.selectedApks.isNotEmpty() && onPrepareSet != null) {

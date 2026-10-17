@@ -46,3 +46,26 @@ async fn media_streams_are_seekable_pinned_and_revocable() {
     );
     std::fs::remove_file(path).unwrap();
 }
+
+#[tokio::test]
+async fn preview_budget_does_not_evict_target_playback_and_close_is_scoped() {
+    initialize(9876);
+    let path = std::env::temp_dir().join(format!("airc-preview-budget-{}", uuid::Uuid::new_v4()));
+    std::fs::write(&path, b"fixture").unwrap();
+    let (target, _) = register(File::open(&path).unwrap(), "video/mp4").unwrap();
+    assert!(revoke_preview(&target).is_err());
+    let mut previews = vec![];
+    for _ in 0..10 {
+        previews.push(register_preview(File::open(&path).unwrap()).unwrap().0);
+    }
+    assert!(lookup(&target).is_ok());
+    let last = previews.last().unwrap();
+    assert!(lookup(last).is_ok());
+    revoke_preview(last).unwrap();
+    assert!(lookup(last).is_err());
+    for id in previews {
+        let _ = revoke_preview(&id);
+    }
+    revoke(&target).unwrap();
+    std::fs::remove_file(path).unwrap();
+}

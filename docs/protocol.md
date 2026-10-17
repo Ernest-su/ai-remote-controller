@@ -263,3 +263,9 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 模型 remote_key 不允许 power，即使请求 allowedTools 包含 remote.key 也拒绝该参数；模型应通过系统提案和 App 确认处理锁屏/重启/关机。直接工具 remote.key 的用户手动电源键仍保持原能力。此检查仅约束该明确的按键入口，不是目标 GUI 行为的通用权限隔离。
 
 `GET /status` 的 `binarySha256` 为服务启动时读取自身运行中可执行文件得到的 SHA-256，启动后缓存；它不读取可能被替换的部署路径。控制端在建立 WebSocket 前对比配套清单的版本与摘要，不匹配或缺少摘要时先部署配套程序，再次校验通过后连接。
+
+### 文件预览与 APK 图标
+
+`files.preview` / `files_preview` 接收 `{root,path}`，只打开选定根中的普通文件，不跟随符号链接，返回 `{id,root,path,sizeBytes,dataPath}`；`dataPath` 为 `/media/{id}`，支持 HTTP GET/HEAD 与单范围 Range。范围响应携带精确 Content-Range 与长度，文件发生变化时返回409。最多八个预览资源、闲置五分钟失效，容量与目标播放资源分别计算。`files.preview_close` / `files_preview_close` 接收 `{id}` 释放预览，不能借此关闭目标播放资源。流不内联文件内容，不计算全文件摘要；需要完整校验的导出继续使用下载任务。
+
+`apps.apk_icon` / `apps_apk_icon` 接收 `{root,path}`（`.apk` 普通文件，最多4 GiB），从已固定的文件描述符经 Android 包资源解析获取96×96 PNG，单图最多128 KiB；返回 BinaryArtifact 加 `root`、`filePath`，`path` 仍为 `/artifacts/{id}`。客户端核对原根、文件路径、尺寸与长度后读取。此接口不安装 APK、不从同包名的已安装应用借用图标；split 缺少独立图标、无访问权限或资源无法解析时可能失败，界面保留占位。

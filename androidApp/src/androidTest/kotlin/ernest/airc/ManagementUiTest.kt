@@ -30,6 +30,26 @@ class ManagementUiTest {
         file.outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
+    @Test fun previewRestoresAndSeparatesControllerPlaybackFromTargetAndApkInstall() {
+        val restoration=StateRestorationTester(compose)
+        var target="";var inspectedApk=""
+        restoration.setContent {RemoteTheme {FileBrowserPanel(FileBrowserState(entries=entries+TargetFileEntry("sample.apk","file",100),loaded=true),true,{},{},{},{},{},
+            onMedia={target=it.name},onApk={inspectedApk=it.name},previewContent={FileTextPreview("literal preview", "UTF-8", false)})}}
+        compose.onNodeWithTag("files-page").performScrollToNode(hasText("movie.mp4"))
+        compose.onNodeWithText("movie.mp4").performClick()
+        compose.onNodeWithText("在主控设备播放").assertExists()
+        assertEquals("",target)
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithTag("file-text-preview").assertExists()
+        compose.onNodeWithText("改为在被控设备播放").performClick()
+        assertEquals("movie.mp4",target)
+        compose.onNodeWithTag("files-tools-dialog-close").performClick()
+        compose.onNodeWithTag("files-page").performScrollToNode(hasText("sample.apk"))
+        compose.onNodeWithText("sample.apk").performClick()
+        assertEquals("sample.apk",inspectedApk)
+        compose.onNodeWithTag("files-tool-apk").assertIsSelected()
+    }
+
     @Test fun gridAndCategoryFilterOnlyLoadedEntriesWithoutRequests() {
         var requests=0
         compose.setContent { RemoteTheme { FileBrowserPanel(FileBrowserState(entries=entries,loaded=true,nextCursor="shortcut"),true,

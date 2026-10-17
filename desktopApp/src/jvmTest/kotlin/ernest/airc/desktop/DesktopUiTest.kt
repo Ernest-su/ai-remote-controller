@@ -15,6 +15,28 @@ import org.junit.Assert.*
 class DesktopUiTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun filePreviewDistinguishesControllerAndTargetPlaybackAndApkInspection() {
+        var target="";var apk="";var properties=""
+        val entries=listOf(TargetFileEntry("movie.mp4","file",500),TargetFileEntry("app.apk","file",100),TargetFileEntry("notes.txt","file",10))
+        compose.setContent {RemoteTheme { FileBrowserPanel(FileBrowserState(entries=entries,loaded=true),true,{},{},{},{},{properties=it.name},
+            onMedia={target=it.name},onApk={apk=it.name},previewContent={entry -> androidx.compose.material3.Text("preview:${entry.name}")}) }}
+        compose.onNodeWithText("movie.mp4").performScrollTo().performClick()
+        compose.onNodeWithTag("files-preview-dialog").assertExists()
+        compose.onNodeWithText("在主控设备播放").assertExists()
+        assertEquals("",target);assertEquals("",properties)
+        compose.onNodeWithText("改为在被控设备播放").performClick()
+        assertEquals("movie.mp4",target)
+        compose.onNodeWithTag("files-preview-dialog").assertDoesNotExist()
+        compose.onNodeWithTag("files-tools-dialog-close").performClick()
+        compose.onNodeWithText("app.apk").performScrollTo().performClick()
+        assertEquals("app.apk",apk)
+        compose.onNodeWithTag("files-tools-dialog").assertExists()
+        compose.onNodeWithTag("files-tools-dialog-close").performClick()
+        compose.onNodeWithTag("file-more-notes.txt").performScrollTo().performClick()
+        compose.onNodeWithText("查看属性").performClick()
+        assertEquals("notes.txt",properties)
+    }
+
     @Test fun directoryCreationRequiresValidNameAndAvailableAction() {
         var created:String?=null
         val enabled=androidx.compose.runtime.mutableStateOf(true)

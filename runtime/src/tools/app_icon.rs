@@ -21,8 +21,16 @@ pub(super) async fn execute(args: &Value) -> Result<String> {
         .trim()
         .parse::<u32>()?;
     let encoded = crate::platform_bridge::app_icon(user, package).await?;
+    let bytes = decode_icon(&encoded)?;
+    let mut descriptor = crate::artifacts::insert(bytes, 96, 96);
+    descriptor["package"] = serde_json::json!(package);
+    descriptor["userId"] = serde_json::json!(user);
+    Ok(descriptor.to_string())
+}
+
+fn decode_icon(encoded: &str) -> Result<Vec<u8>> {
     let encoded = encoded.trim();
-    if encoded.len() > 256 * 1024 || encoded.len() % 2 != 0 {
+    if encoded.len() > 256 * 1024 || !encoded.len().is_multiple_of(2) {
         bail!("invalid icon length");
     }
     let bytes = (0..encoded.len())
@@ -35,9 +43,48 @@ pub(super) async fn execute(args: &Value) -> Result<String> {
     if !bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
         bail!("invalid icon PNG");
     }
+    Ok(bytes)
+}
+
+pub(super) async fn apk(args: &Value) -> Result<String> {
+    use std::os::fd::AsRawFd;
+    static GATE: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
+    let object = args
+        .as_object()
+        .context("APK icon arguments must be object")?;
+    if object
+        .keys()
+        .any(|key| !["root", "path"].contains(&key.as_str()))
+    {
+        bail!("only root and path accepted");
+    }
+    let root = args
+        .get("root")
+        .map(|v| v.as_str().context("root must be string"))
+        .transpose()?
+        .unwrap_or("downloads");
+    let path = args["path"].as_str().context("path required")?;
+    if !path.to_ascii_lowercase().ends_with(".apk") {
+        bail!("APK file required");
+    }
+    let file = super::files::open(&super::files::root(root)?, path)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_file() || metadata.len() > 4 * 1024 * 1024 * 1024 {
+        bail!("APK requires a regular file up to 4 GiB");
+    }
+    let _permit = GATE.try_acquire().context("APK icon requests busy")?;
+    let user = run_command("am", &["get-current-user".into()])
+        .await?
+        .trim()
+        .parse::<u32>()?;
+    let pinned = format!("/proc/{}/fd/{}", std::process::id(), file.as_raw_fd());
+    let bytes = decode_icon(&crate::platform_bridge::apk_icon(user, &pinned).await?)?;
+    if !crate::file_actions::same(&metadata, &file.metadata()?) {
+        bail!("APK changed while reading icon");
+    }
     let mut descriptor = crate::artifacts::insert(bytes, 96, 96);
-    descriptor["package"] = serde_json::json!(package);
-    descriptor["userId"] = serde_json::json!(user);
+    descriptor["root"] = serde_json::json!(root);
+    descriptor["filePath"] = serde_json::json!(path);
     Ok(descriptor.to_string())
 }
 

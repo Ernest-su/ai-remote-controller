@@ -19,6 +19,7 @@ data class FileBrowserState(
     val error: String? = null,
     val selected: TargetFileStat? = null,
     val root: String = "downloads",
+    val contentRevision: Long = 0,
 )
 
 fun validTargetFileName(name: String): Boolean = name.isNotEmpty() && name != "." && name != ".." &&

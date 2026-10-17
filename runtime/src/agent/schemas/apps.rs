@@ -21,6 +21,7 @@ pub(super) fn management() -> Vec<Value> {
 
 pub(super) fn launcher() -> Vec<Value> {
     vec![
+        json!({"type":"function","function":{"name":"apps_apk_icon","description":"Read a selected APK archive icon as a short-lived 96px PNG artifact. Does not install the APK or depend on an installed application. Relative path within the selected root; no symlinks.","parameters":{"type":"object","properties":{"root":{"type":"string","enum":["downloads","inbox","full"]},"path":{"type":"string"}},"required":["path"],"additionalProperties":false}}}),
         json!({"type":"function","function":{"name":"apps_icon","description":"Read one installed application's 96px PNG icon as a short-lived binary artifact, not inline image data.","parameters":{"type":"object","properties":{"package":{"type":"string"}},"required":["package"],"additionalProperties":false}}}),
         json!({"type":"function","function":{"name":"apps_list","description":"List installed Android applications as JSON with package, nullable label, and system flag. Unavailable labels are null; use package names to launch.","parameters":{"type":"object","properties":{}}}}),
         json!({"type":"function","function":{"name":"apps_open","description":"Launch an installed application by package name. List apps first if unsure.","parameters":{"type":"object","properties":{"package":{"type":"string"}},"required":["package"]}}}),

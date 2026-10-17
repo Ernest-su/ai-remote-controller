@@ -3,7 +3,13 @@ use sha2::{Digest, Sha256};
 use std::{
     fs::{self, OpenOptions},
     io::{Read, Write},
-    os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
+    os::{
+        fd::AsRawFd,
+        unix::{
+            ffi::OsStrExt,
+            fs::{MetadataExt, OpenOptionsExt, PermissionsExt},
+        },
+    },
     path::{Path, PathBuf},
     sync::OnceLock,
 };
@@ -28,6 +34,26 @@ fn verify(path: &Path) -> Result<()> {
         .read_to_end(&mut bytes)?;
     if bytes != DEX {
         bail!("platform bridge asset content mismatch");
+    }
+    Ok(())
+}
+// SELinux shell domains may rename private files but forbid hard links.
+// Publish atomically without replacing an existing hash-addressed bridge.
+fn publish_noreplace(parent: &fs::File, temporary: &Path, path: &Path) -> std::io::Result<()> {
+    let from = std::ffi::CString::new(temporary.file_name().unwrap().as_bytes())?;
+    let to = std::ffi::CString::new(path.file_name().unwrap().as_bytes())?;
+    let result = unsafe {
+        libc::syscall(
+            libc::SYS_renameat2,
+            parent.as_raw_fd(),
+            from.as_ptr(),
+            parent.as_raw_fd(),
+            to.as_ptr(),
+            libc::RENAME_NOREPLACE,
+        )
+    };
+    if result != 0 {
+        return Err(std::io::Error::last_os_error());
     }
     Ok(())
 }
@@ -58,7 +84,7 @@ pub(crate) fn initialize(state: &Path) -> Result<()> {
             file.write_all(DEX)?;
             file.sync_all()?;
             drop(file);
-            match fs::hard_link(&temporary, &path) {
+            match publish_noreplace(&parent, &temporary, &path) {
                 Ok(()) => {}
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
                 Err(error) => return Err(error.into()),
@@ -112,6 +138,14 @@ pub(crate) async fn app_icon(user: u32, package: &str) -> Result<String> {
     )
     .await
 }
+pub(crate) async fn apk_icon(user: u32, path: &str) -> Result<String> {
+    invoke_class(
+        "ernest.airc.bridge.AppsBridge",
+        "archive_icon",
+        &[user.to_string(), path.to_owned()],
+    )
+    .await
+}
 async fn invoke_class(class: &str, operation: &str, arguments: &[String]) -> Result<String> {
     let path = BRIDGE
         .get()
@@ -128,4 +162,41 @@ pub(crate) fn input_bridge_path() -> Result<PathBuf> {
         .context("persistent input bridge unavailable")?;
     verify(path)?;
     Ok(path.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn bridge_publication_is_atomic_and_never_overwrites_or_follows_a_link() {
+        let directory =
+            std::env::temp_dir().join(format!("airc-bridge-publish-{}", uuid::Uuid::new_v4()));
+        fs::create_dir(&directory).unwrap();
+        let parent = fs::File::open(&directory).unwrap();
+        let temporary = directory.join("temporary");
+        let target = directory.join("bridge.dex");
+        fs::write(&temporary, b"bridge").unwrap();
+        fs::set_permissions(&temporary, fs::Permissions::from_mode(0o400)).unwrap();
+        publish_noreplace(&parent, &temporary, &target).unwrap();
+        assert!(!temporary.exists());
+        assert_eq!(fs::read(&target).unwrap(), b"bridge");
+        fs::write(&temporary, b"replacement").unwrap();
+        assert_eq!(
+            publish_noreplace(&parent, &temporary, &target)
+                .unwrap_err()
+                .kind(),
+            std::io::ErrorKind::AlreadyExists
+        );
+        assert_eq!(fs::read(&target).unwrap(), b"bridge");
+        let link = directory.join("link.dex");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        assert_eq!(
+            publish_noreplace(&parent, &temporary, &link)
+                .unwrap_err()
+                .kind(),
+            std::io::ErrorKind::AlreadyExists
+        );
+        assert_eq!(fs::read(&target).unwrap(), b"bridge");
+        fs::remove_dir_all(directory).unwrap();
+    }
 }

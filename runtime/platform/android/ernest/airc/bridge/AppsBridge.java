@@ -14,6 +14,17 @@ public final class AppsBridge {
     private static void icon(int user, String name) throws Exception {
         PackageManager manager=FrameworkContext.forUser(user).getPackageManager();
         android.graphics.drawable.Drawable drawable=manager.getApplicationIcon(name);
+        renderIcon(drawable);
+    }
+    private static void archiveIcon(int user, String path) throws Exception {
+        if(!path.matches("/proc/[0-9]+/fd/[0-9]+")) throw new IllegalArgumentException("pinned APK descriptor required");
+        PackageManager manager=FrameworkContext.forUser(user).getPackageManager();
+        android.content.pm.PackageInfo info=manager.getPackageArchiveInfo(path,0);
+        if(info==null || info.applicationInfo==null) throw new IllegalArgumentException("cannot read APK application");
+        info.applicationInfo.sourceDir=path;info.applicationInfo.publicSourceDir=path;
+        renderIcon(info.applicationInfo.loadIcon(manager));
+    }
+    private static void renderIcon(android.graphics.drawable.Drawable drawable) throws Exception {
         android.graphics.Bitmap bitmap=android.graphics.Bitmap.createBitmap(96,96,android.graphics.Bitmap.Config.ARGB_8888);
         try {
             drawable.setBounds(0,0,96,96);
@@ -29,6 +40,7 @@ public final class AppsBridge {
     }
     public static void main(String[] args) {
         try {
+            if(args.length==3 && args[0].equals("archive_icon")) { archiveIcon(Integer.parseInt(args[1]),args[2]); return; }
             if(args.length==3 && args[0].equals("icon")) { icon(Integer.parseInt(args[1]),args[2]); return; }
             if(args.length!=2 || !args[0].equals("list")) throw new IllegalArgumentException("invalid app bridge operation");
             int user=Integer.parseInt(args[1]);

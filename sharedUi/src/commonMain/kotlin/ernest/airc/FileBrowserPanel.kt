@@ -31,7 +31,10 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
     onApk: ((TargetFileEntry) -> Unit)? = null, onCreateDirectory: ((String) -> Unit)? = null,
     directoryAvailable: Boolean = available, onNavigate: ((String) -> Unit)? = null,
     unavailableMessage: String = "请连接支持文件工具的目标服务。", operationMessage: String? = null,
+    thumbnail: (@Composable (TargetFileEntry, Modifier) -> Unit)? = null,
+    previewContent: (@Composable (TargetFileEntry) -> Unit)? = null,
     transfer: @Composable ColumnScope.(String) -> Unit = {}) {
+    var previewName by rememberSaveable(state.root, state.path) { mutableStateOf<String?>(null) }
     var fullConfirmation by remember { mutableStateOf(false) }
     var query by rememberSaveable(state.root, state.path) { mutableStateOf("") }
     var sort by rememberSaveable { mutableStateOf("name") }
@@ -61,6 +64,17 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
     fun tools(section: String, action: () -> Unit = {}) { toolSection = section; showTools = true; action() }
     fun inspect(entry: TargetFileEntry) { inspectedName = entry.name; onInspect(entry) }
 
+    previewName?.let { name ->
+        val entry = state.entries.firstOrNull { it.name == name }
+        if (entry != null && filePreviewKind(entry) != null && previewContent != null) ManagementDialog("文件预览", "files-preview-dialog", { previewName = null }) {
+            Text(name, style = MaterialTheme.typography.bodyLarge)
+            if(filePreviewKind(entry) in listOf(FilePreviewKind.VIDEO,FilePreviewKind.AUDIO)) {
+                Text("在主控设备播放", style=MaterialTheme.typography.titleMedium)
+                onMedia?.let { target -> ActionButton("改为在被控设备播放", enabled) {previewName=null;tools("media") {target(entry)}} }
+            }
+            if (available) previewContent(entry) else ManagementMessage("设备未连接或正在执行操作，恢复后可重新打开预览。")
+        }
+    }
     if (fullConfirmation) AlertDialog(onDismissRequest = { fullConfirmation = false }, title = { Text("进入全盘浏览") },
         text = { Text("从 / 浏览目标文件系统。可访问和修改的范围取决于服务当前权限，系统保护目录可能拒绝访问。删除目录不可恢复，请逐项核对目标。") },
         confirmButton = { TextButton({ fullConfirmation = false; onRoot?.invoke("full") }, Modifier.heightIn(min = 48.dp)) { Text("进入") } },
@@ -181,11 +195,12 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                 row.forEach { entry ->
                     Box(Modifier.weight(1f).then(if(grid) Modifier.fillMaxHeight() else Modifier)) {
                         FileManagementRow(entry,enabled,
-                            { if(selectedName!=null) selectedName=if(selectedName==entry.name) null else entry.name else if(entry.kind=="directory") onEnter(entry) else inspect(entry) },
+                            { if(selectedName!=null) selectedName=if(selectedName==entry.name) null else entry.name else if(entry.kind=="directory") onEnter(entry) else if(entry.name.endsWith(".apk",true) && onApk != null) tools("apk") {onApk(entry)} else if(previewContent != null && filePreviewKind(entry) != null) previewName=entry.name else inspect(entry) },
                             { inspect(entry) },onDownload?.let { { tools("transfer") { it(entry) } } },
                             onMedia?.let { { tools("media") { it(entry) } } },onApk?.let { { tools("apk") { it(entry) } } },
                             onDelete?.let { { tools("transfer") { it(entry) } } },
-                            grid=grid,selected=selectedName==entry.name,onSelect={selectedName=entry.name})
+                            grid=grid,selected=selectedName==entry.name,onSelect={selectedName=entry.name},
+                            thumbnail=thumbnail, onPreview=if(previewContent != null && filePreviewKind(entry) != null) ({previewName=entry.name}) else null)
                     }
                 }
                 if(grid && row.size==1) Spacer(Modifier.weight(1f))
@@ -204,6 +219,7 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                         ManagementIconButton(ManagementIcons.Close,"取消选择",tag="files-clear-selection") {selectedName=null}
                     }
                     FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        if(previewContent != null && filePreviewKind(selected) != null) TextButton({previewName=selected.name},enabled=enabled,modifier=Modifier.heightIn(min=48.dp)) {Text("在主控设备预览 / 播放")}
                         TextButton({inspect(selected)},enabled=enabled,modifier=Modifier.heightIn(min=48.dp)) {Text("属性")}
                         if(selected.kind=="file") onDownload?.let { action -> TextButton({tools("transfer"){action(selected)}},enabled=enabled,modifier=Modifier.heightIn(min=48.dp)) {Text("下载") } }
                         onDelete?.let { action -> TextButton({tools("transfer"){action(selected)}},enabled=enabled,modifier=Modifier.heightIn(min=48.dp),colors=ButtonDefaults.textButtonColors(contentColor=RemoteColors.Warning)) {Text("删除") } }
@@ -224,14 +240,19 @@ private fun FileManagementRow(
     entry: TargetFileEntry, enabled: Boolean, onOpen: () -> Unit, onInspect: () -> Unit,
     onDownload: (() -> Unit)?, onMedia: (() -> Unit)?, onApk: (() -> Unit)?, onDelete: (() -> Unit)?,
     grid: Boolean = false, selected: Boolean = false, onSelect: () -> Unit = {},
+    thumbnail: (@Composable (TargetFileEntry, Modifier) -> Unit)? = null, onPreview: (() -> Unit)? = null,
 ) {
     var menu by remember(entry.name) { mutableStateOf(false) }
     val supported = entry.kind in listOf("directory", "file") && validTargetFileName(entry.name)
     val interaction = Modifier.combinedClickable(enabled = enabled && supported, role = Role.Button,
-        onClickLabel = if (entry.kind == "directory") "进入目录" else "查看属性",
+        onClickLabel = if (entry.kind == "directory") "进入目录" else if(onPreview != null) "预览文件" else "查看属性",
         onLongClickLabel = "选择文件", onLongClick = onSelect, onClick = onOpen)
         .semantics { this.selected = selected }
     @Composable fun FileIcon() {
+        if (thumbnail != null && (filePreviewKind(entry) != null || (entry.kind=="file" && entry.name.endsWith(".apk",true)))) {
+            thumbnail(entry, Modifier.size(if(grid) RemoteDimensions.FileGridThumbnail else RemoteDimensions.ManagementFileIcon))
+            return
+        }
         Box(Modifier.size(RemoteDimensions.ManagementFileIcon).background(RemoteColors.Fill, MaterialTheme.shapes.small), contentAlignment = Alignment.Center) {
             Icon(when(fileCategory(entry)) {
                 FileCategory.FOLDER -> ManagementIcons.Folder
@@ -258,8 +279,9 @@ private fun FileManagementRow(
                 DropdownMenuItem(text = { Text("选择文件") }, onClick = { menu = false; onSelect() })
                 DropdownMenuItem(text = { Text("查看属性") }, enabled = enabled, onClick = { menu = false; onInspect() })
                 if (entry.kind == "file") {
+                    onPreview?.let { DropdownMenuItem(text = { Text("在主控设备预览 / 播放") }, enabled = enabled, onClick = { menu = false; it() }) }
                     onDownload?.let { DropdownMenuItem(text = { Text("下载文件") }, enabled = enabled, onClick = { menu = false; it() }) }
-                    if (isTargetMedia(entry.name)) onMedia?.let { DropdownMenuItem(text = { Text("媒体打开") }, enabled = enabled, onClick = { menu = false; it() }) }
+                    if (isTargetMedia(entry.name)) onMedia?.let { DropdownMenuItem(text = { Text("在被控设备播放") }, enabled = enabled, onClick = { menu = false; it() }) }
                     if (entry.name.endsWith(".apk", true)) onApk?.let { DropdownMenuItem(text = { Text("APK 信息") }, enabled = enabled, onClick = { menu = false; it() }) }
                 }
                 onDelete?.let { DropdownMenuItem(text = { Text("删除", color = RemoteColors.Warning) }, enabled = enabled, onClick = { menu = false; it() }) }

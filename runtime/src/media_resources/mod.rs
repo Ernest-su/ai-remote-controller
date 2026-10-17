@@ -17,6 +17,7 @@ fn resources() -> &'static Mutex<HashMap<String, Arc<Resource>>> {
 }
 struct Resource {
     file: File,
+    preview: bool,
     metadata: Metadata,
     mime: String,
     created: Instant,
@@ -35,16 +36,27 @@ pub fn base_url() -> Result<String> {
     Ok(format!("http://127.0.0.1:{port}"))
 }
 pub fn register(file: File, mime: &str) -> Result<(String, String)> {
+    register_kind(file, mime, false)
+}
+pub fn register_preview(file: File) -> Result<(String, String)> {
+    register_kind(file, "application/octet-stream", true)
+}
+fn register_kind(file: File, mime: &str, preview: bool) -> Result<(String, String)> {
     let metadata = file.metadata()?;
     if !metadata.is_file() || metadata.len() > 1024 * 1024 * 1024 * 1024 {
         bail!("media requires a regular file up to 1 TiB");
     }
     let mut registry = resources().lock().unwrap();
-    registry.retain(|_, r| r.touched.lock().unwrap().elapsed() < Duration::from_secs(86400));
-    if registry.len() >= 4 {
+    registry.retain(|_, r| {
+        r.touched.lock().unwrap().elapsed()
+            < Duration::from_secs(if r.preview { 300 } else { 86400 })
+    });
+    if registry.values().filter(|r| r.preview == preview).count() >= if preview { 8 } else { 4 } {
         let oldest = registry
             .iter()
-            .filter(|(_, r)| r.readers.load(std::sync::atomic::Ordering::Relaxed) == 0)
+            .filter(|(_, r)| {
+                r.preview == preview && r.readers.load(std::sync::atomic::Ordering::Relaxed) == 0
+            })
             .min_by_key(|(_, r)| r.created)
             .map(|(id, _)| id.clone())
             .context("all media resources are streaming; release one first")?;
@@ -56,6 +68,7 @@ pub fn register(file: File, mime: &str) -> Result<(String, String)> {
         id.clone(),
         Arc::new(Resource {
             file,
+            preview,
             metadata,
             mime: mime.into(),
             created: Instant::now(),
@@ -65,6 +78,18 @@ pub fn register(file: File, mime: &str) -> Result<(String, String)> {
         }),
     );
     Ok((id, url))
+}
+pub fn revoke_preview(id: &str) -> Result<()> {
+    let mut registry = resources().lock().unwrap();
+    if !registry.get(id).is_some_and(|r| r.preview) {
+        bail!("preview resource not found");
+    }
+    registry
+        .remove(id)
+        .unwrap()
+        .revoked
+        .store(true, std::sync::atomic::Ordering::Relaxed);
+    Ok(())
 }
 pub fn revoke(id: &str) -> Result<()> {
     resources()
@@ -82,7 +107,9 @@ fn lookup(id: &str) -> Result<Arc<Resource>> {
         .get(id)
         .context("media resource not found")?
         .clone();
-    if resource.touched.lock().unwrap().elapsed() >= Duration::from_secs(86400) {
+    if resource.touched.lock().unwrap().elapsed()
+        >= Duration::from_secs(if resource.preview { 300 } else { 86400 })
+    {
         bail!("media resource expired");
     }
     *resource.touched.lock().unwrap() = Instant::now();

@@ -8,6 +8,13 @@ internal enum class FileCategory(val title: String) {
 internal fun fileCategory(entry: TargetFileEntry): FileCategory {
     if (entry.kind == "directory") return FileCategory.FOLDER
     if (entry.kind != "file") return FileCategory.OTHER
+    when(filePreviewKind(entry)) {
+        FilePreviewKind.IMAGE -> return FileCategory.IMAGE
+        FilePreviewKind.VIDEO -> return FileCategory.VIDEO
+        FilePreviewKind.AUDIO -> return FileCategory.AUDIO
+        FilePreviewKind.TEXT -> return FileCategory.DOCUMENT
+        null -> Unit
+    }
     return when (entry.name.substringAfterLast('.', "").lowercase()) {
         "jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "avif" -> FileCategory.IMAGE
         "mp4", "mkv", "webm", "avi", "mov", "m4v", "ts" -> FileCategory.VIDEO

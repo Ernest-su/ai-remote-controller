@@ -83,6 +83,8 @@ dependencies {
     implementation(project(":client"))
     implementation(project(":ascrcpy"))
     implementation(project(":sharedUi"))
+    implementation("androidx.media3:media3-exoplayer:1.10.0")
+    implementation("androidx.media3:media3-ui:1.10.0")
     val composeBom = platform("androidx.compose:compose-bom:2025.08.01")
     implementation(composeBom)
     androidTestImplementation(composeBom)

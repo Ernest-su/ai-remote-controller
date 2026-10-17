@@ -32,6 +32,7 @@ class DesktopController(
     val appIcons = AppIconController(scope, runtime)
     val appInstallation = AppInstallationController(scope, runtime)
     val apkInspection = ApkInspectionController(scope, runtime)
+    val filePreviews = FilePreviewClient(runtime)
     val fileMedia = FileMediaController(scope,runtime)
     val appManagement = AppManagementController(scope,runtime)
     val systemObservation = SystemObservationController(scope,runtime)
@@ -235,7 +236,7 @@ class DesktopController(
     }
     fun disconnect() = operation { generation++; feedbackGeneration++; runtime.disconnect(); releaseForward(); mutable.update { it.copy(status = "已断开", touchBusy = false) } }
     override fun close() {
-        transfers.close()
+        transfers.close(); filePreviews.close()
         runtime.close()
         profiles.close()
         val previous = forward; forward = null

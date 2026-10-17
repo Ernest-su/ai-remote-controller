@@ -91,7 +91,7 @@ class FileBrowserController(private val scope: CoroutineScope, private val runti
                 if (token == generation) mutable.update {
                     val entries = if (append) (it.entries + page.entries) else page.entries
                     check(entries.size <= 4096) { "目录缓存超过 4096 项，请选择更小目录" }
-                    FileBrowserState(path, entries, page.nextCursor, loaded = true, root = root)
+                    FileBrowserState(path, entries, page.nextCursor, loaded = true, root = root, contentRevision = it.contentRevision + if(append) 0 else 1)
                 }
             } catch (e: CancellationException) {
                 if (token == generation) mutable.update { it.copy(loading = false) }

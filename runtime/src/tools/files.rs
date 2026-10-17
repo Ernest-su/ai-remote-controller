@@ -105,6 +105,14 @@ fn execute_at(root: &Path, tool: &str, args: &Value) -> Result<String> {
         .unwrap_or("");
     let file = open(root, relative)?;
     let metadata = file.metadata()?;
+    if tool == "files.preview" {
+        if !metadata.is_file() {
+            bail!("preview requires a regular file");
+        }
+        let size = metadata.len();
+        let (id, _) = crate::media_resources::register_preview(file)?;
+        return Ok(json!({"id":id,"root":root_name,"path":relative,"sizeBytes":size,"dataPath":format!("/media/{id}")}).to_string());
+    }
     if tool == "files.download" {
         use std::io::Read;
         if !metadata.is_file() {
@@ -177,6 +185,14 @@ fn execute_at(root: &Path, tool: &str, args: &Value) -> Result<String> {
 }
 
 pub(super) async fn execute(tool: &str, args: &Value) -> Result<String> {
+    if tool == "files.preview_close" {
+        let object = args.as_object().context("arguments must be object")?;
+        if object.len() != 1 {
+            bail!("only preview id accepted");
+        }
+        crate::media_resources::revoke_preview(args["id"].as_str().context("id required")?)?;
+        return Ok(json!({"released":true}).to_string());
+    }
     let _permit = if tool == "files.download" {
         Some(
             DOWNLOAD
@@ -216,6 +232,42 @@ pub(crate) fn parent(root: &Path, relative: &str) -> Result<(File, std::ffi::CSt
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn previews_pin_regular_files_without_snapshot_size_limit() {
+        crate::media_resources::initialize(9876);
+        let root = std::env::temp_dir().join(format!("airc-preview-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        let file = File::create(root.join("large.mp4")).unwrap();
+        file.set_len(100 * 1024 * 1024).unwrap();
+        std::os::unix::fs::symlink("large.mp4", root.join("link.mp4")).unwrap();
+        let result: Value = serde_json::from_str(
+            &execute_at(
+                &root,
+                "files.preview",
+                &json!({"root":"inbox","path":"large.mp4"}),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(result["sizeBytes"], 100 * 1024 * 1024);
+        assert_eq!(result["root"], "inbox");
+        assert_eq!(result["path"], "large.mp4");
+        assert_eq!(
+            result["dataPath"],
+            format!("/media/{}", result["id"].as_str().unwrap())
+        );
+        crate::media_resources::revoke_preview(result["id"].as_str().unwrap()).unwrap();
+        for path in ["link.mp4", "../escape", ""] {
+            assert!(execute_at(&root, "files.preview", &json!({"path":path})).is_err());
+        }
+        assert!(execute_at(
+            &root,
+            "files.preview",
+            &json!({"path":"large.mp4","limit":1})
+        )
+        .is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn paging_and_symlink_escape_are_controlled() {
         let root = std::env::temp_dir().join(format!("airc-files-{}", uuid::Uuid::new_v4()));

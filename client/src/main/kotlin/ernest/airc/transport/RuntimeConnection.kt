@@ -147,6 +147,20 @@ class RuntimeConnection(private val language: () -> String = { java.util.Locale.
         return bytes
     }
 
+    internal suspend fun apkIcon(root: String, path: String): ByteArray {
+        val target = transferTarget()
+        val output = withContext(NonCancellable) {
+            requestAt(target, "apps.apk_icon", kotlinx.serialization.json.buildJsonObject { put("root", kotlinx.serialization.json.JsonPrimitive(root)); put("path", kotlinx.serialization.json.JsonPrimitive(path)) })
+        }
+        currentCoroutineContext().ensureActive()
+        checkTransferTarget(target)
+        val fields = json.parseToJsonElement(output).jsonObject
+        check(fields["root"]?.jsonPrimitive?.content == root && fields["filePath"]?.jsonPrimitive?.content == path) { "APK 图标对象不匹配" }
+        val artifact = json.decodeFromString<BinaryArtifact>(output)
+        check(artifact.width == 96 && artifact.height == 96 && artifact.sizeBytes in 1..128*1024) { "APK 图标尺寸无效" }
+        return artifacts.download(target.host,target.port,artifact).also { checkTransferTarget(target) }
+    }
+
     suspend fun screenshot(): ByteArray {
         val target = transferTarget()
         val artifact = json.decodeFromString<BinaryArtifact>(requestAt(target, "device.screenshot", JsonObject(emptyMap())))

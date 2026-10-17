@@ -54,6 +54,7 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite lan-co
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite appearance
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite controller-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite management-ui
+python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite file-preview-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite app-packages-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite models
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite profile-isolation
@@ -70,6 +71,7 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite profil
 | `appearance` | 三种外观模式、本地持久化、重建、设置返回、草稿、系统栏与未知值回退 |
 | `controller-ui` | 页面导航、提交与执行反馈、键盘间距、离线、大字体、旋转与输入工具 |
 | `management-ui` | 文件/应用列表、搜索筛选、按需面板、离线与草稿恢复 |
+| `file-preview-ui` | 主控端图片受限解码、文本范围读取及关闭释放、音频播放/后台暂停；仅使用本机回环媒体 fixture |
 | `app-packages-ui` | 图标显示、多包安装清单与显式提交 |
 | `models` | API 配置、模型选择、真实 Keystore 持久化与手动同步边界 |
 | `profile-isolation` | 测试配置备份隔离、恢复与重复隔离拒绝 |
@@ -102,6 +104,14 @@ python3 scripts/verify-local.py --scope commit
 ```
 
 提交后的文档 CI 复核严格构建并生成站点。生成站点不进入源码提交。
+
+文件预览的隔离目标回归：
+
+```sh
+./gradlew :desktopApp:jvmTest --tests ernest.airc.desktop.FilePreviewTargetTest -PaircTargetSerial=<自有模拟器序列号> --no-daemon
+```
+
+该测试使用 UUID 服务目录，读取未安装 APK 的图标并核对 App 包内的原色图标，验证文本范围读取、释放及路径边界；不安装目标 APK。显式指定目标的桌面测试先构建配套 App/runtime 与 fixture，避免使用过期二进制。不会修改已有目标服务。
 
 ## 设备与提供商专项
 

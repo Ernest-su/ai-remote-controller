@@ -44,7 +44,7 @@ tasks.withType<Test>().configureEach {
         systemProperty("airc.targetSerial", it)
         systemProperty("airc.runtimeAssets",rootProject.file("androidApp/src/main/assets/runtime").absolutePath)
         systemProperty("airc.deploymentScript",rootProject.file("android-build-run.sh").absolutePath)
-        dependsOn(":mediaFixture:assembleDebug", ":mediaFixture:assembleUpdateFixture")
+        dependsOn(":androidApp:assembleDebug", ":mediaFixture:assembleDebug", ":mediaFixture:assembleUpdateFixture")
         systemProperty("airc.mediaFixtureApk",rootProject.file("mediaFixture/build/outputs/apk/debug/mediaFixture-debug.apk").absolutePath)
         systemProperty("airc.mediaUpdateFixtureApk",rootProject.file("mediaFixture/build/outputs/apk/updateFixture/mediaFixture-updateFixture.apk").absolutePath)
         // Real target state is external to Gradle inputs; opt-in always performs the check.
