@@ -564,6 +564,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/apps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    应用管理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/cache/" class="md-nav__link">
         
   
@@ -1535,7 +1563,10 @@ python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </sp
 python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>lan-connection-ui
 python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>appearance
 python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>controller-ui
+python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>gamepad-ui
 python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>management-ui
+python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>file-preview-ui
+python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>mirror-toolbar-ui
 python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>app-packages-ui
 python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>models
 python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>profile-isolation
@@ -1570,12 +1601,24 @@ python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </sp
 <td>三种外观模式、本地持久化、重建、设置返回、草稿、系统栏与未知值回退</td>
 </tr>
 <tr>
+<td><code>gamepad-ui</code></td>
+<td>标题启停/重连图标、重连可停止且游戏按键禁用、固定无滚动视口、多指操作与取消释放、横屏方向及离页恢复；只验证控制端界面</td>
+</tr>
+<tr>
 <td><code>controller-ui</code></td>
 <td>页面导航、提交与执行反馈、键盘间距、离线、大字体、旋转与输入工具</td>
 </tr>
 <tr>
 <td><code>management-ui</code></td>
 <td>文件/应用列表、搜索筛选、按需面板、离线与草稿恢复</td>
+</tr>
+<tr>
+<td><code>mirror-toolbar-ui</code></td>
+<td>动态预览标题图标、全屏原生视图复用、悬浮遥控横竖屏比例及草稿保留；不连接目标</td>
+</tr>
+<tr>
+<td><code>file-preview-ui</code></td>
+<td>主控端图片受限解码、文本范围读取及关闭释放、音频播放/后台暂停；仅使用本机回环媒体 fixture</td>
 </tr>
 <tr>
 <td><code>app-packages-ui</code></td>
@@ -1606,6 +1649,10 @@ python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </sp
 python3<span class="w"> </span>scripts/verify-local.py<span class="w"> </span>--scope<span class="w"> </span>commit
 </code></pre></div>
 <p>提交后的文档 CI 复核严格构建并生成站点。生成站点不进入源码提交。</p>
+<p>文件预览的隔离目标回归：</p>
+<div class="highlight"><pre><span></span><code>./gradlew<span class="w"> </span>:desktopApp:jvmTest<span class="w"> </span>--tests<span class="w"> </span>ernest.airc.desktop.FilePreviewTargetTest<span class="w"> </span>-PaircTargetSerial<span class="o">=</span>&lt;自有模拟器序列号&gt;<span class="w"> </span>--no-daemon
+</code></pre></div>
+<p>该测试使用 UUID 服务目录，读取未安装 APK 的图标并核对 App 包内的原色图标，验证文本范围读取、释放及路径边界；不安装目标 APK。显式指定目标的桌面测试先构建配套 App/runtime 与 fixture，避免使用过期二进制。不会修改已有目标服务。</p>
 <h2 id="_6">设备与提供商专项<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h2>
 <p>普通按键提速专项使用独立的 <code>inputFixture</code> APK 和 UUID runtime 目录，安装前拒绝覆盖已有接收 fixture，结束后移除自建资源并恢复目标原 Activity：</p>
 <div class="highlight"><pre><span></span><code>./gradlew<span class="w"> </span>:inputFixture:assembleDebug<span class="w"> </span>:androidApp:assembleDebug<span class="w"> </span>:androidApp:assembleDebugAndroidTest<span class="w"> </span>--no-daemon
@@ -1618,6 +1665,16 @@ uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </sp
 <h2 id="_7">结果判定<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <p>回复或提交说明写明命令、环境、实际执行或缓存复用、失败/跳过及未执行范围。相同输入的 Gradle 缓存可用于纯代码检查；依赖外部设备状态的专项不能拿缓存代替当前执行。</p>
 <p>JVM fixture、模拟器和真实设备分别说明。UI fixture 不证明目标实际输入、文件/应用操作或游戏消费；主机工具不证明 Android 系统效果；模拟器不能替代厂商系统、摄像头和自然 WLAN 故障。保留失败证据与有效断言，不扩大通过结论。</p>
+<p>手柄恢复使用 <code>VirtualGamepadControllerTest</code> 和 <code>VirtualGamepadRecoveryTransportTest</code> 验证更新超时、清理无回复、打开回复丢失、晚到回复、取消恢复、连接绑定和重试次数边界；WebSocket fixture 不证明目标游戏消费输入。服务端重开归属及旧设备释放可在自有 root 模拟器运行：</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </span>websockets<span class="w"> </span>python<span class="w"> </span>runtime/virtual_gamepad_target_test.py<span class="w"> </span>--serial<span class="w"> </span>&lt;自有模拟器序列号&gt;<span class="w"> </span>--binary<span class="w"> </span>androidApp/src/main/assets/runtime/airc-runtime-x86_64<span class="w"> </span>--receiver-apk<span class="w"> </span>mediaFixture/build/outputs/apk/debug/mediaFixture-debug.apk
+</code></pre></div>
+<p>运行前构建匹配 ABI 的 runtime 和 <code>:mediaFixture:assembleDebug</code>，不要向其他 ABI 的设备推送 x86_64 文件。专项只创建 UUID 服务和原先未安装的接收 fixture，验证同连接重开、外连接拒绝、内核设备回收、按键边沿及回中，结束清理自建资源。</p>
+<p>应用详情 UI 使用控制端回环协议 fixture，验证页面返回、旋转、权限确认与离线禁用，以及 320dp、1.5 倍字体的亮暗布局：</p>
+<div class="highlight"><pre><span></span><code>python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;自有模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>app-details-ui
+</code></pre></div>
+<p>被控端应用操作使用 UUID 包名、临时签名 APK 与独立 runtime 状态目录；脚本创建相机运行时权限、普通网络权限和私有标记数据，验证拒绝/重复确认、权限授予撤销、状态改变后确认拒绝、强停、启停用及数据清除。只在显式选择的自有模拟器或专用目标执行，不操作已有应用的数据，结束卸载自建 APK、停止自建服务并移除自己的转发和目录。先构建配套 ABI：</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </span>websockets<span class="w"> </span>python<span class="w"> </span>runtime/app_control_target_test.py<span class="w"> </span>--serial<span class="w"> </span>&lt;自有模拟器序列号&gt;<span class="w"> </span>--binary<span class="w"> </span>androidApp/src/main/assets/runtime/airc-runtime-x86_64
+</code></pre></div>
 
 
 

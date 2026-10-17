@@ -564,6 +564,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../guide/apps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    应用管理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../guide/cache/" class="md-nav__link">
         
   
@@ -1087,6 +1115,34 @@
     <span class="md-ellipsis">
       
         模型工具调用组校验
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="模型工具调用组校验">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#apk_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        文件预览与 APK 图标
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#app-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        应用详情与管理
       
     </span>
   </a>
@@ -1829,6 +1885,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="模型工具调用组校验">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#apk_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        文件预览与 APK 图标
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#app-controls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        应用详情与管理
+      
+    </span>
+  </a>
+  
 </li>
       
     </ul>
@@ -2038,6 +2122,13 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 <p>模型提供商 message.role 必须为 assistant；tool_calls 只接受缺省、null 或数组。错误类型不能降级为正文答案，避免畸形调用消息进入会话历史。</p>
 <p>模型 remote_key 不允许 power，即使请求 allowedTools 包含 remote.key 也拒绝该参数；模型应通过系统提案和 App 确认处理锁屏/重启/关机。直接工具 remote.key 的用户手动电源键仍保持原能力。此检查仅约束该明确的按键入口，不是目标 GUI 行为的通用权限隔离。</p>
 <p><code>GET /status</code> 的 <code>binarySha256</code> 为服务启动时读取自身运行中可执行文件得到的 SHA-256，启动后缓存；它不读取可能被替换的部署路径。控制端在建立 WebSocket 前对比配套清单的版本与摘要，不匹配或缺少摘要时先部署配套程序，再次校验通过后连接。</p>
+<h3 id="apk_2">文件预览与 APK 图标<a class="headerlink" href="#apk_2" title="Permanent link">&para;</a></h3>
+<p><code>files.preview</code> / <code>files_preview</code> 接收 <code>{root,path}</code>，只打开选定根中的普通文件，不跟随符号链接，返回 <code>{id,root,path,sizeBytes,dataPath}</code>；<code>dataPath</code> 为 <code>/media/{id}</code>，支持 HTTP GET/HEAD 与单范围 Range。范围响应携带精确 Content-Range 与长度，文件发生变化时返回409。最多八个预览资源、闲置五分钟失效，容量与目标播放资源分别计算。<code>files.preview_close</code> / <code>files_preview_close</code> 接收 <code>{id}</code> 释放预览，不能借此关闭目标播放资源。流不内联文件内容，不计算全文件摘要；需要完整校验的导出继续使用下载任务。</p>
+<p><code>apps.apk_icon</code> / <code>apps_apk_icon</code> 接收 <code>{root,path}</code>（<code>.apk</code> 普通文件，最多4 GiB），从已固定的文件描述符经 Android 包资源解析获取96×96 PNG，单图最多128 KiB；返回 BinaryArtifact 加 <code>root</code>、<code>filePath</code>，<code>path</code> 仍为 <code>/artifacts/{id}</code>。客户端核对原根、文件路径、尺寸与长度后读取。此接口不安装 APK、不从同包名的已安装应用借用图标；split 缺少独立图标、无访问权限或资源无法解析时可能失败，界面保留占位。</p>
+<h2 id="app-controls">应用详情与管理<a class="headerlink" href="#app-controls" title="Permanent link">&para;</a></h2>
+<p><code>apps.control_info</code> 接收 <code>{package}</code>，返回 <code>{app,state}</code>；app 沿用 <code>apps.info</code> 的身份字段，state 含 package/userId、enabled/enabledSetting、stopped、capabilities(forceStop/setEnabled/clearData) 和 permissions(name/label/granted/runtime/mutable/reason)。读取来自当前 Android 用户的 PackageManager，stopped 为停止标记而非进程状态。特殊访问的 grant 结果不代表其 AppOps/设置已允许。</p>
+<p><code>apps.prepare_control</code> 接收 package、action(force_stop/enable/disable/clear_data/grant/revoke)，grant/revoke 必须另有 permission。仅允许用户应用。返回 <code>{id,kind:"app_control",app,action,permission,approvalRequired:true,dataLoss,before}</code>，最多32份、15分钟有效。目标权限须由应用声明、属于可修改的运行时权限；系统/策略固定权限以及无法读取策略的权限拒绝修改。</p>
+<p>控制端独立 <code>type=approve_app_control</code>，arguments 为 id 和可选 accepted(false拒绝)，不向模型暴露确认函数。提案单次消费，确认时及后台任务执行前重新核对当前用户、应用安装身份和相关状态。固定 pm/am 参数明确指定用户；不接受任意 shell 或组件。返回 <code>task.progress</code> 格式、direction=app_control、unit=items、name=package，提交后不可取消。完成包含 package/userId/action/permission/completed/verifiedBy/state；权限、启停用和强停读取实际包状态核对，数据清除以包管理器 Success 和安装身份核对为准，不报告释放空间。控制端完成后再次读取详情。</p>
 
 
 

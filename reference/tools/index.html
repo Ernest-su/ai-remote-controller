@@ -564,6 +564,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/apps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    应用管理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/cache/" class="md-nav__link">
         
   
@@ -1133,8 +1161,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#apk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        文件预览与 APK 图标
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        应用详情操作
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1860,8 +1910,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#apk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        文件预览与 APK 图标
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        应用详情操作
+      
+    </span>
+  </a>
   
 </li>
       
@@ -2097,7 +2169,7 @@
 <tr>
 <td><code>gamepad.virtual_open</code></td>
 <td><code>{}</code></td>
-<td>注册当前连接独占的单个 UUID 手柄</td>
+<td>注册当前连接独占的单个 UUID 手柄；同一连接重开先释放并替换旧会话，其他连接不能替换</td>
 </tr>
 <tr>
 <td><code>gamepad.virtual_update</code></td>
@@ -2135,6 +2207,11 @@
 <h3 id="_9">应用图标与多包安装<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
 <p><code>apps.icon</code> 接收 <code>{"package":"com.example.app"}</code>，返回关联包名、Android 用户及 96×96 PNG 的短时二进制资源描述；图像通过 <code>/artifacts/{id}</code> 读取，不内联到应用列表 JSON。单个 PNG 上限 128 KiB。</p>
 <p><code>apps.install</code> 保留 <code>root/path/sha256/update</code> 单包参数，也可用 <code>root/apks/update</code>，其中 <code>apks</code> 为 1–32 个 <code>{"path":"…apk","sha256":"…"}</code>。两种参数不可混用，总大小不超过 4 GiB。提案的 <code>apk</code> 为 base，<code>apks</code> 为完整清单；准备任务 name 仍为请求首个路径。模型只能准备提案，不能调用确认；用户独立确认后通过 install-create/write/commit 会话整组提交，失败尝试 install-abandon。</p>
+<h3 id="apk">文件预览与 APK 图标<a class="headerlink" href="#apk" title="Permanent link">&para;</a></h3>
+<p><code>files.preview</code> / <code>files_preview</code> 接收 <code>{root,path}</code>，只打开选定根中的普通文件，不跟随符号链接，返回 <code>{id,root,path,sizeBytes,dataPath}</code>；<code>dataPath</code> 为 <code>/media/{id}</code>，支持 HTTP GET/HEAD 与单范围 Range。范围响应携带精确 Content-Range 与长度，文件发生变化时返回409。最多八个预览资源、闲置五分钟失效，容量与目标播放资源分别计算。<code>files.preview_close</code> / <code>files_preview_close</code> 接收 <code>{id}</code> 释放预览，不能借此关闭目标播放资源。流不内联文件内容，不计算全文件摘要；需要完整校验的导出继续使用下载任务。</p>
+<p><code>apps.apk_icon</code> / <code>apps_apk_icon</code> 接收 <code>{root,path}</code>（<code>.apk</code> 普通文件，最多4 GiB），从已固定的文件描述符经 Android 包资源解析获取96×96 PNG，单图最多128 KiB；返回 BinaryArtifact 加 <code>root</code>、<code>filePath</code>，<code>path</code> 仍为 <code>/artifacts/{id}</code>。客户端核对原根、文件路径、尺寸与长度后读取。此接口不安装 APK、不从同包名的已安装应用借用图标；split 缺少独立图标、无访问权限或资源无法解析时可能失败，界面保留占位。</p>
+<h2 id="_10">应用详情操作<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
+<p><code>apps.control_info</code> 与 <code>apps.prepare_control</code> 为控制端应用详情提供只读快照和用户待确认操作；模型可读取状态或准备提案，独立确认接口不向模型暴露，不能自动执行。接口、能力字段、确认和结果语义见<a href="../../protocol/#app-controls">协议</a>，使用步骤见<a href="../../guide/apps/">应用管理</a>。</p>
 
 
 
