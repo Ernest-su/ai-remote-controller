@@ -12,6 +12,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.*
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
@@ -52,6 +54,12 @@ class ScreenMirrorLifecycleTargetTest {
         fun await(stage:String,condition:()->Boolean){try{compose.waitUntil(15000,condition)}catch(error:ComposeTimeoutException){throw AssertionError("Mirror timeout at $stage; preview=${if(initialized) model.ascrcpyPreview.state.value else null}",error)}}
         try {
             deviceId=observer.connect(host!!,port!!).deviceId
+            // This suite owns the temporary target runtime; no provider request is sent.
+            observer.request("configure", arguments = buildJsonObject {
+                put("baseUrl", "https://fixture.invalid/v1")
+                put("apiKey", "fixture-key")
+                put("model", "fixture-model")
+            })
             val fixture=RememberedDevice(deviceId!!,"Owned ascrcpy fixture",ConnectionMethod.TCP,host,args.getString("ascrcpyTargetPort")?.toIntOrNull() ?: 5555,null,port,System.currentTimeMillis())
             DeviceStore(instrumentation.targetContext).remember(fixture)
             compose.runOnUiThread{
@@ -112,6 +120,12 @@ class ScreenMirrorLifecycleTargetTest {
         fun await(stage:String,condition:()->Boolean){try{compose.waitUntil(15000,condition)}catch(error:ComposeTimeoutException){throw AssertionError("Mirror timeout at $stage; preview=${if(initialized) model.ascrcpyPreview.state.value else null}",error)}}
         try {
             deviceId=observer.connect(host!!,port!!).deviceId
+            // This suite owns the temporary target runtime; no provider request is sent.
+            observer.request("configure", arguments = buildJsonObject {
+                put("baseUrl", "https://fixture.invalid/v1")
+                put("apiKey", "fixture-key")
+                put("model", "fixture-model")
+            })
             val fixture=RememberedDevice(deviceId!!,"Owned ascrcpy fixture",ConnectionMethod.TCP,host,args.getString("ascrcpyTargetPort")?.toIntOrNull() ?: 5555,null,port,System.currentTimeMillis())
             DeviceStore(instrumentation.targetContext).remember(fixture)
             compose.runOnUiThread{

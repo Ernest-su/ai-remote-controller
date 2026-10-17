@@ -47,6 +47,7 @@ class RemoteLayoutUiTest {
     }
 
     @Test fun realKeyboardKeepsComposerNearItsTopAndClosingRestoresLayout() {
+        configuredOfflineComposer(compose)
         val activity = compose.activity
         var windowHeight = 0
         compose.runOnUiThread { windowHeight = activity.window.decorView.height }
@@ -81,6 +82,7 @@ class RemoteLayoutUiTest {
     }
 
     @Test fun realKeyboardWithNarrowLayoutAndLargeTextStillKeepsSmallGap() {
+        configuredOfflineComposer(compose)
         compose.runOnUiThread {
             val model = ViewModelProvider(compose.activity)[RemoteViewModel::class.java]
             compose.activity.setContent {
@@ -108,6 +110,7 @@ class RemoteLayoutUiTest {
     }
 
     @Test fun shortNarrowWindowAndLargeTextKeepReferenceKeySizesAndNavigationAccessible() {
+        configuredOfflineComposer(compose)
         compose.runOnUiThread {
             val model = ViewModelProvider(compose.activity)[RemoteViewModel::class.java]
             compose.activity.setContent {

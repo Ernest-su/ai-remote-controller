@@ -300,7 +300,8 @@ class DesktopUiTest {
         try {
             compose.setContent { Box(Modifier.size(390.dp, 844.dp)) { DesktopApp(controller) } }
             compose.onNodeWithTag("remote-page").assertIsDisplayed()
-            compose.onNodeWithTag("remote-send-command").assertIsNotEnabled()
+            compose.onNodeWithTag("remote-send-command").assertDoesNotExist()
+            compose.onNodeWithTag("remote-model-required").assertIsDisplayed().assertHasNoClickAction()
             compose.onNodeWithTag("device-status").performClick()
             compose.onNodeWithTag("devices-page").assertIsDisplayed()
             compose.onNodeWithTag("navigate-back").performClick()

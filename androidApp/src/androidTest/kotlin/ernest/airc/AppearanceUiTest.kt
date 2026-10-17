@@ -28,6 +28,7 @@ class AppearanceUiTest {
     }
 
     @Test fun appearancePersistsAndPreservesDraftNavigationAndSystemBars() {
+        configuredOfflineComposer(compose)
         compose.onNodeWithTag("remote-command-input").performTextInput("保留外观切换草稿")
         compose.onNodeWithTag("open-menu").performClick()
         compose.onNodeWithTag("feature-settings").performScrollTo().performClick()

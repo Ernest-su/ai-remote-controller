@@ -32,7 +32,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 @RunWith(AndroidJUnit4::class)
 class RemoteExecutionUiTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
-    private fun withPreview(adbPort: Int? = null, action: (RemoteViewModel, List<RuntimeRequest>) -> Unit) {
+    private fun withPreview(adbPort: Int? = null, modelConfigured: Boolean = true, action: (RemoteViewModel, List<RuntimeRequest>) -> Unit) {
         val types = CopyOnWriteArrayList<RuntimeRequest>()
         val languages = CopyOnWriteArrayList<String?>()
         val server = MockWebServer()
@@ -40,7 +40,7 @@ class RemoteExecutionUiTest {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 languages.add(request.getHeader("Accept-Language"))
                 return when (request.path) {
-                    "/status" -> MockResponse().setBody(alignedRuntimeStatusFixture("""{"version":"0.1.0","protocol":1,"deviceId":"ui-preview-fixture","name":"客厅电视","tools":[],"modelConfigured":true,"uid":2000}"""))
+                    "/status" -> MockResponse().setBody(alignedRuntimeStatusFixture("""{"version":"0.1.0","protocol":1,"deviceId":"ui-preview-fixture","name":"客厅电视","tools":[],"modelConfigured":$modelConfigured,"uid":2000}"""))
                     "/ws" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                         override fun onMessage(webSocket: WebSocket, text: String) {
                             val message = Json.parseToJsonElement(text).jsonObject
@@ -71,6 +71,18 @@ class RemoteExecutionUiTest {
             DeviceStore(InstrumentationRegistry.getInstrumentation().targetContext).remove("ui-preview-fixture")
         }
     }
+    @Test fun unconfiguredStatusHidesComposerUntilTargetConfigurationSucceeds() = withPreview(modelConfigured = false) { model, requests ->
+        compose.onNodeWithTag("remote-command-input").assertDoesNotExist()
+        compose.onNodeWithTag("remote-send-command").assertDoesNotExist()
+        compose.onNodeWithTag("remote-model-required").assertIsDisplayed().assertHasNoClickAction()
+        compose.runOnUiThread { model.configure("https://fixture.invalid/v1", "fixture-key", "fixture-model") }
+        compose.waitUntil(10_000) { model.state.value.modelConfigured && !model.state.value.busy }
+        compose.onNodeWithTag("remote-model-required").assertDoesNotExist()
+        compose.onNodeWithTag("remote-command-input").assertIsDisplayed()
+        compose.onNodeWithTag("remote-send-command").assertIsDisplayed().assertIsNotEnabled()
+        assertFalse(requests.any { it.type == "text" })
+    }
+
     @Test fun everyPreviewVisitAutomaticallyStartsButLeavingStopsCapture() = withPreview { model, _ ->
         repeat(2) {
             compose.onNodeWithTag("open-menu").let { menu -> if(it==0) menu.performClick() }

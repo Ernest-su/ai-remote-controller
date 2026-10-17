@@ -92,6 +92,7 @@ class RemoteNavigationUiTest {
         compose.onNodeWithTag("remote-page").assertIsDisplayed()
     }
     @Test fun remoteTypePickerRestoresAndKeepsStandardRemoteDraft() {
+        configuredOfflineComposer(compose)
         compose.onNodeWithTag("remote-command-input").performTextInput("保留遥控草稿")
         compose.onNodeWithTag("open-remote-types").performClick()
         compose.onNodeWithTag("remote-types-page").assertIsDisplayed()
@@ -204,7 +205,8 @@ class RemoteNavigationUiTest {
     }
 
     @Test fun textDraftSurvivesFeatureSwitchAndOfflineRemoteActionsStayDisabled() {
-        compose.onNodeWithTag("remote-send-command").assertIsNotEnabled()
+        compose.onNodeWithTag("remote-send-command").assertDoesNotExist()
+        compose.onNodeWithTag("remote-model-required").assertIsDisplayed().assertHasNoClickAction()
         compose.onNodeWithTag("open-menu").performClick()
         compose.onNodeWithTag("feature-text").performClick()
         compose.onNodeWithTag("text-command-input").performTextInput("打开设置")

@@ -134,19 +134,21 @@ fun DesktopRemoteScreen(state: DesktopState, model: DesktopController, showResul
                 }
                 Row(Modifier.fillMaxWidth().padding(start = RemoteDimensions.InnerPadding, end = RemoteDimensions.InnerPadding, bottom = if (imeVisible) 8.dp else RemoteDimensions.VerticalPadding).testTag("remote-text-controls"), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = draft, onValueChange = { draft = it },
-                        modifier = Modifier.weight(1f).testTag("remote-command-input"),
-                        placeholder = { Text("输入文字指令", style = MaterialTheme.typography.bodyMedium) },
-                        minLines = 1, maxLines = 3,
-                        textStyle = MaterialTheme.typography.bodyMedium,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                        keyboardActions = KeyboardActions(onSend = { submit() }),
-                    )
-                    FilledIconButton(onClick = ::submit,
-                        enabled = state.connected && state.modelConfigured && !state.submitting && draft.isNotBlank(),
-                        modifier = Modifier.size(48.dp).testTag("remote-send-command")) {
-                        Icon(painterResource("drawable/ic_send.xml"), "发送文字指令", Modifier.size(24.dp))
+                    RemoteModelAvailability(state.modelConfigured) {
+                        OutlinedTextField(
+                            value = draft, onValueChange = { draft = it },
+                            modifier = Modifier.weight(1f).testTag("remote-command-input"),
+                            placeholder = { Text("输入文字指令", style = MaterialTheme.typography.bodyMedium) },
+                            minLines = 1, maxLines = 3,
+                            textStyle = MaterialTheme.typography.bodyMedium,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                            keyboardActions = KeyboardActions(onSend = { submit() }),
+                        )
+                        FilledIconButton(onClick = ::submit,
+                            enabled = state.connected && state.modelConfigured && !state.submitting && draft.isNotBlank(),
+                            modifier = Modifier.size(48.dp).testTag("remote-send-command")) {
+                            Icon(painterResource("drawable/ic_send.xml"), "发送文字指令", Modifier.size(24.dp))
+                        }
                     }
                 }
             }

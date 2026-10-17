@@ -62,7 +62,7 @@ class MirrorToolbarUiTest {
         val original=Configuration(compose.activity.resources.configuration)
         var config by mutableStateOf(Configuration(original).apply {screenWidthDp=360;screenHeightDp=800})
         compose.setContent {CompositionLocalProvider(LocalConfiguration provides config) {RemoteTheme(dark) {
-            Box(Modifier.fillMaxSize()) {ScreenshotScreen(RemoteUiState(),model,full,{full=it})}
+            Box(Modifier.fillMaxSize()) {ScreenshotScreen(RemoteUiState(modelConfigured = true),model,full,{full=it})}
         }}}
         compose.waitUntil(5000) {surface()?.holder?.surface?.isValid==true}
         val before=checkNotNull(surface())
