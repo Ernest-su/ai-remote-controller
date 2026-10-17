@@ -31,7 +31,9 @@ class MirrorSurfaceUiTest {
         compose.waitForIdle()
         assertSame(failure,model.ascrcpyPreview.state.value)
         compose.onNodeWithTag("mirror-fullscreen").assertIsNotEnabled()
-        compose.onNodeWithText("开始屏幕镜像").assertIsEnabled()
+        compose.onNodeWithText("开始屏幕镜像").assertDoesNotExist()
+        compose.onNodeWithText("停止屏幕镜像").assertDoesNotExist()
+        compose.onNodeWithTag("mirror-retry").assertIsEnabled()
     }
     @Test fun fullScreenRelocationKeepsSurfaceAndTouchCoordinates() {
         val current=AtomicReference<Surface?>()

@@ -12,9 +12,9 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun ScreenshotPanel(image: ImageBitmap?, loading: Boolean, available: Boolean, error: String?,
-    onCapture: () -> Unit, onSave: () -> Unit, onShare: (() -> Unit)? = null, preview: (@Composable () -> Unit)? = null, unavailableMessage: String = "请连接支持截图工具的服务。") = PageContent(Modifier.testTag("screenshot-page")) {
+    onCapture: () -> Unit, onSave: () -> Unit, onShare: (() -> Unit)? = null, preview: (@Composable () -> Unit)? = null, unavailableMessage: String = "请连接支持截图工具的服务。", fullscreen: Boolean = false) = PageContent(Modifier.testTag("screenshot-page"), spacing = if(fullscreen) 0.dp else 16.dp, contentPadding = if(fullscreen) 0.dp else 16.dp) {
     preview?.invoke()
-    Panel {
+    if(!fullscreen) Panel {
         SectionTitle("单张截图", "获取目标当前画面，可刷新、保存。")
         ActionButton(if (loading) "正在获取截图…" else "获取 / 刷新截图", available && !loading, onCapture)
         if (!available) Text(unavailableMessage, color = RemoteColors.Secondary)

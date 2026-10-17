@@ -25,6 +25,7 @@ SUITES = {
     "models": ("ernest.airc.ModelProfilesUiTest", 1),
     "model-sync": ("ernest.airc.ModelProfileSyncTargetTest", 1),
     "gamepad-lifecycle": ("ernest.airc.GamepadLifecycleTargetTest", 5),
+    "mirror-toolbar-ui": ("ernest.airc.MirrorToolbarUiTest", 2),
     "mirror-surface-ui": ("ernest.airc.MirrorSurfaceUiTest", 5),
     "mirror-ui": ("ernest.airc.RemoteNavigationUiTest#dynamicSurfaceRecreatesWithoutStartingOfflineCapture,ernest.airc.RemoteNavigationUiTest#ascrcpyAppParametersSurviveRotationAndReturnWithoutCapture,ernest.airc.RemoteNavigationUiTest#ascrcpyReplacesLegacyPngPreviewAfterRotation,ernest.airc.RemoteExecutionUiTest#everyPreviewVisitAutomaticallyStartsButLeavingStopsCapture", 4),
     "ascrcpy": ("ernest.airc.AscrcpyPreviewTargetTest", 4),
@@ -48,7 +49,7 @@ def main():
     parser.add_argument("--use-installed-phone", action="store_true", help="Verify matching installed phone APK hashes instead of reinstalling")
     parser.add_argument("--suite", choices=[*SUITES, "all"], default="all")
     args = parser.parse_args()
-    phone_only=args.suite in ("remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-surface-ui", "mirror-ui", "gamepad-ui", "models", "profile-isolation", "controller-ui")
+    phone_only=args.suite in ("remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-surface-ui", "mirror-toolbar-ui", "mirror-ui", "gamepad-ui", "models", "profile-isolation", "controller-ui")
     if not phone_only and (not args.target or not args.host):
         parser.error("This suite requires --target and --host")
     if not phone_only and args.phone == args.target:
@@ -89,7 +90,7 @@ def main():
         if not asset.is_file() or hashlib.sha256(asset.read_bytes()).digest() != hashlib.sha256(embedded).digest():
             parser.error("Runtime asset differs from the app APK; rebuild before testing")
 
-    selected = [value for name,value in SUITES.items() if name not in ("remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "gamepad-lifecycle", "models", "model-sync", "profile-isolation", "controller-ui")] if args.suite == "all" else [SUITES[args.suite]]
+    selected = [value for name,value in SUITES.items() if name not in ("remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-toolbar-ui", "gamepad-lifecycle", "models", "model-sync", "profile-isolation", "controller-ui")] if args.suite == "all" else [SUITES[args.suite]]
     directory = f"/data/local/tmp/airc-phone-acceptance-{uuid.uuid4()}"
     binary = f"{directory}/airc-runtime"
     touch_selected = not phone_only and (args.suite in ("all", "touchpad", "ascrcpy", "gamepad-lifecycle") or args.with_touch_receiver)

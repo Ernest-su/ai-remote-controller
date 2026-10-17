@@ -5,6 +5,13 @@ import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -58,12 +65,16 @@ internal fun ScreenshotScreen(state: RemoteUiState, model: RemoteViewModel, full
             catch (_: Exception) { message = "无法保存截图" }
         }
     }
-    val mirrorContent=remember(model) { movableContentOf<RemoteUiState,Boolean> { current,full ->
-        AndroidScreenMirror(current,model,full,onFullscreen)
-    } }
+    var remoteVisible by rememberSaveable { mutableStateOf(false) }
+    var showResults by rememberSaveable { mutableStateOf(false) }
+    val remoteState = rememberSaveableStateHolder()
     androidx.activity.compose.BackHandler(fullscreen) { onFullscreen(false) }
-    DisposableEffect(Unit) { onDispose { onFullscreen(false) } }
-    if(fullscreen) { mirrorContent(state,true); return }
+    if(showResults) AlertDialog(onDismissRequest={showResults=false}, title={Text("执行结果")},
+        text={ androidx.compose.foundation.text.selection.SelectionContainer {
+            Text(state.output, Modifier.heightIn(max=RemoteDimensions.ManagementDialogHeight).then(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())))
+        } }, confirmButton={TextButton({showResults=false}) {Text("关闭")}})
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val viewportHeight = maxHeight
     ScreenshotPanel(image, screenshot.loading, state.connected && !state.busy && !dynamicActive && "device.screenshot" in state.tools,
         screenshot.error ?: message,
         onCapture = { message = null; model.screenshots.refresh(state.connected && !state.busy && !dynamicActive && "device.screenshot" in state.tools) },
@@ -84,5 +95,18 @@ internal fun ScreenshotScreen(state: RemoteUiState, model: RemoteViewModel, full
                 } catch (e: CancellationException) { throw e }
                 catch (_: Exception) { message = "无法分享截图" }
             }
-        }, preview = { Panel { mirrorContent(state,false) } }, unavailableMessage = if(dynamicActive) "停止连续画面后可获取单张截图。" else "请连接支持截图工具的服务。")
+        }, preview = {
+            // Keep the same composition and native view ancestors across fullscreen changes.
+            Surface(color=RemoteColors.Surface, shape=MaterialTheme.shapes.small) {
+                Box(Modifier.padding(if(fullscreen) 0.dp else 16.dp)) {
+                    AndroidScreenMirror(state, model, fullscreen, onFullscreen,
+                        modifier=if(fullscreen) Modifier.height(viewportHeight) else Modifier,
+                        onRemote={remoteVisible=!remoteVisible}, remoteVisible=remoteVisible)
+                }
+            }
+        }, unavailableMessage = if(dynamicActive) "动态预览期间暂不获取单张截图。" else "请连接支持截图工具的服务。", fullscreen=fullscreen)
+        if(remoteVisible) remoteState.SaveableStateProvider("floating-remote") {
+            MirrorFloatingRemote(state,model,onClose={remoteVisible=false},onResults={showResults=true})
+        }
+    }
 }

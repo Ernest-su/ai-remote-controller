@@ -29,7 +29,6 @@ internal fun MirrorSurface(epoch:Long,active:Boolean,ratio:Float,onSurface:(Surf
     }
     val touchCallback by rememberUpdatedState(onTouch)
     val latestEpoch by rememberUpdatedState(epoch)
-    DisposableEffect(epoch){surfaceCallback(null);onDispose{}}
     key(epoch){
         AndroidView(factory={context->SurfaceView(context).apply{
             setOnTouchListener { view,event ->

@@ -54,12 +54,12 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
         message?.let { snackbar.showSnackbar(it.take(240)) }
     }
     var selectedTypeName by rememberSaveable { mutableStateOf(RemotePage.REMOTE.name) }
-    var mirrorFullscreen by remember { mutableStateOf(false) }
+    var mirrorFullscreen by rememberSaveable { mutableStateOf(false) }
     val isRemoteType = remoteTypes.any { it.page == page }
     fun navigate(target: RemotePage) {
         if (target == page) return
-        // A fresh visit starts preview; Activity recreation retains its stopped state.
-        if (page == RemotePage.SCREENSHOT) pages.removeState(RemotePage.SCREENSHOT.name)
+        // A fresh visit receives its own preview and floating-remote navigation state.
+        if (page == RemotePage.SCREENSHOT) { pages.removeState(RemotePage.SCREENSHOT.name); mirrorFullscreen = false }
         if (target == RemotePage.DEVICES) deviceOriginName = page.name
         if (remoteTypes.any { it.page == target }) selectedTypeName = target.name
         pageName = target.name

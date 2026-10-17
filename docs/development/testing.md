@@ -55,6 +55,7 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite appear
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite controller-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite management-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite file-preview-ui
+python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite mirror-toolbar-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite app-packages-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite models
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite profile-isolation
@@ -71,6 +72,7 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite profil
 | `appearance` | 三种外观模式、本地持久化、重建、设置返回、草稿、系统栏与未知值回退 |
 | `controller-ui` | 页面导航、提交与执行反馈、键盘间距、离线、大字体、旋转与输入工具 |
 | `management-ui` | 文件/应用列表、搜索筛选、按需面板、离线与草稿恢复 |
+| `mirror-toolbar-ui` | 动态预览标题图标、全屏原生视图复用、悬浮遥控横竖屏比例及草稿保留；不连接目标 |
 | `file-preview-ui` | 主控端图片受限解码、文本范围读取及关闭释放、音频播放/后台暂停；仅使用本机回环媒体 fixture |
 | `app-packages-ui` | 图标显示、多包安装清单与显式提交 |
 | `models` | API 配置、模型选择、真实 Keystore 持久化与手动同步边界 |

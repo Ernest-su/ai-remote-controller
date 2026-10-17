@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.view.SurfaceView
 import ernest.ascrcpy.scrcpy.ScrcpyState
 import androidx.compose.ui.test.*
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
@@ -35,14 +36,20 @@ class ScreenMirrorLifecycleTargetTest {
         assertFalse("Stopped preview must release its old Surface",view.holder.surface.isValid)
         assertNotSame("Stopped preview must replace the old buffer-bearing view",view,previewView())
     }
-    @Test fun backgroundStopsCaptureAndForegroundRequiresManualRestart()=runBlocking {
+    private fun screenshot(name:String) {
+        val instrumentation=InstrumentationRegistry.getInstrumentation()
+        val bitmap=checkNotNull(instrumentation.uiAutomation.takeScreenshot())
+        try {java.io.File(instrumentation.targetContext.filesDir,name+".png").outputStream().use {bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}}
+        finally {bitmap.recycle()}
+    }
+    @Test fun backgroundStopsCaptureAndForegroundAutomaticallyRestarts()=runBlocking {
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val args=InstrumentationRegistry.getArguments()
         val host=args.getString("mirrorTargetHost");val port=args.getString("mirrorTargetPort")?.toIntOrNull()
         assumeTrue("Explicit independent mirror target required",host!=null&&port!=null)
         lateinit var model:RemoteViewModel;var initialized=false;var deviceId:String?=null
         val observer=RuntimeConnection()
-        suspend fun await(stage:String,condition:()->Boolean){try{withTimeout(15000){while(!condition())delay(50)}}catch(error:TimeoutCancellationException){throw AssertionError("Mirror timeout at $stage",error)}}
+        fun await(stage:String,condition:()->Boolean){try{compose.waitUntil(15000,condition)}catch(error:ComposeTimeoutException){throw AssertionError("Mirror timeout at $stage; preview=${if(initialized) model.ascrcpyPreview.state.value else null}",error)}}
         try {
             deviceId=observer.connect(host!!,port!!).deviceId
             val fixture=RememberedDevice(deviceId!!,"Owned ascrcpy fixture",ConnectionMethod.TCP,host,args.getString("ascrcpyTargetPort")?.toIntOrNull() ?: 5555,null,port,System.currentTimeMillis())
@@ -58,10 +65,18 @@ class ScreenMirrorLifecycleTargetTest {
             await("decoded frame"){(model.ascrcpyPreview.state.value as? ScrcpyState.Streaming)?.renderedFrames?.let{it>0}==true||model.ascrcpyPreview.state.value is ScrcpyState.Failed}
             assertTrue("Actual preview state: ${model.ascrcpyPreview.state.value}",model.ascrcpyPreview.state.value is ScrcpyState.Streaming)
             repeat(2) {
+                val beforeFull=previewView()
+                val frames=(model.ascrcpyPreview.state.value as ScrcpyState.Streaming).renderedFrames
                 compose.onNodeWithTag("mirror-fullscreen").performScrollTo().performClick()
-                await("fullscreen preview"){(model.ascrcpyPreview.state.value as? ScrcpyState.Streaming)?.renderedFrames?.let{it>0}==true}
-                compose.onNodeWithText("退出全屏").performClick()
-                await("inline preview"){(model.ascrcpyPreview.state.value as? ScrcpyState.Streaming)?.renderedFrames?.let{it>0}==true}
+                await("fullscreen advancing frames"){(model.ascrcpyPreview.state.value as? ScrcpyState.Streaming)?.renderedFrames?.let{it>frames+3}==true}
+                assertSame("Fullscreen must keep the native video view",beforeFull,previewView())
+                compose.onNodeWithTag("mirror-toggle-remote").performClick()
+                compose.onNodeWithTag("mirror-floating-remote").assertExists()
+                if(it==0)screenshot("mirror-live-portrait")
+                compose.onNodeWithTag("mirror-close-remote").performClick()
+                compose.onNodeWithTag("mirror-exit-fullscreen").performClick()
+                await("inline advancing frames"){(model.ascrcpyPreview.state.value as? ScrcpyState.Streaming)?.renderedFrames?.let{it>frames+6}==true}
+                assertSame("Returning inline must keep the native video view",beforeFull,previewView())
             }
             val beforeBackground=previewView()
             compose.runOnUiThread{assertTrue(compose.activity.moveTaskToBack(true))}
@@ -73,22 +88,20 @@ class ScreenMirrorLifecycleTargetTest {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
             await("foreground lifecycle"){compose.activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)}
             compose.waitForIdle()
-            assertEquals(ScrcpyState.Idle,model.ascrcpyPreview.state.value)
             assertRetired(beforeBackground)
-            compose.onNodeWithText("开始屏幕镜像").performScrollTo().assertIsEnabled().performClick()
             await("decoded frame"){(model.ascrcpyPreview.state.value as? ScrcpyState.Streaming)?.renderedFrames?.let{it>0}==true||model.ascrcpyPreview.state.value is ScrcpyState.Failed}
             assertTrue("Actual preview state: ${model.ascrcpyPreview.state.value}",model.ascrcpyPreview.state.value is ScrcpyState.Streaming)
-            val beforeStop=previewView()
-            compose.onNodeWithText("停止屏幕镜像").performScrollTo().performClick()
+            val beforeLeaving=previewView()
+            compose.onNodeWithTag("navigate-back").performClick()
             await("capture stopped"){model.ascrcpyPreview.state.value==ScrcpyState.Idle}
-            assertRetired(beforeStop)
+            compose.waitUntil(10000){!beforeLeaving.isAttachedToWindow}
         }finally{
             observer.close()
             if(initialized)compose.runOnUiThread{model.disconnect()}
             deviceId?.let{DeviceStore(instrumentation.targetContext).remove(it)}
         }
     }
-    @Test fun physicalOrientationChangeClearsCaptureAndPreservesSettings()=runBlocking {
+    @Test fun physicalOrientationChangeRestoresCaptureAndPreservesSettings()=runBlocking {
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val args=InstrumentationRegistry.getArguments()
         val host=args.getString("mirrorTargetHost");val port=args.getString("mirrorTargetPort")?.toIntOrNull()
@@ -96,7 +109,7 @@ class ScreenMirrorLifecycleTargetTest {
         lateinit var model:RemoteViewModel;var initialized=false;var deviceId:String?=null
         val observer=RuntimeConnection();val originalActivity=compose.activity
         val originalOrientation=originalActivity.requestedOrientation
-        suspend fun await(stage:String,condition:()->Boolean){try{withTimeout(15000){while(!condition())delay(50)}}catch(error:TimeoutCancellationException){throw AssertionError("Mirror timeout at $stage",error)}}
+        fun await(stage:String,condition:()->Boolean){try{compose.waitUntil(15000,condition)}catch(error:ComposeTimeoutException){throw AssertionError("Mirror timeout at $stage; preview=${if(initialized) model.ascrcpyPreview.state.value else null}",error)}}
         try {
             deviceId=observer.connect(host!!,port!!).deviceId
             val fixture=RememberedDevice(deviceId!!,"Owned ascrcpy fixture",ConnectionMethod.TCP,host,args.getString("ascrcpyTargetPort")?.toIntOrNull() ?: 5555,null,port,System.currentTimeMillis())
@@ -108,26 +121,38 @@ class ScreenMirrorLifecycleTargetTest {
             await("connection"){model.state.value.connected&&!model.state.value.busy}
             compose.onNodeWithTag("open-menu").performClick()
             compose.onNodeWithTag("feature-screenshot").performScrollTo().performClick()
-            compose.onNodeWithText("1920 · 8 Mbps · 60 fps").performScrollTo().assertExists()
+            compose.onNodeWithText("1920 · 8 Mbps · 60 fps").assertDoesNotExist()
             await("decoded frame"){(model.ascrcpyPreview.state.value as? ScrcpyState.Streaming)?.renderedFrames?.let{it>0}==true||model.ascrcpyPreview.state.value is ScrcpyState.Failed}
             assertTrue("Actual preview state: ${model.ascrcpyPreview.state.value}",model.ascrcpyPreview.state.value is ScrcpyState.Streaming)
+            compose.onNodeWithTag("mirror-toggle-remote").performClick()
+            compose.onNodeWithTag("remote-command-input").performTextInput("旋转保留草稿")
+            compose.runOnUiThread {
+                val input=compose.activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                input.hideSoftInputFromWindow(compose.activity.window.decorView.windowToken,0)
+            }
+            compose.onNodeWithTag("mirror-fullscreen").performScrollTo().performClick()
             val before=compose.activity
             val orientation=before.resources.configuration.orientation
             compose.runOnUiThread{before.requestedOrientation=if(orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT)
                 android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT}
             await("orientation recreation"){compose.activity!==before&&compose.activity.resources.configuration.orientation!=orientation}
-            await("capture stopped"){model.ascrcpyPreview.state.value==ScrcpyState.Idle}
             compose.waitForIdle()
-            assertEquals(ScrcpyState.Idle,model.ascrcpyPreview.state.value)
-            compose.onNodeWithText("1920 · 8 Mbps · 60 fps").performScrollTo().assertExists()
+            compose.onNodeWithText("1920 · 8 Mbps · 60 fps").assertDoesNotExist()
             assertTrue(withTimeout(10000){observer.screenshot()}.isNotEmpty())
-            compose.onNodeWithText("开始屏幕镜像").performScrollTo().assertIsEnabled().performClick()
             await("decoded frame"){(model.ascrcpyPreview.state.value as? ScrcpyState.Streaming)?.renderedFrames?.let{it>0}==true||model.ascrcpyPreview.state.value is ScrcpyState.Failed}
             assertTrue("Actual preview state: ${model.ascrcpyPreview.state.value}",model.ascrcpyPreview.state.value is ScrcpyState.Streaming)
-            val beforeStop=previewView()
-            compose.onNodeWithText("停止屏幕镜像").performScrollTo().performClick()
+            compose.onNodeWithTag("mirror-exit-fullscreen").assertExists()
+            compose.onNodeWithTag("remote-command-input").assertTextContains("旋转保留草稿")
+            val config=compose.activity.resources.configuration
+            val expected=mirrorFloatingRemoteWidth(config.screenWidthDp.dp,config.screenHeightDp.dp)
+            compose.onNodeWithTag("mirror-floating-remote").assertWidthIsEqualTo(expected)
+            screenshot("mirror-live-landscape")
+            compose.onNodeWithTag("mirror-close-remote").performClick()
+            compose.onNodeWithTag("mirror-exit-fullscreen").performClick()
+            val beforeLeaving=previewView()
+            compose.onNodeWithTag("navigate-back").performClick()
             await("capture stopped"){model.ascrcpyPreview.state.value==ScrcpyState.Idle}
-            assertRetired(beforeStop)
+            compose.waitUntil(10000){!beforeLeaving.isAttachedToWindow}
         }finally{
             observer.close()
             if(initialized)compose.runOnUiThread{model.disconnect()}
