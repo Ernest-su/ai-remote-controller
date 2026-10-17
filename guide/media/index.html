@@ -461,7 +461,7 @@
   <span class="md-ellipsis">
     
   
-    设备截图
+    设备预览
   
 
     
@@ -489,7 +489,7 @@
   <span class="md-ellipsis">
     
   
-    目标文件
+    文件管理
   
 
     
@@ -1400,7 +1400,7 @@
 
 
 <h1 id="_1">媒体投送<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
-<p>在“目标文件”页选择图片、音乐或视频，先完成上传，再点击文件条目的“媒体打开”。App 查询目标实际声明的播放器，展示来源、MIME 类型和包名。选择播放器后点击“用目标播放器打开”；查询本身不会启动播放。</p>
+<p>在“文件管理”页选择图片、音乐或视频，先完成上传，再点击文件条目的“媒体打开”。App 查询目标实际声明的播放器，展示来源、MIME 类型和包名。选择播放器后点击“用目标播放器打开”；查询本身不会启动播放。</p>
 <p>Downloads 文件使用本地文件 URI；服务收件箱及全盘范围通过 Rust 二进制服务的临时 HTTP 媒体地址提供内容，避免要求播放器读取服务私有目录。播放器是否支持这两种来源可能不同，Android 占位处理器不算可用播放器。没有匹配播放器时提示不可用，可在目标安装支持该来源的播放器，或把文件放到可供播放器访问的 Downloads 中。</p>
 <p>支持 PNG、JPEG、WebP、GIF，MP4、WebM、MKV，以及 MP3、M4A、WAV、Ogg、FLAC 的类型选择；扩展名只用于选择 MIME，不证明内容可解码。具体格式、编码、DRM 和网络策略由目标播放器决定。工具返回“播放器已启动”仅证明 Android 启动请求成功，实际显示/播放请查看目标画面与播放状态。</p>
 <p>私有媒体地址提供 GET/HEAD 和单段 Range 请求，按 64 KiB 缓冲读取，支持播放器请求片段与拖动，不把文件转成 Base64。每份资源最多四个同时读取，最多保留四份资源；连续 24 小时没有访问后过期，进程重启后失效。新投送可能淘汰未在读取的旧资源。文件内容变化会拒绝继续读取，需要重新打开。控制端可点击“释放服务媒体流”，关闭此资源的后续读取；目标文件保留，已经被播放器缓存的内容可能继续显示。</p>
@@ -1462,7 +1462,7 @@
       <nav class="md-footer__inner md-grid" aria-label="页脚" >
         
           
-          <a href="../files/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 目标文件">
+          <a href="../files/" class="md-footer__link md-footer__link--prev" aria-label="上一页: 文件管理">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1472,7 +1472,7 @@
                 上一页
               </span>
               <div class="md-ellipsis">
-                目标文件
+                文件管理
               </div>
             </div>
           </a>

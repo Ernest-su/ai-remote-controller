@@ -459,7 +459,7 @@
   <span class="md-ellipsis">
     
   
-    设备截图
+    设备预览
   
 
     
@@ -487,7 +487,7 @@
   <span class="md-ellipsis">
     
   
-    目标文件
+    文件管理
   
 
     
@@ -1891,6 +1891,8 @@
 <p><code>GET /status</code> 返回 version、protocol、deviceId、name、tools、modelConfigured、uid（进程有效用户 ID，<code>0</code> 为 root，<code>2000</code> 为 Android shell）；不返回模型密钥。</p>
 <h2 id="websocket">WebSocket<a class="headerlink" href="#websocket" title="Permanent link">&para;</a></h2>
 <p>连接 <code>/ws</code>，文本帧的请求和响应通过 id 关联。</p>
+<p>控制端在 HTTP 状态查询和 WebSocket 握手中通过 <code>Accept-Language</code> 传递 App 语言：Android 使用当前 App 资源语言，桌面使用当前系统语言。中文语言标签（含 <code>zh-CN</code>、<code>zh-TW</code>、<code>zh-Hans</code>）使用中文，其余控制端语言使用英文。服务支持按标准优先权选择 <code>zh</code> 或 <code>en</code>，缺少或不支持的语言使用英文。语言绑定到该 WebSocket 连接，多控制端之间互不影响；App 语言变化后重新连接生效。</p>
+<p>设备端按语言返回请求错误，手柄 uinput 版本、root 权限等常见错误有对应中英文文案。<code>gamepad.virtual_capabilities</code>、<code>device.system_capabilities</code>、<code>device.system_state</code> 的结构化 <code>reason</code> / <code>error</code> 也按连接语言显示。未知平台错误在中文说明后保留原始诊断；协议字段、文件内容、路径、工具标识和模型回答不做替换。</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="s2">"request-1"</span><span class="p">,</span><span class="nt">"protocol"</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span><span class="nt">"type"</span><span class="p">:</span><span class="s2">"tool"</span><span class="p">,</span><span class="nt">"tool"</span><span class="p">:</span><span class="s2">"remote.key"</span><span class="p">,</span><span class="nt">"arguments"</span><span class="p">:{</span><span class="nt">"key"</span><span class="p">:</span><span class="s2">"up"</span><span class="p">}}</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="s2">"request-1"</span><span class="p">,</span><span class="nt">"protocol"</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span><span class="nt">"ok"</span><span class="p">:</span><span class="kc">true</span><span class="p">,</span><span class="nt">"result"</span><span class="p">:</span><span class="s2">""</span><span class="p">,</span><span class="nt">"error"</span><span class="p">:</span><span class="kc">null</span><span class="p">}</span>
@@ -1926,7 +1928,9 @@
 <p>当前版本仅支持文字与工具请求，不再接受 audio.start / audio.stop / audio.cancel 或二进制音频。旧模型配置中的 transcriptionModel 字段读取时忽略，保存时移除；文字配置与现有设备记录保持兼容。</p>
 <p>工具命令以独立参数执行；只有明确的 <code>device.shell</code> 工具接受 shell 文本。遥控按键支持 up/down/left/right/ok/back/home/menu/power/volume_up/volume_down/mute/play_pause/media_previous/media_next。应用启动参数为 <code>package</code>，shell 参数为 <code>command</code>。</p>
 <p>每条工具命令最长 30 秒，每路输出最多 256 KiB；整体请求最长 170 秒。模型执行期间 WebSocket 仍处理心跳。请求缓冲有限制，防止长任务阻塞连接或无限积累内存。</p>
-<p>直接 <code>tool</code> 和文字/配置请求分别使用 FIFO 队列。模型 HTTP 请求进行中仍可执行遥控工具；文字决策共用会话历史并串行执行。响应可能跨队列交错，客户端必须按 id 匹配。断开连接时取消全部工作队列及在途执行。</p>
+<p><code>remote.key</code>、其他直接 <code>tool</code>/确认操作、文字/配置请求分别使用独立 FIFO 队列。模型 HTTP 请求或普通工具执行期间仍可执行遥控按键；文字决策共用会话历史并串行执行。响应可能跨队列交错，客户端必须按 id 匹配。断开连接时取消尚未开始的输入；已开始的按下/抬起事务独立完成释放，其他工作队列及在途执行按原生命周期取消。</p>
+<p>每连接的三个请求队列各最多等待 16 条；所有连接共用的输入执行器另有最多 16 条的有界等待队列，每个连接最多一条在途按键进入该执行器。队列已满时，对当前新请求返回相同 id 的 <code>ok:false</code> 与“操作队列已满，请等待已有操作完成后重试”（英文连接返回对应英文错误），不关闭 WebSocket、不取消已接受的操作。拒绝响应可能先于较早请求的完成返回；客户端不得自动重试设备动作。收发循环继续处理 ping/pong，队列恢复后同一连接可继续提交。</p>
+<p><code>remote.key</code> 的结果是 JSON 字符串，包含 <code>operation:key,keyCode,submitted,released,source,bridgePid,injectionMicros</code>。<code>source=257</code> 保持普通键盘输入来源；<code>submitted/released</code> 表示 Android 接受了按下和抬起的提交，不表示前台应用已消费；<code>injectionMicros</code> 为输入执行器与桥接一次事务的耗时，排除网络往返和排队。同一常驻桥接进程串行处理所有普通按键。回执丢失或子进程异常时，结果明确为不确定；恢复只补发待确认键的抬起，不重放按下。释放未确认前不接受下一次按下注入。</p>
 <h2 id="_3">后台管理<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code>airc-runtime<span class="w"> </span>service<span class="w"> </span>start<span class="w"> </span>--state-dir<span class="w"> </span>/data/local/tmp/airc/state<span class="w"> </span>--port<span class="w"> </span><span class="m">9876</span>
 airc-runtime<span class="w"> </span>service<span class="w"> </span>status<span class="w"> </span>--state-dir<span class="w"> </span>/data/local/tmp/airc/state
@@ -1984,7 +1988,7 @@ airc-runtime<span class="w"> </span>service<span class="w"> </span>stop<span cla
 <p><code>screen.preview_start</code> 返回一次性 <code>{id,path,mimeType:"application/x-airc-preview",format:"airc-png-v1",intervalMs,durationSeconds,claimWithinSeconds:30,maxFrameBytes:16777216}</code>。通过 <code>GET /preview/{id}</code> 在三十秒内领取一次；后续领取返回 409 或已释放后的 404。只有 HTTP 读取时捕获。预览与截图共用捕获锁；全局一个待领取或读取中的会话。<code>screen.preview_stop {id}</code> 停止指定会话，未知 UUID 返回 <code>stopped:false</code>，不停止其他媒体。</p>
 <p>流首部为 ASCII <code>AIRCPRV1</code>，后续每条记录是大端 <code>sequence:u32,width:u32,height:u32,length:u32,elapsedMs:u64</code>（24 字节），紧跟 length 字节的 PNG。序号从 1 开始递增；elapsedMs 是服务端本次流的单调经过时间，每帧尺寸以当前截图为准。宽高为零时，length=0 表示正常结束，length&gt;0 是最多 1024 字节的 UTF-8 错误。结束记录序号为已经生成的帧数，截断不算正常结束。HTTP 无整流 Content-Length，带 no-store/nosniff；不通过 WebSocket 传帧或 Base64。</p>
 <p>单帧最多 16 MiB、32M 像素，边长最多 16384；间隔 500..5000 毫秒、时长 10..120 秒。无历史帧队列，不追赶补帧；实际间隔包含捕获和消费耗时。捕获失败终止流；停止/断开取消命令进程组并释放读取资源。恶意或停滞的读取者可能延迟资源释放，需关闭旧读取连接再开始；服务重启清空所有会话，无自动续流。</p>
-<p><code>gamepad.pulse {buttons?,x?,y?,holdMs?}</code> 是 10..2000 毫秒的有限输入事务，默认100，按钮最多四个、轴值 -1..1。<code>gamepad.reset {}</code> 提交全部受控合成按键抬起与零轴。工具响应包含 <code>operation:pulse|reset,submitted,released,sourceGamepad:1025,sourceJoystick:16777232,elapsedMs,gameVerified:false</code>；released 只确认系统队列接受释放。请求中止不取消已接受的在途事务，按钮/轴状态不落盘。输入拒绝或释放失败返回错误；服务强制终止不保证释放。详见<a href="../reference/tools/#gamepad">手柄工具</a>。</p>
+<p><code>gamepad.pulse {buttons?,x?,y?,rightX?,rightY?,holdMs?}</code> 是 10..2000 毫秒的有限输入事务，默认100，按钮最多六个、轴值 -1..1。<code>gamepad.reset {}</code> 提交全部受控合成按键抬起与零轴。工具响应包含 <code>operation:pulse|reset,submitted,released,sourceGamepad:1025,sourceJoystick:16777232,elapsedMs,gameVerified:false</code>；released 只确认系统队列接受释放。请求中止不取消已接受的在途事务，按钮/轴状态不落盘。输入拒绝或释放失败返回错误；服务强制终止不保证释放。详见<a href="../reference/tools/#gamepad">手柄工具</a>。</p>
 <p>应用缓存清理为独立提案/确认流程：<code>apps.clear_cache {package}</code> 返回 <code>{id,kind:app_cache_clear,app,approvalRequired:true,cacheOnly:true,mode:package_manager_cache_only}</code>；模型只能准备或查询 <code>apps.cache_pending</code>。人工 <code>approve_cache</code> 拒绝或提交不可取消的缓存长任务。<code>apps.cache_capabilities</code> 只读探测；未明确声明 cache-only、缺少 INTERNAL_DELETE_CACHE_FILES 或 UID 不适用时拒绝，不执行数据清除 fallback。任务结果不提供回收字节，不宣称全面的数据保留验证。</p>
 <h2 id="screen-mirror-stream">AVC 镜像流 v1<a class="headerlink" href="#screen-mirror-stream" title="Permanent link">&para;</a></h2>
 <p><code>screen.mirror_start</code> 接受width/height/bitrate/durationSeconds，返回一次性id与<code>/mirror/{id}</code>，mimeType <code>application/x-airc-avc</code>、format <code>airc-avc-v1</code>、请求尺寸/码率/期限、claimWithinSeconds=30、maxChunkBytes=65536、maxStreamBytes=134217728、audio=false。单会话单读取者，与截图共用捕获锁。准备只保留名额，HTTP领取才启动固定screenrecord命令。宽/高160..1280/90..1280且为偶数，像素量≤921600；码率250000..8000000，期限10..120秒。</p>
@@ -2033,6 +2037,7 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 <p>提供商一次返回多条工具调用时，runtime 在记录该组调用或执行其中任何工具前，校验所有调用具有非空白字符串 ID，且组内 ID 唯一。缺失、类型错误、空白或重复 ID 均拒绝整组，以免留下无法与工具结果对应的历史。调用还必须声明 type=function、非空白 function.name 和字符串 function.arguments；缺失参数不得默认为 {} 执行。参数字符串内的 JSON 或工具参数错误仍作为对应工具结果返回。该校验不替代各工具参数、请求范围及人工确认校验。</p>
 <p>模型提供商 message.role 必须为 assistant；tool_calls 只接受缺省、null 或数组。错误类型不能降级为正文答案，避免畸形调用消息进入会话历史。</p>
 <p>模型 remote_key 不允许 power，即使请求 allowedTools 包含 remote.key 也拒绝该参数；模型应通过系统提案和 App 确认处理锁屏/重启/关机。直接工具 remote.key 的用户手动电源键仍保持原能力。此检查仅约束该明确的按键入口，不是目标 GUI 行为的通用权限隔离。</p>
+<p><code>GET /status</code> 的 <code>binarySha256</code> 为服务启动时读取自身运行中可执行文件得到的 SHA-256，启动后缓存；它不读取可能被替换的部署路径。控制端在建立 WebSocket 前对比配套清单的版本与摘要，不匹配或缺少摘要时先部署配套程序，再次校验通过后连接。</p>
 
 
 

@@ -459,7 +459,7 @@
   <span class="md-ellipsis">
     
   
-    设备截图
+    设备预览
   
 
     
@@ -487,7 +487,7 @@
   <span class="md-ellipsis">
     
   
-    目标文件
+    文件管理
   
 
     
@@ -1901,7 +1901,7 @@
 <td><code>remote.key</code></td>
 <td><code>remote_key</code></td>
 <td><code>key</code></td>
-<td><code>input keyevent</code></td>
+<td>常驻输入桥接提交一次按下/抬起</td>
 </tr>
 <tr>
 <td><code>remote.text</code></td>
@@ -2069,9 +2069,9 @@
 <p><code>screen.preview_start</code> / 模型 <code>screen_preview_start</code> 接受可选 <code>intervalMs</code>（500..5000，默认1000）和 <code>durationSeconds</code>（10..120，默认60），准备一个一次性二进制流地址；不直接捕获或将画面放入文本。<code>screen.preview_stop</code> / <code>screen_preview_stop</code> 接受准确 UUID <code>id</code>。应用手动开始才读取流，模型单独准备的未领取地址三十秒后过期。一个会话占一个名额，停止正在读取的会话后需关闭其读取连接以完全释放名额。</p>
 <p>这是连续 PNG 预览原型，非带音频的高帧率投屏。帧协议与限额见<a href="../../protocol/#screen-preview-stream">设备协议</a>，此兼容工具不再提供 App 页面入口；当前 Android 动态画面见<a href="../../guide/screenshots/#screen-mirror">设备截图</a>。</p>
 <h2 id="gamepad">有限手柄输入<a class="headerlink" href="#gamepad" title="Permanent link">&para;</a></h2>
-<p><code>gamepad.pulse</code> / 模型 <code>gamepad_pulse</code> 接受 <code>buttons</code>（最多四个且不重复）、X/Y <code>x,y</code>（有限浮点数 -1..1，默认0）及 <code>holdMs</code>（10..2000，默认100）。按钮白名单：a/b/x/y/l1/r1/l2/r2/start/select/thumb_l/thumb_r/up/down/left/right；相反方向不能组合。空且零轴拒绝。受控代码映射、参数与时长在 Rust 校验，不接受 shell 字符串或任意事件/设备 ID。</p>
-<p>单事务经 GamepadBridge 提交 GAMEPAD KeyEvent 按下、JOYSTICK AXIS_X/Y、持有时间、逆序抬起和回中，虚拟设备 ID=-1。操作在独立、单名额的 Rust task 中完成，请求断开不取消释放；错误另行重试释放，服务正常关闭等待在途事务。<code>gamepad.reset</code> / 模型 <code>gamepad_reset</code> 只接受空对象，等待在途事务释放名额（最多20秒）后提交白名单全部按键抬起与回中，不操作物理控制器 ID。响应 <code>submitted/released:true</code> 仅表示注入队列接受输入和释放，<code>gameVerified:false</code>，不宣称游戏实际消费。</p>
-<p>标准来源定义见 <a href="https://developer.android.com/reference/android/view/InputDevice">Android InputDevice</a>。未注册硬件轴范围、右摇杆或连续低延迟输入，真实消费需另测。</p>
+<p><code>gamepad.pulse</code> / 模型 <code>gamepad_pulse</code> 接受 <code>buttons</code>（最多六个且不重复）、X/Y <code>x,y</code>（有限浮点数 -1..1，默认0），右摇杆 <code>rightX,rightY</code>（Z/RZ，同范围，默认0）及 <code>holdMs</code>（10..2000，默认100）。按钮白名单：a/b/x/y/l1/r1/l2/r2/start/select/thumb_l/thumb_r/up/down/left/right；相反方向不能组合。空且零轴拒绝。受控代码映射、参数与时长在 Rust 校验，不接受 shell 字符串或任意事件/设备 ID。</p>
+<p>单事务经 GamepadBridge 提交 GAMEPAD KeyEvent 按下、JOYSTICK AXIS_X/Y/Z/RZ、持有时间、逆序抬起和回中，虚拟设备 ID=-1。操作在独立、单名额的 Rust task 中完成，请求断开不取消释放；错误另行重试释放，服务正常关闭等待在途事务。<code>gamepad.reset</code> / 模型 <code>gamepad_reset</code> 只接受空对象，等待在途事务释放名额（最多20秒）后提交白名单全部按键抬起与回中，不操作物理控制器 ID。响应 <code>submitted/released:true</code> 仅表示注入队列接受输入和释放，<code>gameVerified:false</code>，不宣称游戏实际消费。</p>
+<p>标准来源定义见 <a href="https://developer.android.com/reference/android/view/InputDevice">Android InputDevice</a>。合成输入未注册硬件轴范围，不保证连续低延迟输入，真实消费需另测。</p>
 <h2 id="app-cache">应用缓存清理<a class="headerlink" href="#app-cache" title="Permanent link">&para;</a></h2>
 <p><code>apps.cache_capabilities</code> / <code>apps_cache_capabilities {}</code> 查询系统帮助中明确的 <code>clear [--user USER_ID] [--cache-only] PACKAGE</code> 和选项说明，以及 runtime UID 是否 shell/root、短时框架探测的 INTERNAL_DELETE_CACHE_FILES 权限；三项均满足才声明 supported。<code>apps.clear_cache</code> / <code>apps_clear_cache {package}</code> 准备用户应用的 <code>app_cache_clear</code> 提案，不执行清理。<code>apps.cache_pending</code> / <code>apps_cache_pending {}</code> 查询待审核提案。32项、15分钟限额，与卸载/安装提案独立。</p>
 <p>直接人工 <code>type:approve_cache {id,accepted?}</code> 消耗一次性提案；拒绝不执行，确认重新核对当前用户/版本/代码路径/应用身份及能力，创建不可取消的 <code>app_cache_clear</code> 长任务。任务再次核对，然后只执行 <code>pm clear --cache-only --user &lt;approved-user&gt; &lt;package&gt;</code>，没有删除数据的 fallback。结果含 <code>cacheOnly:true,completed:true,verifiedBy:package_manager,reclaimedBytes:null,appDataVerified:false</code>，不把系统成功当作任意数据完整性或释放字节证明。</p>

@@ -461,7 +461,7 @@
   <span class="md-ellipsis">
     
   
-    设备截图
+    设备预览
   
 
     
@@ -489,7 +489,7 @@
   <span class="md-ellipsis">
     
   
-    目标文件
+    文件管理
   
 
     
@@ -1382,6 +1382,7 @@
 <h2 id="_2">内置版本<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
 <p>首次通过 ADB 连接部署时使用 APK 内三 ABI 的设备端资产。安装器按目标 ABI 选择程序，校验大小与 SHA-256、执行 <code>--version</code>。目标摘要和运行权限均相同时不重复推送或重启。</p>
 <p>部署和重启先传输并校验临时脚本，再通过短命令执行，兼容 ADB 单包上限为 4096 字节的旧设备。脚本无输出时提示连接可能中断；重新连接后先查询服务状态，再决定是否重试。</p>
+<p>停止旧服务和替换程序前会检查目标端口。属于当前状态记录且进程身份有效的服务允许正常更新；其他占用会中止部署并显示端口检查错误，保留原服务与程序。若程序或状态目录曾被删除，旧进程仍可能运行并占用端口；切换 root 开关不能解除占用。通过 ADB 核实监听进程后，以该进程所需的权限停止它（root 进程需要 root），再重新部署。不要通过删除状态目录处理此问题，以免丢失设备身份和模型配置。</p>
 <h2 id="_3">在线版本<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
 <p>在线源固定为项目 <a href="https://github.com/Ernest-su/ai-remote-controller">GitHub 仓库</a>，界面不再要求填写清单地址或保存更新源。点击“检查 / 安装在线版本”获取仓库最新 Release 的 <code>manifest.json</code> 和 <code>manifest.json.sig</code>，验签后下载清单中对应 ABI 的程序。GitHub 最新资产下载入口采用官方的 <a href="https://docs.github.com/en/repositories/releasing-projects-on-github/linking-to-releases"><code>releases/latest/download/文件名</code></a> 约定。</p>
 <p>Release 必须提供完整的签名资产；缺少 Release、清单或有效签名时明确报错，不回退到未签名文件。应用保留固定公钥、协议、应用版本范围和大小/摘要核对。发布准备见<a href="../../development/releasing/">准备发布</a>。发布 workflow 生成草稿 Release；维护者公开后才进入在线更新入口，草稿不能用于在线更新。</p>
@@ -1391,6 +1392,7 @@
 <p>服务权限检测同时支持 <code>su -c</code> 与目标常见的 <code>su 0 sh -c</code>；只有实际 UID=0 的探测结果才选择 root 管理。关闭优先 root 时，已有 root 服务仍由已验证管理权限处理，然后明确以 UID2000 启动；没有可靠降权路径时在停止原服务之前拒绝。切换 root 时只调整私有 framework 适配目录所有者，切回 shell 沿用状态权限归一化，保留设备身份和配置。</p>
 <p>停止目标服务前会提示遥控连接将断开；确认「停止服务」才执行，取消不改变服务。查询、安装和重启的完整输出可在「查看操作详情」中展开。</p>
 <p>服务管理需要目标记录中已有已授权的 ADB 连接；仅通过局域网服务发现的设备应先在设备页完成 ADB 连接，相关管理按钮才可使用。</p>
+<p>普通连接和历史重连会先核对当前控制端配套版本与正在运行的二进制 SHA-256，不匹配时自动部署并复核；不以版本号相同作为复用依据。更新失败保留错误并停止连接，详见<a href="../connections/#runtime-alignment">连接说明</a>。</p>
 
 
 

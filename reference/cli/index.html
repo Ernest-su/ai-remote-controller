@@ -459,7 +459,7 @@
   <span class="md-ellipsis">
     
   
-    设备截图
+    设备预览
   
 
     
@@ -487,7 +487,7 @@
   <span class="md-ellipsis">
     
   
-    目标文件
+    文件管理
   
 
     
@@ -1269,11 +1269,13 @@
 <h1 id="cli">设备端 CLI<a class="headerlink" href="#cli" title="Permanent link">&para;</a></h1>
 <p>以下命令在目标设备执行。默认安装路径为 <code>/data/local/tmp/airc/airc-runtime</code>，状态目录由手机安装器指定为 <code>/data/local/tmp/airc/state</code>。</p>
 <div class="highlight"><pre><span></span><code>/data/local/tmp/airc/airc-runtime<span class="w"> </span>--version
+/data/local/tmp/airc/airc-runtime<span class="w"> </span>service<span class="w"> </span>check-port<span class="w"> </span>--state-dir<span class="w"> </span>/data/local/tmp/airc/state<span class="w"> </span>--port<span class="w"> </span><span class="m">9876</span>
 /data/local/tmp/airc/airc-runtime<span class="w"> </span>service<span class="w"> </span>start<span class="w"> </span>--state-dir<span class="w"> </span>/data/local/tmp/airc/state<span class="w"> </span>--port<span class="w"> </span><span class="m">9876</span>
 /data/local/tmp/airc/airc-runtime<span class="w"> </span>service<span class="w"> </span>status<span class="w"> </span>--state-dir<span class="w"> </span>/data/local/tmp/airc/state
 /data/local/tmp/airc/airc-runtime<span class="w"> </span>service<span class="w"> </span>stop<span class="w"> </span>--state-dir<span class="w"> </span>/data/local/tmp/airc/state
 </code></pre></div>
 <p>启动和停止会改变目标进程状态；查询不会启动服务。后台启动复用已健康运行的进程，状态包含运行/就绪信息，启动记录保存实际端口与进程身份。停止前检查进程身份以防 PID 复用。</p>
+<p><code>check-port</code> 检查指定端口是否可绑定；同一状态目录中进程身份有效、占用该端口的已有服务允许通过，供部署事务随后停止。其他占用返回错误，不停止进程或替换程序。检查不保留端口，之后出现的端口竞争仍可能导致启动失败并触发回滚。</p>
 <p>前台调试可使用 <code>serve --state-dir &lt;directory&gt; --port &lt;port&gt;</code>，调试时可增加 <code>--no-mdns</code> 关闭广播；后台管理使用 <code>service</code> 子命令脱离 ADB 终端。日志写入状态目录的 <code>runtime.log</code>，模型配置为 <code>model.json</code>；目录权限 <code>0700</code>，私有配置与日志以 <code>0600</code> 创建。调试目录不要提交模型凭据。</p>
 <p>生命周期、发现和 HTTP/WS 字段见<a href="../../protocol/">协议</a>。</p>
 
