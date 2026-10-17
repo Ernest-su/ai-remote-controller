@@ -75,7 +75,7 @@ fun AppDetailsPanel(packageName: String, state: AppControlState, connected: Bool
                 Text("权限管理", style = MaterialTheme.typography.titleMedium)
                 Text("显示目标实际授权状态。特殊访问和安装时权限仅供查看；特殊访问的开关状态需在目标系统设置中核对。", color = RemoteColors.Secondary)
                 if (d.state.permissions.isEmpty()) Text("此应用未声明权限。", color = RemoteColors.Secondary)
-                d.state.permissions.forEach { permission ->
+                d.state.permissions.sortedByDescending { it.runtime && it.mutable }.forEach { permission ->
                     val rowModifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).let {
                         if (permission.runtime && permission.mutable) it.toggleable(value = permission.granted, enabled = enabled, role = Role.Switch,
                             onValueChange = { granted -> onAction(if (granted) "grant" else "revoke", permission.name) }).testTag("app-permission-${permission.name}") else it

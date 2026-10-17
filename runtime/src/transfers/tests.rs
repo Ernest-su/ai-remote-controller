@@ -126,3 +126,60 @@ async fn large_streams_validate_digest_commit_without_overwrite_and_clean_failur
     }
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[tokio::test]
+async fn app_control_progress_uses_items_and_stays_committing_until_completion() {
+    // Hold a real background job so the approval snapshot and progress/cancel
+    // responses can be checked before any Android operation finishes.
+    let (release, wait) = std::sync::mpsc::channel();
+    let initial = start_background(
+        "apps".into(),
+        "fixture.app".into(),
+        "app_control",
+        0,
+        move |cancel, count| {
+            wait.recv_timeout(Duration::from_secs(5))
+                .context("test job release missing")?;
+            if cancel.load(Ordering::Relaxed) {
+                bail!("committed app task was incorrectly cancelled");
+            }
+            count.store(1, Ordering::Relaxed);
+            Ok(json!({"completed":true}))
+        },
+    )
+    .unwrap();
+    let id = initial["id"].as_str().unwrap().to_owned();
+    // Always release the worker before asserting, including on the old bug.
+    let progress: Value =
+        serde_json::from_str(&execute("task.progress", &json!({"id":id})).await.unwrap()).unwrap();
+    let cancelled: Value =
+        serde_json::from_str(&execute("task.cancel", &json!({"id":id})).await.unwrap()).unwrap();
+    release.send(()).unwrap();
+    let completed = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let state = lookup(&id).unwrap().progress();
+            if matches!(
+                state["phase"].as_str(),
+                Some("completed" | "failed" | "cancelled")
+            ) {
+                break state;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    tasks().lock().unwrap().remove(&id);
+    for state in [&initial, &progress, &cancelled, &completed] {
+        assert_eq!(state["id"], id);
+        assert_eq!(state["direction"], "app_control");
+        assert_eq!(state["root"], "apps");
+        assert_eq!(state["name"], "fixture.app");
+        assert_eq!(state["unit"], "items");
+    }
+    for state in [&initial, &progress, &cancelled] {
+        assert_eq!(state["phase"], "committing");
+    }
+    assert_eq!(completed["phase"], "completed");
+    assert_eq!(completed["bytesTransferred"], 1);
+}

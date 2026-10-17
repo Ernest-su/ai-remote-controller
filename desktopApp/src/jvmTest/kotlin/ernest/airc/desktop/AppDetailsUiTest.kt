@@ -37,6 +37,27 @@ class AppDetailsUiTest {
         compose.onNodeWithText("清除全部数据").performScrollTo().assertIsNotEnabled()
         compose.onNodeWithTag("app-permission-android.permission.CAMERA").performScrollTo().assertIsNotEnabled()
     }
+    @Test fun switchablePermissionsComeFirstWithStableOrderIncludingOffline() {
+        val permissions = listOf(
+            AppPermission("normal.first", "普通权限一", true, false, false, "仅供查看"),
+            AppPermission("runtime.first", "可修改权限一", false, true, true),
+            AppPermission("fixed.second", "受限权限二", false, true, false, "系统策略限制"),
+            AppPermission("runtime.second", "可修改权限二", true, true, true))
+        var connected by mutableStateOf(true)
+        compose.setContent { RemoteTheme {
+            AppDetailsPanel("fixture.app", AppControlState("fixture.app", details = AppControlDetails(app, snapshot.copy(permissions = permissions))),
+                connected, tools, false, {}, { _, _ -> }, {}, {}, {}, {})
+        } }
+        fun assertOrder() {
+            val positions = listOf("可修改权限一", "可修改权限二", "普通权限一", "受限权限二").map {
+                compose.onNodeWithText(it, useUnmergedTree = true).fetchSemanticsNode().positionInRoot.y
+            }
+            assertTrue("Permission rows must keep stable order within both groups: $positions", positions.zipWithNext().all { (a, b) -> a < b })
+        }
+        assertOrder()
+        compose.runOnIdle { connected = false }
+        assertOrder()
+    }
     @Test fun detailsAndDeviceReturnPathsKeepApplicationListAsParent() {
         assertEquals(RemotePage.APPS, RemotePage.APP_DETAILS.backDestination(RemotePage.REMOTE))
         assertEquals(RemotePage.APP_DETAILS, RemotePage.DEVICES.backDestination(RemotePage.APP_DETAILS))

@@ -21,8 +21,8 @@ class AppDetailsUiTest {
     @Test fun applicationDetailsRestoreSelectionAndPermissionsRequireConfirmation() {
         val app = TargetAppInfo("fixture.app", 0, 10001, 1, codePath = "/data/app/fixture", lastUpdateTime = "fixture", system = false)
         val snapshot = AppControlSnapshot("fixture.app", 0, true, 0, false, AppControlCapabilities(true, true, true), listOf(
-            AppPermission("android.permission.CAMERA", "相机", false, true, true),
-            AppPermission("android.permission.SYSTEM_ALERT_WINDOW", "悬浮窗", false, false, false, "特殊访问仅供查看")))
+            AppPermission("android.permission.SYSTEM_ALERT_WINDOW", "悬浮窗", false, false, false, "特殊访问仅供查看"),
+            AppPermission("android.permission.CAMERA", "相机", false, true, true)))
         val server = MockWebServer()
         server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
@@ -68,6 +68,9 @@ class AppDetailsUiTest {
             compose.onNodeWithTag("navigate-back").performClick()
             compose.onNodeWithTag("app-details-page").assertIsDisplayed()
             compose.waitUntil(10_000) { !model.appControl.state.value.busy }
+            val cameraY = compose.onNodeWithText("相机", useUnmergedTree = true).fetchSemanticsNode().positionInRoot.y
+            val specialY = compose.onNodeWithText("悬浮窗", useUnmergedTree = true).fetchSemanticsNode().positionInRoot.y
+            assertTrue("Switchable permissions must precede special-access permissions", cameraY < specialY)
             compose.onNodeWithTag("app-permission-android.permission.CAMERA").performScrollTo().assertIsOff().performClick()
             compose.onNodeWithTag("app-control-confirm").assertIsDisplayed()
             compose.onNodeWithText("取消").performClick()

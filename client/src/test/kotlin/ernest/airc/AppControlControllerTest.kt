@@ -16,6 +16,10 @@ class AppControlControllerTest {
     private fun verify(mode: String): Unit = runBlocking {
         val messages = CopyOnWriteArrayList<JsonObject>()
         var reads = 0
+        fun task(phase: String, unit: String = "items") = Json.encodeToString(TransferProgress("task",
+            if (mode == "wrong-task") "delete" else "app_control", "fixture.app", 0, if (phase == "completed") 1 else 0, phase,
+            dataPath = "/transfers/task/data", root = "apps", unit = unit,
+            result = if (phase == "completed") buildJsonObject { put("package", "fixture.app"); put("userId", 10); put("action", "grant"); put("permission", "android.permission.CAMERA"); put("completed", true) } else null))
         val server = MockWebServer()
         server.enqueue(MockResponse().setBody("""{"version":"fixture","protocol":1,"deviceId":"fixture","tools":[]}"""))
         server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
@@ -28,9 +32,8 @@ class AppControlControllerTest {
                     tool == "apps.prepare_control" -> Json.encodeToString(AppControlProposal("proposal", "app_control", app,
                         if (mode == "wrong-proposal") "clear_data" else "grant", "android.permission.CAMERA", true, false, snapshot()))
                     request["type"]?.jsonPrimitive?.content == "approve_app_control" && request["arguments"]?.jsonObject?.get("accepted") == JsonPrimitive(false) -> "{}"
-                    request["type"]?.jsonPrimitive?.content == "approve_app_control" -> Json.encodeToString(TransferProgress("task",
-                        if (mode == "wrong-task") "delete" else "app_control", "fixture.app", 0, 1, "completed", dataPath = "/transfers/task/data", root = "apps", unit = "items",
-                        result = buildJsonObject { put("package", "fixture.app"); put("userId", 10); put("action", "grant"); put("permission", "android.permission.CAMERA"); put("completed", true) }))
+                    request["type"]?.jsonPrimitive?.content == "approve_app_control" -> task("committing", if (mode == "wrong-unit") "bytes" else "items")
+                    tool == "task.progress" -> task("completed", if (mode == "wrong-poll-unit") "bytes" else "items")
                     else -> error("Unexpected request: $request")
                 }
                 socket.send(buildJsonObject { put("id", request.getValue("id")); put("protocol", 1); put("ok", true); put("result", result) }.toString())
@@ -59,7 +62,9 @@ class AppControlControllerTest {
                 else -> { assertNotNull(state.error); assertNull(state.message); assertEquals(1, reads) }
             }
             val accepted = messages.filter { it["type"]?.jsonPrimitive?.content == "approve_app_control" && it["arguments"]?.jsonObject?.get("accepted") != JsonPrimitive(false) }
-            assertEquals(if (mode in listOf("success", "wrong-task", "unchanged")) 1 else 0, accepted.size)
+            assertEquals(if (mode in listOf("success", "wrong-task", "wrong-unit", "wrong-poll-unit", "unchanged")) 1 else 0, accepted.size)
+            assertEquals(if (mode in listOf("success", "unchanged", "wrong-poll-unit")) 1 else 0,
+                messages.count { it["tool"]?.jsonPrimitive?.content == "task.progress" })
             if (mode in listOf("reject", "wrong-proposal")) assertTrue(messages.any { it["arguments"]?.jsonObject?.get("accepted") == JsonPrimitive(false) })
         } finally { controller.clear(); runtime.close(); scope.cancel(); server.shutdown() }
     }
@@ -67,6 +72,8 @@ class AppControlControllerTest {
     @Test fun rejectionDoesNotSubmitMutation() = verify("reject")
     @Test fun wrongProposalIsRejected() = verify("wrong-proposal")
     @Test fun wrongTaskCannotReportSuccess() = verify("wrong-task")
+    @Test fun invalidApprovalUnitIsStillRejected() = verify("wrong-unit")
+    @Test fun invalidPolledUnitIsStillRejected() = verify("wrong-poll-unit")
     @Test fun unchangedObservedPermissionCannotReportSuccess() = verify("unchanged")
     @Test fun disconnectBeforeConfirmationDoesNotSubmit() = verify("disconnect")
 }

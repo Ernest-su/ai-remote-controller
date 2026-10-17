@@ -103,8 +103,12 @@ def main():
 
             async def commit(proposal):
                 task = await request(arguments=dict(id=proposal['id']), kind='approve_app_control')
+                assert task['phase'] == 'committing' and task['unit'] == 'items', task
+                task_id = task['id']
+                task = await request('task.cancel', dict(id=task['id']))
+                assert task['phase'] in ('committing', 'completed'), task
                 for _ in range(80):
-                    assert task['direction'] == 'app_control' and task['name'] == package, task
+                    assert task['id'] == task_id and task['direction'] == 'app_control' and task['name'] == package and task['root'] == 'apps' and task['unit'] == 'items', task
                     if task['phase'] in ('completed', 'failed', 'cancelled'):
                         break
                     await asyncio.sleep(.25)

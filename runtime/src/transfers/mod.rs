@@ -343,7 +343,7 @@ pub(crate) fn start_background(
                 "inspecting"
             } else if matches!(
                 direction,
-                "app_uninstall" | "app_install" | "app_cache_clear"
+                "app_uninstall" | "app_install" | "app_cache_clear" | "app_control"
             ) {
                 "committing"
             } else {

@@ -54,7 +54,7 @@ impl Transfer {
     }
     pub(super) fn progress(&self) -> Value {
         *self.touched.lock().unwrap() = Instant::now();
-        json!({"id":self.id,"direction":self.direction,"root":self.root,"name":self.name,"sizeBytes":self.size,"bytesTransferred":self.bytes.load(Ordering::Relaxed),"phase":self.phase.lock().unwrap().clone(),"sha256":self.digest.lock().unwrap().clone(),"error":self.error.lock().unwrap().clone(),"result":self.result.lock().unwrap().clone(),"unit":if self.direction=="delete" || self.direction=="app_uninstall" || self.direction=="app_cache_clear" || self.direction=="storage_scan" {"items"}else{"bytes"},"dataPath":format!("/transfers/{}/data",self.id)})
+        json!({"id":self.id,"direction":self.direction,"root":self.root,"name":self.name,"sizeBytes":self.size,"bytesTransferred":self.bytes.load(Ordering::Relaxed),"phase":self.phase.lock().unwrap().clone(),"sha256":self.digest.lock().unwrap().clone(),"error":self.error.lock().unwrap().clone(),"result":self.result.lock().unwrap().clone(),"unit":if self.direction=="delete" || self.direction=="app_uninstall" || self.direction=="app_cache_clear" || self.direction=="app_control" || self.direction=="storage_scan" {"items"}else{"bytes"},"dataPath":format!("/transfers/{}/data",self.id)})
     }
     pub(super) fn failed(&self, message: String) {
         *self.error.lock().unwrap() = Some(message);
