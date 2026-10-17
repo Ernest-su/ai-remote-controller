@@ -53,7 +53,7 @@ class GamepadLifecycleTargetTest(private val control:String) {
             compose.onNodeWithTag("remote-type-gamepad").performScrollTo().performClick()
             compose.waitUntil(15000){(!requiresRotation||compose.activity!==before) && compose.activity.lifecycle.currentState==Lifecycle.State.RESUMED && compose.activity.resources.configuration.orientation==Configuration.ORIENTATION_LANDSCAPE}
             compose.waitForIdle()
-            compose.onNodeWithText("开始手柄").performScrollTo().performClick()
+            compose.onNodeWithContentDescription("开始手柄").performClick()
             await("virtual device"){model.virtualGamepad.state.value.running&&!model.virtualGamepad.state.value.starting || model.virtualGamepad.state.value.error!=null}
             assertNull(model.virtualGamepad.state.value.error)
             val name=checkNotNull(model.virtualGamepad.state.value.deviceName)
@@ -65,7 +65,7 @@ class GamepadLifecycleTargetTest(private val control:String) {
             if(combined)compose.runOnUiThread{assertTrue(model.virtualGamepad.replace(VirtualGamepadInput(
                 buttons=listOf("a","b"),leftX=.9,leftY=-.9,rightX=.9,rightY=-.9,hatX=1,hatY=-1)))}
             else if(multiTouch){
-                compose.onNodeWithTag("virtual-stick-left").performScrollTo().assertIsDisplayed()
+                compose.onNodeWithTag("virtual-stick-left").assertIsDisplayed()
                 compose.onNodeWithTag("virtual-stick-right").assertIsDisplayed()
                 compose.onNodeWithTag("virtual-button-a").assertIsDisplayed()
                 val left=compose.onNodeWithTag("virtual-stick-left").fetchSemanticsNode().boundsInRoot
@@ -83,7 +83,7 @@ class GamepadLifecycleTargetTest(private val control:String) {
                     assertTrue("Button touch state: $state","a" in state.buttons)
                 }
             }
-            else input.performScrollTo().performTouchInput{down(if(control=="button-a")center else centerRight)}
+            else input.performTouchInput{down(if(control=="button-a")center else centerRight)}
             val axis=if(control=="left-stick")"x"else"z"
             val pressed=event(name){if(control=="button-a")keyMatches(it,0)else it["kind"]?.jsonPrimitive?.content=="motion" &&
                 if(combined)it["x"]!!.jsonPrimitive.double>.8 && it["y"]!!.jsonPrimitive.double<-.8 &&
@@ -111,7 +111,7 @@ class GamepadLifecycleTargetTest(private val control:String) {
             if(multiTouch)compose.onRoot().performTouchInput{up(2);up(1);up(0)}
             else if(!combined)input.performTouchInput{up()}
             assertFalse(model.virtualGamepad.state.value.running)
-            compose.onNodeWithText("开始手柄").performScrollTo().assertIsEnabled()
+            compose.onNodeWithContentDescription("开始手柄").assertIsEnabled()
         }finally{if(initialized)compose.runOnUiThread{model.virtualGamepad.stop();model.disconnect()};observer.close();id?.let{DeviceStore(instrumentation.targetContext).remove(it)}}
     }
 }

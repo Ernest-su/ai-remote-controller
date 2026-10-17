@@ -20,6 +20,7 @@ data class VirtualGamepadState(
     val running: Boolean = false,
     val starting: Boolean = false,
     val stopping: Boolean = false,
+    val reconnecting: Boolean = false,
     val input: VirtualGamepadInput = VirtualGamepadInput(),
     val sequence: Long = 0,
     val deviceName: String? = null,

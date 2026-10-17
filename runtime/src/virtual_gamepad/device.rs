@@ -1,6 +1,7 @@
 use super::state::{delta, State, AXES, BUTTONS};
 use anyhow::{bail, Context, Result};
 use std::{
+    ffi::CString,
     fs::{File, OpenOptions},
     io::Write,
     os::unix::{
@@ -98,6 +99,12 @@ impl Device {
             bail!("virtual device name too long");
         }
         setup.name[..bytes.len()].copy_from_slice(bytes);
+        // InputReader groups devices with the same physical location. A unique
+        // location keeps a rapidly reopened lease from inheriting the retired
+        // gamepad's logical identity and cached name.
+        let physical = CString::new(name).context("virtual device name contains NUL")?;
+        let set_phys = 0x4000556c | ((std::mem::size_of::<*const libc::c_char>() as u32) << 16);
+        ioctl(&device.file, set_phys, physical.as_ptr() as usize)?;
         ioctl(&device.file, DEV_SETUP, &setup as *const _ as usize)?;
         ioctl(&device.file, 0x5501, 0)?;
         device.created = true;

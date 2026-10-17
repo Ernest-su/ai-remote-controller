@@ -155,4 +155,146 @@ class VirtualGamepadControllerTest {
         } finally { controller.stop(); scope.cancel() }
     }
 
+    @Test fun updateTimeoutRecoversPromptlyWithNeutralInputEvenWhenCloseDoesNotReply(): Unit = runBlocking {
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
+        val stalled=CompletableDeferred<Unit>()
+        val snapshots=CopyOnWriteArrayList<JsonObject>()
+        val opens=java.util.concurrent.atomic.AtomicInteger()
+        val controller=VirtualGamepadController(scope,{tool,args -> when(tool) {
+            "gamepad.virtual_capabilities" -> capability
+            "gamepad.virtual_open" -> { opens.incrementAndGet(); session }
+            "gamepad.virtual_close" -> { if(opens.get()==1) awaitCancellation(); "{}" }
+            else -> {
+                snapshots+=args
+                if(opens.get()==1 && (stalled.isCompleted || args["state"]!!.jsonObject["buttons"]!!.jsonArray.isNotEmpty())) {
+                    stalled.complete(Unit); awaitCancellation()
+                }
+                response(args)
+            }
+        }})
+        try {
+            controller.start(true)
+            withTimeout(2000){controller.state.first{it.sequence>0}}
+            controller.replace(VirtualGamepadInput(buttons=listOf("a"),rightX=.8))
+            stalled.await()
+            val began=System.nanoTime()
+            withTimeout(2500){controller.state.first{it.reconnecting}}
+            assertEquals(VirtualGamepadInput(),controller.state.value.input)
+            assertFalse(controller.replace(VirtualGamepadInput(buttons=listOf("b"))))
+            withTimeout(3500){controller.state.first{!it.reconnecting && it.sequence>0 && opens.get()==2}}
+            assertTrue((System.nanoTime()-began)/1_000_000 < 3300,"Recovery must not wait five seconds for cleanup")
+            assertEquals(Json { encodeDefaults = true }.encodeToJsonElement(VirtualGamepadInput.serializer(),VirtualGamepadInput()),snapshots.last()["state"])
+            assertNull(controller.state.value.error)
+        } finally {controller.stop();scope.cancel()}
+    }
+
+    @Test fun lostOpenAcknowledgementAutomaticallyReopensOnTheSameConnection(): Unit = runBlocking {
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
+        val opens=java.util.concurrent.atomic.AtomicInteger()
+        val controller=VirtualGamepadController(scope,{tool,args -> when(tool) {
+            "gamepad.virtual_capabilities" -> capability
+            "gamepad.virtual_open" -> { if(opens.incrementAndGet()==1) awaitCancellation(); session }
+            "gamepad.virtual_close" -> "{}"
+            else -> response(args)
+        }})
+        try {
+            controller.start(true)
+            withTimeout(3000){controller.state.first{opens.get()==2 && it.sequence>0}}
+            assertTrue(controller.state.value.running)
+            assertFalse(controller.state.value.reconnecting)
+            assertEquals(VirtualGamepadInput(),controller.state.value.input)
+        } finally {controller.stop();scope.cancel()}
+    }
+
+    @Test fun stopDuringRecoveryPreventsAnyFurtherOpen(): Unit = runBlocking {
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
+        val cleanup=CompletableDeferred<Unit>()
+        val release=CompletableDeferred<Unit>()
+        val opens=java.util.concurrent.atomic.AtomicInteger()
+        val controller=VirtualGamepadController(scope,{tool,_ -> when(tool) {
+            "gamepad.virtual_capabilities" -> capability
+            "gamepad.virtual_open" -> {opens.incrementAndGet();session}
+            "gamepad.virtual_close" -> {cleanup.complete(Unit);release.await();"{}"}
+            else -> error("session expired")
+        }})
+        try {
+            controller.start(true);cleanup.await()
+            assertTrue(controller.state.value.reconnecting)
+            controller.stop();release.complete(Unit)
+            withTimeout(2000){controller.state.first{!it.stopping}}
+            delay(300)
+            assertEquals(1,opens.get());assertFalse(controller.state.value.running)
+            assertFalse(controller.state.value.reconnecting)
+        } finally {release.complete(Unit);controller.stop();scope.cancel()}
+    }
+
+    @Test fun recoveryNeverCapturesAChangedTargetAndRetryCountIsBounded(): Unit = runBlocking {
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
+        val opens=java.util.concurrent.atomic.AtomicInteger()
+        val controller=VirtualGamepadController(scope,{tool,args -> when(tool) {
+            "gamepad.virtual_capabilities" -> capability
+            "gamepad.virtual_open" -> {opens.incrementAndGet();session}
+            "gamepad.virtual_close" -> "{}"
+            else -> if(args["sequence"]!!.jsonPrimitive.long==1L) response(args) else error("session expired")
+        }})
+        try {
+            controller.start(true)
+            withTimeout(5000){controller.state.first{!it.running}}
+            assertEquals(4,opens.get())
+            assertTrue(controller.state.value.error!!.contains("自动重连失败"))
+        } finally {controller.stop();scope.cancel()}
+        val otherScope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
+        var target=1;var requests=0;var captures=0
+        val guarded=VirtualGamepadController(otherScope,{tool,_ -> requests++;when(tool) {
+            "gamepad.virtual_capabilities" -> capability
+            "gamepad.virtual_open" -> session
+            else -> {target=2;error("connection changed")}
+        }},{captures++;val original=target;{check(target==original){"目标已改变"}}})
+        try {
+            guarded.start(true)
+            assertFalse(guarded.state.value.running)
+            assertEquals(1,captures);assertEquals(3,requests)
+            assertEquals("目标已改变",guarded.state.value.error)
+        } finally {guarded.stop();otherScope.cancel()}
+    }
+
+    @Test fun malformedUpdateReplyIsFatalRatherThanRetried(): Unit = runBlocking {
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
+        var opens=0
+        val controller=VirtualGamepadController(scope,{tool,_ -> when(tool) {
+            "gamepad.virtual_capabilities" -> capability
+            "gamepad.virtual_open" -> {opens++;session}
+            else -> "{}"
+        }})
+        try {
+            controller.start(true)
+            assertFalse(controller.state.value.running)
+            assertEquals(1,opens)
+            assertEquals("虚拟手柄更新响应不匹配",controller.state.value.error)
+        } finally {controller.stop();scope.cancel()}
+    }
+
+    @Test fun syntheticRequestFailureRecoversWithoutReplayingHeldInput(): Unit = runBlocking {
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Default)
+        val capabilities=java.util.concurrent.atomic.AtomicInteger()
+        val pulses=java.util.concurrent.atomic.AtomicInteger()
+        val resets=java.util.concurrent.atomic.AtomicInteger()
+        val controller=VirtualGamepadController(scope,{tool,_ -> when(tool) {
+            "gamepad.virtual_capabilities" -> {capabilities.incrementAndGet();"""{"supported":false,"runtimeUid":2000,"mode":"uinput"}"""}
+            "gamepad.pulse" -> {pulses.incrementAndGet();error("temporary input request failure")}
+            "gamepad.reset" -> {resets.incrementAndGet();"{}"}
+            else -> error(tool)
+        }})
+        try {
+            controller.start(true,allowSynthetic=true)
+            withTimeout(2000){controller.state.first{it.mode=="synthetic"}}
+            controller.replace(VirtualGamepadInput(buttons=listOf("a")))
+            withTimeout(2000){controller.state.first{capabilities.get()==2 && !it.reconnecting}}
+            delay(200)
+            assertEquals(1,pulses.get());assertEquals(1,resets.get())
+            assertEquals(VirtualGamepadInput(),controller.state.value.input)
+            assertTrue(controller.state.value.running);assertNull(controller.state.value.error)
+        } finally {controller.stop();scope.cancel()}
+    }
+
 }

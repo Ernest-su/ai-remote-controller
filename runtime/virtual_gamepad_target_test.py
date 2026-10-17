@@ -52,9 +52,16 @@ def main():
 
             capabilities = await tool('capabilities')
             assert capabilities['supported'] and capabilities['runtimeUid'] == 0, capabilities
+            previous = await tool('open')
+            await tool('update', dict(id=previous['id'], sequence=1, state=dict(buttons=['a'])))
             session = await tool('open')
+            assert session['id'] != previous['id'], 'reopen must issue a fresh lease'
+            await asyncio.sleep(.3)
+            assert previous['deviceName'] not in devices(), 'reopen left the old device registered'
+            await tool('close', dict(id=previous['id']), success=False)
             identity = dict(id=session['id'])
             name = session['deviceName']
+            print('Replacement device:', name, 'retired:', previous['deviceName'], flush=True)
             await asyncio.sleep(1)
             blocks = [block for block in devices().split('\n\n') if f'N: Name="{name}"' in block]
             assert len(blocks) == 1, 'owned kernel registration missing or ambiguous'
@@ -63,8 +70,8 @@ def main():
             node = '/dev/input/' + event.group()
             assert name in devices(), 'kernel registration missing'
             assert name in root('dumpsys input'), 'Android input registration missing'
-            await tool('open', success=False)
             async with websockets.connect(f'ws://127.0.0.1:{local_port}/ws') as other:
+                await tool('open', other=other, success=False)
                 await tool('close', identity, other, success=False)
                 await tool('update', dict(**identity, sequence=1, state={}), other, success=False)
             # Read only the event node resolved from this UUID device. timeout bounds
@@ -153,7 +160,8 @@ def main():
                     time.sleep(.1)
             else:
                 raise AssertionError('receiver did not obtain focus')
-        root('mkdir ' + shlex.quote(directory))
+        root('mkdir -m 700 ' + shlex.quote(directory))
+        root('chown 2000:2000 ' + shlex.quote(directory))
         adb('push', str(args.binary.resolve()), binary)
         root('chmod 700 ' + shlex.quote(binary))
         reply = json.loads(root(f'{binary} service start --state-dir {directory}/state --port 0 --no-mdns'))

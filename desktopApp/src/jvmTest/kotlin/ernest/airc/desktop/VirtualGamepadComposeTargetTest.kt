@@ -37,16 +37,22 @@ class VirtualGamepadComposeTargetTest {
             compose.setContent { RemoteTheme { Box(Modifier.width(390.dp)) {
                 val state by controller.state.collectAsState()
                 CompositionLocalProvider(LocalWindowInfo provides windowInfo) {
-                    if(visible) DesktopGamepad(state,controller)
+                    if(visible) Column(Modifier.fillMaxSize()) {
+                        val gamepad by controller.virtualGamepad.state.collectAsState()
+                        val available = gamepadAvailable(state.connected, state.tools)
+                        GamepadSessionButton(gamepad, available,
+                            { controller.virtualGamepad.start(available, allowSynthetic = true) }, { controller.virtualGamepad.stop() })
+                        Box(Modifier.weight(1f)) { DesktopGamepad(state,controller) }
+                    }
                 }
             } } }
             controller.connectLan("127.0.0.1",checkNotNull(target.port))
             assertEquals(0,withTimeout(7000){controller.state.first{it.connected}}.uid)
-            compose.onNodeWithText("开始手柄").performScrollTo().performClick()
+            compose.onNodeWithContentDescription("开始手柄").performClick()
             val active=withTimeout(7000){controller.virtualGamepad.state.first{it.running&&!it.starting}}
             var name=checkNotNull(active.deviceName);delay(700)
             val a=compose.onNodeWithTag("virtual-button-a")
-            a.performScrollTo().performTouchInput{down(center)}
+            a.performTouchInput{down(center)}
             val down=key(96,0);assertEquals(name,down["deviceName"]!!.jsonPrimitive.content);assertTrue(down.int("deviceId")>0)
             delay(400)
             a.performTouchInput{up()}
@@ -54,13 +60,13 @@ class VirtualGamepadComposeTargetTest {
             assertTrue(up["eventTime"]!!.jsonPrimitive.long-down["eventTime"]!!.jsonPrimitive.long>=400)
             for((tag,axis) in listOf("left" to "x","right" to "z")) {
                 val stick=compose.onNodeWithTag("virtual-stick-$tag")
-                stick.performScrollTo().performTouchInput{down(centerRight)}
+                stick.performTouchInput{down(centerRight)}
                 val moved=target.awaitEvent{it["kind"]!!.jsonPrimitive.content=="motion"&&it["deviceName"]!!.jsonPrimitive.content==name&&it[axis]!!.jsonPrimitive.double>.8}
                 stick.performTouchInput{up()}
                 target.awaitEvent{it["kind"]!!.jsonPrimitive.content=="motion"&&it["eventTime"]!!.jsonPrimitive.long>moved["eventTime"]!!.jsonPrimitive.long&&kotlin.math.abs(it[axis]!!.jsonPrimitive.double)<.02}
             }
             val x=compose.onNodeWithTag("virtual-button-x")
-            x.performScrollTo().performTouchInput{down(center)}
+            x.performTouchInput{down(center)}
             key(99,0)
             compose.runOnIdle{focused=false}
             withTimeout(7000){controller.virtualGamepad.state.first{!it.running&&!it.stopping}}
@@ -71,11 +77,11 @@ class VirtualGamepadComposeTargetTest {
             assertFalse(controller.virtualGamepad.state.value.running,"Focus restoration restarted input")
             target.awaitRemoved(name)
             val previous=name
-            compose.onNodeWithText("开始手柄").performScrollTo().performClick()
+            compose.onNodeWithContentDescription("开始手柄").performClick()
             name=checkNotNull(withTimeout(7000){controller.virtualGamepad.state.first{it.running&&!it.starting&&it.deviceName!=previous}}.deviceName)
             delay(700)
             val b=compose.onNodeWithTag("virtual-button-b")
-            b.performScrollTo().performTouchInput{down(center)}
+            b.performTouchInput{down(center)}
             key(97,0)
             compose.runOnIdle{visible=false}
             withTimeout(7000){controller.virtualGamepad.state.first{!it.running&&!it.stopping}}

@@ -69,11 +69,13 @@ class DesktopUiTest {
         compose.onNodeWithText("取消").performClick();assertEquals(false,accepted)
     }
     @Test fun gamepadActionsAreDisabledOffline() {
-        compose.setContent { RemoteTheme { GamepadPanel(VirtualGamepadState(), false,
-            { fail("Offline start") }, { fail("Offline stop") }, { fail("Offline input") }) } }
-        compose.onNodeWithTag("virtual-button-a").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithText("开始手柄").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithText("全部释放并回中").performScrollTo().assertIsNotEnabled()
+        compose.setContent { RemoteTheme { androidx.compose.foundation.layout.Column {
+            GamepadSessionButton(VirtualGamepadState(), false, { fail("Offline start") }, { fail("Offline stop") })
+            GamepadPanel(VirtualGamepadState(), false, { fail("Offline input") })
+        } } }
+        compose.onNodeWithTag("virtual-button-a").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("开始手柄").assertIsNotEnabled()
+        compose.onNodeWithText("全部释放并回中").assertDoesNotExist()
         compose.onNodeWithTag("gamepad-advanced").assertDoesNotExist()
     }
     @Test fun screenPreviewIsManualAndCannotStartOffline() {

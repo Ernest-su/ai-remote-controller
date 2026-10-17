@@ -24,48 +24,52 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalLayoutApi::class)
+/** Fixed viewport: session state never adds rows or changes control positions. */
 @Composable
-fun VirtualGamepadPanel(state: VirtualGamepadState, available: Boolean, onStart: () -> Unit,
-    onStop: () -> Unit, onChange: ((VirtualGamepadInput) -> VirtualGamepadInput) -> Unit) {
-    val enabled = available && state.running && !state.starting && !state.stopping
-    Panel {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val wide = maxWidth >= RemoteDimensions.GamepadRowMinWidth
-            val dualSticks = maxWidth >= RemoteDimensions.GamepadDualStickMinWidth
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (wide) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    StickPad("左摇杆", "left", state.input.leftX, state.input.leftY, enabled) { x, y -> onChange { it.copy(leftX=x,leftY=y) } }
-                    if (dualSticks) Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+fun VirtualGamepadPanel(state: VirtualGamepadState, available: Boolean,
+    onChange: ((VirtualGamepadInput) -> VirtualGamepadInput) -> Unit) {
+    val enabled = available && state.running && !state.starting && !state.reconnecting && !state.stopping
+    Surface(Modifier.fillMaxSize(), shape = MaterialTheme.shapes.small, color = RemoteColors.Surface) {
+        BoxWithConstraints(Modifier.padding(RemoteDimensions.GamepadPanelPadding)) {
+            val wide = maxWidth >= RemoteDimensions.GamepadDualStickMinWidth ||
+                (maxWidth >= RemoteDimensions.GamepadRowMinWidth && maxWidth >= maxHeight)
+            val gap = RemoteDimensions.GamepadGap
+            val rowHeight = if (wide) maxHeight else (maxHeight - gap) / 2
+            val labelHeight = with(androidx.compose.ui.platform.LocalDensity.current) {
+                MaterialTheme.typography.bodyLarge.lineHeight.toDp()
+            }
+            // Reserve enough room for enlarged SELECT/START labels before sizing the sticks.
+            val sessionWidth = with(androidx.compose.ui.platform.LocalDensity.current) {
+                MaterialTheme.typography.bodyMedium.fontSize.toDp() * 6
+            } + RemoteDimensions.GamepadButtonLabelPadding
+            val faceSize = minOf(RemoteDimensions.GamepadFaceSize, rowHeight,
+                if (wide) maxWidth - RemoteDimensions.GamepadMinStickSize * 2 - sessionWidth - gap * 3
+                else (maxWidth - gap) * RemoteDimensions.GamepadFaceWidthFraction)
+                .coerceAtLeast(RemoteDimensions.GamepadMinFaceSize)
+            val stickSize = minOf(RemoteDimensions.GamepadStickSize, rowHeight - labelHeight,
+                if (wide) (maxWidth - faceSize - sessionWidth - gap * 3) / 2 else maxWidth - gap - faceSize)
+                .coerceAtLeast(RemoteDimensions.GamepadMinStickSize)
+            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap, Alignment.CenterVertically)) {
+                Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    StickPad("左摇杆", "left", state.input.leftX, state.input.leftY, enabled, stickSize) { x, y -> onChange { it.copy(leftX=x,leftY=y) } }
+                    if (wide) {
+                        Column(verticalArrangement = Arrangement.spacedBy(gap), horizontalAlignment = Alignment.CenterHorizontally) {
+                            GamepadButtons(listOf("select", "start"), state, enabled, onChange)
+                        }
+                        StickPad("右摇杆", "right", state.input.rightX, state.input.rightY, enabled, stickSize) { x, y -> onChange { it.copy(rightX=x,rightY=y) } }
+                    }
+                    FaceButtons(state, enabled, faceSize, onChange)
+                }
+                if (!wide) Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(verticalArrangement = Arrangement.spacedBy(gap)) {
                         GamepadButtons(listOf("select", "start"), state, enabled, onChange)
                     }
-                    if (dualSticks) StickPad("右摇杆", "right", state.input.rightX, state.input.rightY, enabled) { x, y -> onChange { it.copy(rightX=x,rightY=y) } }
-                    FaceButtons(state, enabled, onChange)
+                    StickPad("右摇杆", "right", state.input.rightX, state.input.rightY, enabled, stickSize) { x, y -> onChange { it.copy(rightX=x,rightY=y) } }
                 }
-                if (!wide) {
-                    StickPad("左摇杆", "left", state.input.leftX, state.input.leftY, enabled) { x, y -> onChange { it.copy(leftX=x,leftY=y) } }
-                    FaceButtons(state, enabled, onChange)
-                }
-                if (!dualSticks) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    GamepadButtons(listOf("select", "start"), state, enabled, onChange)
-                }
-                if (!dualSticks) StickPad("右摇杆", "right", state.input.rightX, state.input.rightY, enabled) { x, y -> onChange { it.copy(rightX=x,rightY=y) } }
             }
         }
-        if (!state.running) ActionButton("开始手柄", available && !state.starting && !state.stopping, onStart)
-        if (state.running || state.stopping) ActionButton("停止手柄", !state.stopping, onStop)
-        Text(when {
-            state.stopping -> "正在停止手柄并释放输入。"
-            !state.running -> "开始后自动选择输入方式；非 root 使用合成输入，游戏兼容性需实际核对。"
-            state.mode == "uinput" -> "虚拟手柄已启动。"
-            state.mode == "synthetic" -> "合成输入已启动；按住时重复短时输入，部分游戏可能忽略，连续性与延迟有限。"
-            else -> "正在准备手柄。"
-        }, color = RemoteColors.Secondary)
-        if(state.starting || state.stopping) LinearProgressIndicator(Modifier.fillMaxWidth())
-        state.error?.let { Text(it, color = RemoteColors.Warning) }
-        if (!available) Text("请连接支持手柄工具的服务。", color = RemoteColors.Secondary)
-        ActionButton("全部释放并回中", enabled) { onChange { VirtualGamepadInput() } }
-        Text("按住按钮，松开释放；拖动摇杆，松开回中。无障碍点击按压100ms。离页、后台或断线停止，需手动重启。", color=RemoteColors.Secondary)
     }
 }
 
@@ -132,14 +136,14 @@ private fun HoldButton(label: String, tag: String, enabled: Boolean, pressed: Bo
 }
 
 @Composable
-private fun StickPad(label: String, tag: String, x: Double, y: Double, enabled: Boolean,
+private fun StickPad(label: String, tag: String, x: Double, y: Double, enabled: Boolean, padSize: androidx.compose.ui.unit.Dp,
     onMove: (Double, Double) -> Unit) {
     val move by rememberUpdatedState(onMove)
     val divider = RemoteColors.Divider
     val knobColor = if (enabled) RemoteColors.Action else RemoteColors.Disabled
     Column {
         Text(label)
-        Canvas(Modifier.size(RemoteDimensions.GamepadStickSize).testTag("virtual-stick-$tag")
+        Canvas(Modifier.size(padSize).testTag("virtual-stick-$tag")
             .background(RemoteColors.Fill, CircleShape)
             .semantics {
                 contentDescription = label
@@ -173,9 +177,9 @@ private fun StickPad(label: String, tag: String, x: Double, y: Double, enabled: 
 }
 
 @Composable
-private fun FaceButtons(state: VirtualGamepadState, enabled: Boolean,
+private fun FaceButtons(state: VirtualGamepadState, enabled: Boolean, padSize: androidx.compose.ui.unit.Dp,
     onChange: ((VirtualGamepadInput) -> VirtualGamepadInput) -> Unit) {
-    Box(Modifier.size(RemoteDimensions.GamepadFaceSize).testTag("gamepad-face-buttons")) {
+    Box(Modifier.size(padSize).testTag("gamepad-face-buttons")) {
         listOf("y" to Alignment.TopCenter, "x" to Alignment.CenterStart,
             "b" to Alignment.CenterEnd, "a" to Alignment.BottomCenter).forEach { (button, alignment) ->
             HoldButton(button.uppercase(), button, enabled, button in state.input.buttons,

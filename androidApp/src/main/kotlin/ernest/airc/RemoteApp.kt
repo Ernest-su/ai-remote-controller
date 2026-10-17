@@ -34,12 +34,21 @@ import kotlinx.coroutines.delay
 @Composable
 internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.SYSTEM, onThemeChange: (ThemeMode) -> Unit = {}) {
     val state by model.state.collectAsState()
+    val gamepad by model.virtualGamepad.state.collectAsState()
+    val gamepadEnabled = gamepadAvailable(state.connected, state.tools)
     var pageName by rememberSaveable { mutableStateOf(RemotePage.REMOTE.name) }
     var deviceOriginName by rememberSaveable { mutableStateOf(RemotePage.REMOTE.name) }
     val page = RemotePage.valueOf(pageName)
     val deviceOrigin = RemotePage.valueOf(deviceOriginName)
     val pages = rememberSaveableStateHolder()
     val snackbar = remember { SnackbarHostState() }
+    var lastGamepadError by rememberSaveable { mutableStateOf(gamepad.error) }
+    LaunchedEffect(gamepad.error) {
+        val error = gamepad.error
+        val fresh = error != lastGamepadError
+        lastGamepadError = error
+        if (page == RemotePage.GAMEPAD && fresh) error?.let { snackbar.showSnackbar(it.take(240)) }
+    }
     var lastNoticeRevision by remember { mutableLongStateOf(state.feedback.revision) }
     LaunchedEffect(page) { snackbar.currentSnackbarData?.dismiss() }
     LaunchedEffect(state.feedback.revision) {
@@ -91,7 +100,11 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                     Icon(painterResource(if (page == RemotePage.REMOTE) R.drawable.ic_menu else R.drawable.ic_back),
                         if (page == RemotePage.REMOTE) "打开功能菜单" else "返回", Modifier.size(24.dp))
                 }
-                Text(page.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).padding(start = 4.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Text(page.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f, fill = false).padding(start = 4.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (page == RemotePage.GAMEPAD) GamepadSessionButton(gamepad, gamepadEnabled,
+                        { model.virtualGamepad.start(gamepadEnabled, allowSynthetic = true) }, { model.virtualGamepad.stop() })
+                }
                 if (isRemoteType) IconButton({ navigate(RemotePage.REMOTE_TYPES) }, Modifier.size(48.dp).testTag("open-remote-types")) {
                     Icon(painterResource(R.drawable.ic_remote_types), "切换遥控器类型", Modifier.size(24.dp))
                 }

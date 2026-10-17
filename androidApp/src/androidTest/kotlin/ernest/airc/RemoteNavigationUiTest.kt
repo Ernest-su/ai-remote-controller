@@ -42,7 +42,7 @@ class RemoteNavigationUiTest {
         compose.onNodeWithTag("virtual-stick-left").assertExists()
         compose.onNodeWithTag("virtual-stick-right").assertExists()
         compose.onNodeWithTag("virtual-button-a").assertIsNotEnabled()
-        compose.onNodeWithText("开始手柄").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithContentDescription("开始手柄").assertIsNotEnabled()
         compose.onNodeWithTag("gamepad-advanced").assertDoesNotExist()
         compose.onNodeWithTag("device-status").performClick()
         compose.onNodeWithTag("navigate-back").performClick()

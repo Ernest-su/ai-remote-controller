@@ -39,6 +39,7 @@ internal object ManagementIcons {
     val Refresh = vector("Refresh") { moveTo(20f,4f); lineTo(20f,10f); lineTo(14f,10f); moveTo(20f,10f); curveTo(18f,1f,4f,3f,4f,12f); curveTo(4f,21f,17f,23f,20f,15f) }
     val Up = vector("Up") { moveTo(5f,11f); lineTo(12f,4f); lineTo(19f,11f); moveTo(12f,4f); lineTo(12f,21f) }
     val Next = vector("Next") { moveTo(9f,5f); lineTo(16f,12f); lineTo(9f,19f) }
+    val Stop = vector("Stop") { moveTo(6f,6f); lineTo(18f,6f); lineTo(18f,18f); lineTo(6f,18f); close() }
     val Play = vector("Play") { moveTo(8f,4f); lineTo(20f,12f); lineTo(8f,20f); close() }
     val AddFolder = vector("AddFolder") { moveTo(3f,6f); lineTo(10f,6f); lineTo(12f,9f); lineTo(21f,9f); lineTo(21f,20f); lineTo(3f,20f); close(); moveTo(12f,11f); lineTo(12f,17f); moveTo(9f,14f); lineTo(15f,14f) }
     val Transfer = vector("Transfer") { moveTo(7f,20f); lineTo(7f,4f); moveTo(3f,8f); lineTo(7f,4f); lineTo(11f,8f); moveTo(17f,4f); lineTo(17f,20f); moveTo(13f,16f); lineTo(17f,20f); lineTo(21f,16f) }

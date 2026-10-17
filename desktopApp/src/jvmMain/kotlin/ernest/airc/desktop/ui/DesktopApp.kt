@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,8 +35,17 @@ private val features = listOf(
 fun DesktopApp(controller: DesktopController, navigation: DesktopNavigation = remember { DesktopNavigation() },
     themeMode: ThemeMode = ThemeMode.SYSTEM, onThemeChange: (ThemeMode) -> Unit = {}) {
     val state by controller.state.collectAsState()
+    val gamepad by controller.virtualGamepad.state.collectAsState()
+    val gamepadEnabled = gamepadAvailable(state.connected, state.tools)
     val pages = rememberSaveableStateHolder()
     val snackbar = remember { SnackbarHostState() }
+    var lastGamepadError by rememberSaveable { mutableStateOf(gamepad.error) }
+    LaunchedEffect(gamepad.error) {
+        val error = gamepad.error
+        val fresh = error != lastGamepadError
+        lastGamepadError = error
+        if (navigation.page == RemotePage.GAMEPAD && fresh) error?.let { snackbar.showSnackbar(it.take(240)) }
+    }
     var lastNoticeRevision by remember { mutableLongStateOf(state.feedback.revision) }
     LaunchedEffect(navigation.page) { snackbar.currentSnackbarData?.dismiss() }
     LaunchedEffect(state.feedback.revision) {
@@ -59,7 +69,11 @@ fun DesktopApp(controller: DesktopController, navigation: DesktopNavigation = re
                             Icon(painterResource("drawable/${if (navigation.page == RemotePage.REMOTE) "ic_menu" else "ic_back"}.xml"),
                                 if (navigation.page == RemotePage.REMOTE) "打开功能菜单" else "返回", Modifier.size(24.dp))
                         }
-                        Text(navigation.page.title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                            Text(navigation.page.title, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleLarge, maxLines = 1)
+                            if (navigation.page == RemotePage.GAMEPAD) GamepadSessionButton(gamepad, gamepadEnabled,
+                                { controller.virtualGamepad.start(gamepadEnabled, allowSynthetic = true) }, { controller.virtualGamepad.stop() })
+                        }
                         TextButton({ navigation.navigate(RemotePage.DEVICES) }, modifier = Modifier.heightIn(min = 48.dp).testTag("device-status")) {
                             Box(Modifier.size(7.dp).background(if (state.connected) RemoteColors.Brand else RemoteColors.Disabled, CircleShape))
                             Spacer(Modifier.width(6.dp))

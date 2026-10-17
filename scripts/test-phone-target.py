@@ -21,7 +21,7 @@ SUITES = {
     "app-packages-ui": ("ernest.airc.AppPackagesUiTest", 3),
     "profile-isolation": ("ernest.airc.EncryptedProfilesIsolationTest", 3),
     "product-pages": ("ernest.airc.ProductPagesUiTest", 1),
-    "controller-ui": ("ernest.airc.RemoteNavigationUiTest,ernest.airc.GamepadOrientationUiTest,ernest.airc.RemoteExecutionUiTest,ernest.airc.RemoteLayoutUiTest,ernest.airc.DeviceInformationUiTest,ernest.airc.SystemActionUiTest,ernest.airc.SystemObservationUiTest,ernest.airc.InputToolsUiTest", 36),
+    "controller-ui": ("ernest.airc.RemoteNavigationUiTest,ernest.airc.GamepadOrientationUiTest,ernest.airc.RemoteExecutionUiTest,ernest.airc.RemoteLayoutUiTest,ernest.airc.DeviceInformationUiTest,ernest.airc.SystemActionUiTest,ernest.airc.SystemObservationUiTest,ernest.airc.InputToolsUiTest", 37),
     "models": ("ernest.airc.ModelProfilesUiTest", 1),
     "model-sync": ("ernest.airc.ModelProfileSyncTargetTest", 1),
     "gamepad-lifecycle": ("ernest.airc.GamepadLifecycleTargetTest", 5),
@@ -36,7 +36,7 @@ SUITES = {
     "pickers": ("ernest.airc.FilePickerTargetTest", 1),
     "picker-success": ("ernest.airc.FilePickerSuccessTargetTest", 1),
     "mirror": ("ernest.airc.ScreenMirrorLifecycleTargetTest", 2),
-    "gamepad-ui": ("ernest.airc.GamepadOrientationUiTest", 2),
+    "gamepad-ui": ("ernest.airc.GamepadOrientationUiTest,ernest.airc.VirtualGamepadUiTest", 7),
 }
 
 

@@ -195,7 +195,7 @@ apps.list / apps_list 优先通过短时框架桥接读取当前 Android 用户�
 | 工具 | 输入 | 行为 |
 | --- | --- | --- |
 | `gamepad.virtual_capabilities` | `{}` | 不创建设备，探测 root/uinput v5 |
-| `gamepad.virtual_open` | `{}` | 注册当前连接独占的单个 UUID 手柄 |
+| `gamepad.virtual_open` | `{}` | 注册当前连接独占的单个 UUID 手柄；同一连接重开先释放并替换旧会话，其他连接不能替换 |
 | `gamepad.virtual_update` | `id, sequence, state` | 完整按钮/左右棒/方向帽快照，严格递增序号 |
 | `gamepad.virtual_close` | `id` | 释放、回中并删除所属设备 |
 

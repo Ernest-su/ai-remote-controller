@@ -102,8 +102,16 @@ pub(crate) fn execute(tool: &str, args: &Value, owner: &str) -> Result<String> {
     if tool == "gamepad.virtual_open" {
         empty(args)?;
         let mut current = CURRENT.lock().unwrap();
-        if current.is_some() {
+        if current
+            .as_ref()
+            .is_some_and(|session| session.owner != owner)
+        {
             bail!("virtual gamepad already active");
+        }
+        // A lost open acknowledgement must not strand this connection for 30s.
+        // Reopening retires only its own lease, including all held input.
+        if let Some(previous) = current.take() {
+            retire(previous);
         }
         let id = uuid::Uuid::new_v4().to_string();
         let name = format!("AIRC virtual gamepad {id}");

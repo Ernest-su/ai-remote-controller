@@ -53,6 +53,7 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite remote
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite lan-connection-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite appearance
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite controller-ui
+python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite gamepad-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite management-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite file-preview-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite mirror-toolbar-ui
@@ -70,6 +71,7 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite profil
 | `remote-haptics-ui` | 遥控震动开关的切换、旋转与重新加载持久化；实际震感需有振动器的设备核对 |
 | `lan-connection-ui` | 仅访问控制端回环地址，验证服务连接失败后尝试 ADB 5555、失败展开并填入目标地址、草稿重建恢复 |
 | `appearance` | 三种外观模式、本地持久化、重建、设置返回、草稿、系统栏与未知值回退 |
+| `gamepad-ui` | 标题启停/重连图标、重连可停止且游戏按键禁用、固定无滚动视口、多指操作与取消释放、横屏方向及离页恢复；只验证控制端界面 |
 | `controller-ui` | 页面导航、提交与执行反馈、键盘间距、离线、大字体、旋转与输入工具 |
 | `management-ui` | 文件/应用列表、搜索筛选、按需面板、离线与草稿恢复 |
 | `mirror-toolbar-ui` | 动态预览标题图标、全屏原生视图复用、悬浮遥控横竖屏比例及草稿保留；不连接目标 |
@@ -137,3 +139,11 @@ uv run --with websockets python scripts/test-remote-input.py --phone <控制手�
 回复或提交说明写明命令、环境、实际执行或缓存复用、失败/跳过及未执行范围。相同输入的 Gradle 缓存可用于纯代码检查；依赖外部设备状态的专项不能拿缓存代替当前执行。
 
 JVM fixture、模拟器和真实设备分别说明。UI fixture 不证明目标实际输入、文件/应用操作或游戏消费；主机工具不证明 Android 系统效果；模拟器不能替代厂商系统、摄像头和自然 WLAN 故障。保留失败证据与有效断言，不扩大通过结论。
+
+手柄恢复使用 `VirtualGamepadControllerTest` 和 `VirtualGamepadRecoveryTransportTest` 验证更新超时、清理无回复、打开回复丢失、晚到回复、取消恢复、连接绑定和重试次数边界；WebSocket fixture 不证明目标游戏消费输入。服务端重开归属及旧设备释放可在自有 root 模拟器运行：
+
+```sh
+uv run --with websockets python runtime/virtual_gamepad_target_test.py --serial <自有模拟器序列号> --binary androidApp/src/main/assets/runtime/airc-runtime-x86_64 --receiver-apk mediaFixture/build/outputs/apk/debug/mediaFixture-debug.apk
+```
+
+运行前构建匹配 ABI 的 runtime 和 `:mediaFixture:assembleDebug`，不要向其他 ABI 的设备推送 x86_64 文件。专项只创建 UUID 服务和原先未安装的接收 fixture，验证同连接重开、外连接拒绝、内核设备回收、按键边沿及回中，结束清理自建资源。

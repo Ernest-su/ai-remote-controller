@@ -77,9 +77,9 @@ class ProductInteractionUiTest {
 
     @Test fun startingVirtualGamepadDisablesRepeatedStart() {
         compose.setContent { RemoteTheme {
-            PageContent { VirtualGamepadPanel(VirtualGamepadState(starting = true), true, {}, {}, {}) }
+            GamepadSessionButton(VirtualGamepadState(starting = true), true, {}, {})
         } }
-        compose.onNodeWithText("开始手柄").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithContentDescription("正在开始手柄").assertIsNotEnabled()
     }
 
     @Test fun largeTextSettingHasOneControlAndCanWrap() {
