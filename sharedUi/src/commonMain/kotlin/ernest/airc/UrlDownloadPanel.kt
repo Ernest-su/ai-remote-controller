@@ -23,14 +23,19 @@ fun UrlDownloadPanel(
         Box(Modifier.fillMaxWidth().height(RemoteDimensions.ManagementDialogHeight)) { directoryPicker { picking = false } }
         return
     }
-    SectionTitle("网址下载", "由被控设备访问 HTTP / HTTPS 地址并保存文件。")
+    Text("由被控设备访问网址并保存文件。", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
     OutlinedTextField(state.url, onUrl, enabled = !state.busy, label = { Text("下载地址") },
         modifier = Modifier.fillMaxWidth().testTag("url-download-address"), maxLines = 3,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
     OutlinedTextField(state.name, onName, enabled = !state.busy, label = { Text("文件名称（可选）") },
-        supportingText = { Text("留空使用网址末段名称，无名称时使用 download.bin。") },
+        supportingText = { Text("自动识别文件名，可自行修改；留空时按网址命名。") },
         modifier = Modifier.fillMaxWidth().testTag("url-download-name"), singleLine = true,
         isError = state.name.isNotBlank() && !validTargetFileName(state.name.trim()))
+    when {
+        state.infoLoading -> { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("正在识别文件信息…", modifier = Modifier.testTag("url-download-info-loading"), color = RemoteColors.Secondary) }
+        state.infoReady -> InfoRow("文件大小", state.fileSize?.let(::managementFileSize) ?: "服务器未提供大小，下载时显示实际进度")
+        state.infoError != null -> Text(state.infoError.orEmpty(), color = RemoteColors.Secondary, modifier = Modifier.testTag("url-download-info-error"))
+    }
     InfoRow("保存目录", if(state.root == "downloads" && state.directory.isEmpty()) "存储卡 Download（默认）" else "${fileRootTitle(state.root)}/${state.directory}")
     OutlinedButton({ picking = true }, shape = MaterialTheme.shapes.small, enabled = available && !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("选择保存目录") }
     if(state.root != "downloads" || state.directory.isNotEmpty())

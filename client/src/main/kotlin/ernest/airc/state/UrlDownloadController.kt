@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.*
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
-fun validDownloadUrl(value: String): Boolean = value.trim().toHttpUrlOrNull()?.let {
+fun validDownloadUrl(value: String): Boolean = value.length <= 8192 && value.trim().toHttpUrlOrNull()?.let {
     it.username.isEmpty() && it.password.isEmpty()
 } ?: false
 
@@ -16,19 +16,52 @@ class UrlDownloadController(private val scope: CoroutineScope, private val runti
     private val json = Json { ignoreUnknownKeys = true }
     private var generation = 0L
     private var job: Job? = null
-    fun editUrl(value: String) { if(!state.value.busy) mutable.update { it.copy(url = value) } }
-    fun editName(value: String) { if(!state.value.busy) mutable.update { it.copy(name = value) } }
+    private var infoJob: Job? = null
+    private var infoGeneration = 0L
+    private var manualName = false
+    fun editUrl(value: String) {
+        if (state.value.busy || value == state.value.url) return
+        infoGeneration++; infoJob?.cancel()
+        val inferred = value.trim().toHttpUrlOrNull()?.pathSegments?.lastOrNull()?.takeIf(::validTargetFileName).orEmpty()
+        mutable.update { it.copy(url = value, name = if (manualName) it.name else inferred,
+            infoReady = false, infoLoading = false, fileSize = null, infoError = null, phase = "idle", bytes = 0, total = null, destination = null, error = null) }
+    }
+    fun editName(value: String) { if(!state.value.busy) { manualName = true; mutable.update { it.copy(name = value) } } }
+    fun inspect(available: Boolean) {
+        infoJob?.cancel()
+        val token = ++infoGeneration
+        val url = state.value.url.trim()
+        if (!available || state.value.busy || !validDownloadUrl(url)) { mutable.update { it.copy(infoLoading = false) }; return }
+        mutable.update { it.copy(infoLoading = true, infoReady = false, fileSize = null, infoError = null) }
+        infoJob = scope.launch {
+            try {
+                delay(400)
+                val target = runtime?.transferTarget()
+                val args = buildJsonObject { put("url", url) }
+                val output = withTimeout(12000) { if (runtime != null) runtime.requestAt(checkNotNull(target), "files.url_info", args) else request("files.url_info", args) }
+                val info = json.decodeFromString<UrlFileInfo>(output)
+                check(validTargetFileName(info.name) && (info.sizeBytes?.let { it >= 0 } != false)) { "网址文件信息无效" }
+                if (runtime != null) runtime.checkTransferTarget(checkNotNull(target))
+                if (token == infoGeneration) mutable.update { it.copy(name = if (manualName) it.name else info.name,
+                    fileSize = info.sizeBytes, infoReady = true, infoLoading = false) }
+            } catch (error: CancellationException) { throw error }
+            catch (error: Exception) {
+                if (token == infoGeneration) mutable.update { it.copy(infoLoading = false, infoError = "暂时无法获取文件信息，仍可尝试下载。") }
+            }
+        }
+    }
     fun directory(root: String, path: String) {
         if(!state.value.busy && root in listOf("downloads", "inbox", "full") && (path.isEmpty() || path.split('/').all(::validTargetFileName)))
             mutable.update { it.copy(root = root, directory = path) }
     }
-    fun clear() { generation++; job?.cancel(); mutable.value = UrlDownloadState() }
+    fun clear() { generation++; job?.cancel(); infoGeneration++; infoJob?.cancel(); manualName = false; mutable.value = UrlDownloadState() }
     fun cancel() { job?.cancel() }
     fun start(available: Boolean) {
         val draft = state.value
         if(!available || draft.busy || !validDownloadUrl(draft.url) || (draft.name.isNotBlank() && !validTargetFileName(draft.name.trim()))) return
+        infoGeneration++; infoJob?.cancel()
         val token = generation
-        mutable.value = draft.copy(busy = true, phase = "connecting", bytes = 0, total = null, destination = null, error = null)
+        mutable.value = draft.copy(busy = true, infoLoading = false, phase = "connecting", bytes = 0, total = null, destination = null, error = null)
         job = scope.launch {
             var id: String? = null; var terminal = false; var userCancelled = false; var target: RuntimeTransferTarget? = null
             fun checkTarget() { check(token == generation) { "目标连接已改变" }; if(runtime != null) runtime.checkTransferTarget(checkNotNull(target)) }

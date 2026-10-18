@@ -35,6 +35,7 @@ internal object ManagementIcons {
     val File = vector("File") { moveTo(5f,3f); lineTo(14f,3f); lineTo(19f,8f); lineTo(19f,21f); lineTo(5f,21f); close(); moveTo(14f,3f); lineTo(14f,8f); lineTo(19f,8f); moveTo(8f,13f); lineTo(16f,13f); moveTo(8f,17f); lineTo(14f,17f) }
     val Apps = vector("Apps") { moveTo(4f,4f); lineTo(10f,4f); lineTo(10f,10f); lineTo(4f,10f); close(); moveTo(14f,4f); lineTo(20f,4f); lineTo(20f,10f); lineTo(14f,10f); close(); moveTo(4f,14f); lineTo(10f,14f); lineTo(10f,20f); lineTo(4f,20f); close(); moveTo(14f,14f); lineTo(20f,14f); lineTo(20f,20f); lineTo(14f,20f); close() }
     val More = vector("More") { moveTo(5f,12f); lineTo(5.1f,12f); moveTo(12f,12f); lineTo(12.1f,12f); moveTo(19f,12f); lineTo(19.1f,12f) }
+    val Trash = vector("Trash") { moveTo(4f,6f);lineTo(20f,6f);moveTo(9f,6f);lineTo(9f,3f);lineTo(15f,3f);lineTo(15f,6f);moveTo(6f,6f);lineTo(7f,21f);lineTo(17f,21f);lineTo(18f,6f);moveTo(10f,10f);lineTo(10f,17f);moveTo(14f,10f);lineTo(14f,17f) }
     val Close = vector("Close") { moveTo(6f,6f); lineTo(18f,18f); moveTo(18f,6f); lineTo(6f,18f) }
     val Refresh = vector("Refresh") { moveTo(20f,4f); lineTo(20f,10f); lineTo(14f,10f); moveTo(20f,10f); curveTo(18f,1f,4f,3f,4f,12f); curveTo(4f,21f,17f,23f,20f,15f) }
     val Up = vector("Up") { moveTo(5f,11f); lineTo(12f,4f); lineTo(19f,11f); moveTo(12f,4f); lineTo(12f,21f) }

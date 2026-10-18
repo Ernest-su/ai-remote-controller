@@ -43,7 +43,7 @@ class FileTransferController(private val scope: CoroutineScope, private val runt
     }
     fun reviewPending(available: Boolean) {
         if(!available) return
-        start("downloads","") { token ->
+        start("downloads","", "delete") { token ->
             val target=runtime.transferTarget()
             val proposals=json.decodeFromString<List<FileActionProposal>>(runtime.requestAt(target,"files.pending",JsonObject(emptyMap())))
             val proposal=proposals.firstOrNull { it.kind=="delete" } ?: error("没有待确认的删除操作")
@@ -55,14 +55,14 @@ class FileTransferController(private val scope: CoroutineScope, private val runt
     @Volatile private var generation = 0L
     private var downloaded: Pair<String,File>? = null
     private var export: Pair<Long,Pair<String,File>>? = null
-    fun select(source: UploadSource) { if (!state.value.running) { this.source=source; mutable.update { it.copy(sourceName=source.name,sourceSize=source.size,error=null) } } }
+    fun select(source: UploadSource) { if (!state.value.running) { this.source=source; mutable.update { it.copy(operation="upload",sourceName=source.name,sourceSize=source.size,error=null,phase="idle",bytes=0,total=null,readyToSave=false,proposal=null) } } }
     private fun update(token: Long, action: (FileTransferState)->FileTransferState) { mutable.update { if (generation==token) action(it) else it } }
     private fun progress(token: Long, value: TransferProgress) = update(token) { it.copy(phase=value.phase,bytes=value.bytesTransferred,total=if(value.unit=="items") null else value.sizeBytes,name=value.name,root=value.root,unit=value.unit) }
-    private fun start(root: String, path: String, action: suspend (Long)->Unit) {
+    private fun start(root: String, path: String, operation: String = "upload", action: suspend (Long)->Unit) {
         if (state.value.running) return
         val token = ++generation
         downloaded?.second?.delete();downloaded=null
-        mutable.update { it.copy(running=true,phase="preparing",bytes=0,total=null,path=path,root=root,error=null,readyToSave=false,proposal=null,unit="bytes") }
+        mutable.update { it.copy(operation=operation,running=true,phase="preparing",bytes=0,total=null,path=path,root=root,error=null,readyToSave=false,proposal=null,unit="bytes") }
         job=scope.launch {
             try { action(token) }
             catch (e: CancellationException) { update(token) { it.copy(phase="cancelled") };throw e }
@@ -92,7 +92,7 @@ class FileTransferController(private val scope: CoroutineScope, private val runt
     }
     fun delete(root: String, path: String, recursive: Boolean, available: Boolean, onComplete: () -> Unit = {}) {
         if (!available || path.isEmpty()) return
-        start(root,path) { token ->
+        start(root,path,"delete") { token ->
             val target=runtime.transferTarget()
             try { runDeletion(target,token,approve(target,token,"delete",root,path,recursive)) }
             finally { if(token==generation)onComplete() }
@@ -124,7 +124,7 @@ class FileTransferController(private val scope: CoroutineScope, private val runt
     }
     fun download(root: String, path: String, cache: File, available: Boolean) {
         if (!available) return
-        start(root,path) { token ->
+        start(root,path,"download") { token ->
             val result=client.download(path,cache,root) { progress(token,it) }
             if (token==generation) { downloaded=result;update(token){it.copy(readyToSave=true)} } else result.second.delete()
         }

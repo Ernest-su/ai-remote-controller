@@ -1,6 +1,7 @@
 package ernest.airc
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlin.test.*
@@ -74,4 +75,65 @@ class UrlDownloadControllerTest {
             assertEquals(UrlDownloadState(), late.state.value)
         } finally { scope.cancel() }
     }
+    @Test fun metadataFillsNameAndSizeWithoutStartingDownloadAndKeepsManualName() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val started = CompletableDeferred<Unit>()
+        val result = CompletableDeferred<String>()
+        val calls = mutableListOf<String>()
+        val controller = UrlDownloadController(scope) { tool, _ -> calls += tool; started.complete(Unit); result.await() }
+        try {
+            controller.editUrl("https://example.org/raw")
+            assertEquals("raw", controller.state.value.name)
+            controller.inspect(true)
+            withTimeout(2000) { started.await() }
+            controller.editName("我的文件.apk")
+            result.complete("""{"name":"电视.apk","sizeBytes":123456}""")
+            withTimeout(2000) { controller.state.first { it.infoReady } }
+            assertEquals("我的文件.apk", controller.state.value.name)
+            assertEquals(123456L, controller.state.value.fileSize)
+            assertFalse(controller.state.value.busy)
+            assertEquals(listOf("files.url_info"), calls)
+            controller.clear()
+            controller.editUrl("https://example.org/next")
+            controller.inspect(true)
+            withTimeout(2000) { controller.state.first { it.infoReady } }
+            assertEquals("电视.apk", controller.state.value.name)
+        } finally { scope.cancel() }
+    }
+    @Test fun changedUrlAndClearDiscardLateMetadata() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val old = CompletableDeferred<String>()
+        val started = CompletableDeferred<Unit>()
+        val controller = UrlDownloadController(scope) { _, args ->
+            if (args["url"]?.jsonPrimitive?.content?.endsWith("old") == true) withContext(NonCancellable) { started.complete(Unit); old.await() }
+            else """{"name":"new.bin","sizeBytes":null}"""
+        }
+        try {
+            controller.editUrl("https://example.org/old"); controller.inspect(true)
+            withTimeout(2000) { started.await() }
+            controller.editUrl("https://example.org/new"); controller.inspect(true)
+            withTimeout(2000) { controller.state.first { it.infoReady } }
+            assertEquals("new.bin", controller.state.value.name)
+            assertNull(controller.state.value.fileSize)
+            old.complete("""{"name":"stale.bin","sizeBytes":12}"""); yield()
+            assertEquals("new.bin", controller.state.value.name)
+            controller.clear()
+            assertEquals(UrlDownloadState(), controller.state.value)
+        } finally { old.complete("{}"); scope.cancel() }
+    }
+    @Test fun metadataFailureLeavesDownloadDraftUsableAndOfflineDoesNotProbe() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        var calls = 0
+        val controller = UrlDownloadController(scope) { _, _ -> calls++; error("fixture network error") }
+        try {
+            controller.editUrl("https://example.org/file.bin"); controller.inspect(false)
+            assertEquals(0, calls)
+            controller.inspect(true)
+            withTimeout(2000) { controller.state.first { it.infoError != null } }
+            assertEquals("file.bin", controller.state.value.name)
+            assertFalse(controller.state.value.infoLoading)
+            assertEquals("idle", controller.state.value.phase)
+        } finally { scope.cancel() }
+    }
+
 }

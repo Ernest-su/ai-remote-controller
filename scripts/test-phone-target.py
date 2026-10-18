@@ -12,6 +12,7 @@ from instrumentation_result import require_passed
 
 ROOT = Path(__file__).resolve().parent.parent
 SUITES = {
+    "file-page-ui": ("ernest.airc.FilePageLayoutUiTest", 1),
     "library-layout-ui": ("ernest.airc.LibraryLayoutUiTest", 1),
     "mobile-convenience-ui": ("ernest.airc.MobileConvenienceUiTest", 4),
     "remote-haptics-input-ui": ("ernest.airc.RemoteHapticsInputUiTest", 7),
@@ -52,7 +53,7 @@ def main():
     parser.add_argument("--use-installed-phone", action="store_true", help="Verify matching installed phone APK hashes instead of reinstalling")
     parser.add_argument("--suite", choices=[*SUITES, "all"], default="all")
     args = parser.parse_args()
-    phone_only=args.suite in ("library-layout-ui", "mobile-convenience-ui", "app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-surface-ui", "mirror-toolbar-ui", "mirror-ui", "gamepad-ui", "models", "profile-isolation", "controller-ui")
+    phone_only=args.suite in ("file-page-ui", "library-layout-ui", "mobile-convenience-ui", "app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-surface-ui", "mirror-toolbar-ui", "mirror-ui", "gamepad-ui", "models", "profile-isolation", "controller-ui")
     if not phone_only and (not args.target or not args.host):
         parser.error("This suite requires --target and --host")
     if not phone_only and args.phone == args.target:

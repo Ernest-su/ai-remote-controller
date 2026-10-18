@@ -30,7 +30,7 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
     onMedia: ((TargetFileEntry) -> Unit)? = null, onDownload: ((TargetFileEntry) -> Unit)? = null,
     onApk: ((TargetFileEntry) -> Unit)? = null, onCreateDirectory: ((String) -> Unit)? = null,
     directoryAvailable: Boolean = available, onNavigate: ((String) -> Unit)? = null,
-    unavailableMessage: String = "请连接支持文件工具的目标服务。", operationMessage: String? = null,
+    unavailableMessage: String = "请连接支持文件工具的目标服务。", operationMessage: String? = null, operationSection: String = "upload", operationActive: Boolean = false,
     thumbnail: (@Composable (TargetFileEntry, Modifier) -> Unit)? = null,
     previewContent: (@Composable (TargetFileEntry) -> Unit)? = null,
     onSelectDirectory: (() -> Unit)? = null,
@@ -48,8 +48,9 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
     var sortMenu by remember { mutableStateOf(false) }
     var showDirectory by rememberSaveable(state.root, state.path) { mutableStateOf(false) }
     var showTools by rememberSaveable { mutableStateOf(false) }
-    var toolSection by rememberSaveable { mutableStateOf("transfer") }
+    var toolSection by rememberSaveable { mutableStateOf(operationSection) }
     var inspectedName by rememberSaveable(state.root, state.path) { mutableStateOf<String?>(null) }
+    LaunchedEffect(operationSection, operationActive) { if (operationActive) toolSection = operationSection }
     val drafts = rememberSaveableStateHolder()
     val enabled = available && !state.loading
     val entries = remember(state.entries, query, sort,category,showHidden,onSelectDirectory) {
@@ -86,14 +87,9 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
             onCreateDirectory?.let { create -> FileDirectoryForm(state.root, state.path, directoryAvailable && !state.loading) { create(it); showDirectory = false } }
         }
     }
-    if (showTools) ManagementDialog("文件操作与任务", "files-tools-dialog", { showTools = false }) {
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf("url" to "网址下载", "transfer" to "传输", "media" to "媒体", "apk" to "APK 安装", "storage" to "存储分析").forEach { (value, label) ->
-                FilterChip(toolSection == value, { toolSection = value }, label = { Text(label, style = MaterialTheme.typography.bodyMedium) },
-                    modifier = Modifier.heightIn(min = 48.dp).testTag("files-tool-$value"))
-            }
-        }
-        Text("关闭此窗口后，任务仍会继续。可从页面的操作与任务入口返回。", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
+    if (showTools) ManagementDialog(when (toolSection) {
+        "url" -> "网址下载"; "download" -> "下载文件"; "delete" -> "删除文件"; "media" -> "在被控设备播放"; "apk" -> "APK 信息与安装"; "storage" -> "存储分析"; else -> "上传文件"
+    }, "files-tools-dialog", { showTools = false }) {
         drafts.SaveableStateProvider("tools:$toolSection") { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { transfer(toolSection) } }
     }
     inspectedName?.let { name ->
@@ -113,17 +109,6 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
     val selected=state.entries.firstOrNull { it.name==selectedName }
     LaunchedEffect(state.entries) { if(selectedName!=null && selected==null) selectedName=null }
     Column(Modifier.fillMaxSize()) {
-        Surface(color=RemoteColors.Surface) {
-            Row(Modifier.fillMaxWidth().padding(horizontal=8.dp),verticalAlignment=Alignment.CenterVertically) {
-                Column(Modifier.weight(1f).padding(horizontal=8.dp)) {
-                    Text("文件管理",style=MaterialTheme.typography.titleMedium)
-                    Text(fileRootTitle(state.root),style=MaterialTheme.typography.bodySmall,color=RemoteColors.Secondary)
-                }
-                ManagementIconButton(ManagementIcons.Refresh,"刷新目录",enabled,"files-refresh",onRefresh)
-                ManagementIconButton(if(grid) ManagementIcons.List else ManagementIcons.Apps,if(grid) "切换列表视图" else "切换网格视图",tag="files-view") { grid=!grid }
-                if(onSelectDirectory == null) ManagementIconButton(ManagementIcons.Transfer,"文件操作与任务",tag="files-tools") { showTools=true }
-            }
-        }
         LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("files-page"), state = list, contentPadding = PaddingValues(16.dp)) {
         item(key = "tools") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -150,7 +135,6 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                                     modifier = Modifier.heightIn(min = 48.dp).testTag("files-path-$index")) { Text(segment, style = MaterialTheme.typography.bodyMedium, maxLines = 1, softWrap = false) }
                             }
                         }
-                        onCreateDirectory?.let { ManagementIconButton(ManagementIcons.AddFolder, "新建目录", directoryAvailable && !state.loading, "files-create-directory") { showDirectory = true } }
                     }
                 }
                 OutlinedTextField(query, { query = it }, label = { Text("搜索当前目录") }, singleLine = true,
@@ -197,9 +181,9 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                     Box(Modifier.weight(1f).then(if(grid) Modifier.fillMaxHeight() else Modifier)) {
                         FileManagementRow(entry,enabled,
                             { if(selectedName!=null) selectedName=if(selectedName==entry.name) null else entry.name else if(entry.kind=="directory") onEnter(entry) else if(entry.name.endsWith(".apk",true) && onApk != null) tools("apk") {onApk(entry)} else if(previewContent != null && filePreviewKind(entry) != null) previewName=entry.name else inspect(entry) },
-                            { inspect(entry) },onDownload?.let { { tools("transfer") { it(entry) } } },
+                            { inspect(entry) },onDownload?.let { { tools("download") { it(entry) } } },
                             onMedia?.let { { tools("media") { it(entry) } } },onApk?.let { { tools("apk") { it(entry) } } },
-                            onDelete?.let { { tools("transfer") { it(entry) } } },
+                            onDelete?.let { { tools("delete") { it(entry) } } },
                             grid=grid,selected=selectedName==entry.name,onSelect={selectedName=entry.name},
                             thumbnail=thumbnail, onPreview=if(previewContent != null && filePreviewKind(entry) != null) ({previewName=entry.name}) else null)
                     }
@@ -215,23 +199,30 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
             Column(Modifier.fillMaxWidth().padding(horizontal=8.dp)) {
                 HorizontalDivider(color=RemoteColors.Divider,thickness=0.5.dp)
                 if(onSelectDirectory != null) {
+                    FileActionBar(listOf(FileBarAction("刷新目录", ManagementIcons.Refresh, "files-refresh", enabled, action = onRefresh)))
                     ActionButton("选择此目录", enabled && state.loaded && state.error == null, onSelectDirectory)
                 } else if(selected!=null) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
                         Text(selected.name,Modifier.weight(1f).padding(8.dp),maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodyMedium)
                         ManagementIconButton(ManagementIcons.Close,"取消选择",tag="files-clear-selection") {selectedName=null}
                     }
-                    FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                        if(previewContent != null && filePreviewKind(selected) != null) TextButton({previewName=selected.name},enabled=enabled,modifier=Modifier.heightIn(min=48.dp)) {Text("在主控设备预览 / 播放")}
-                        TextButton({inspect(selected)},enabled=enabled,modifier=Modifier.heightIn(min=48.dp)) {Text("属性")}
-                        if(selected.kind=="file") onDownload?.let { action -> TextButton({tools("transfer"){action(selected)}},enabled=enabled,modifier=Modifier.heightIn(min=48.dp)) {Text("下载") } }
-                        onDelete?.let { action -> TextButton({tools("transfer"){action(selected)}},enabled=enabled,modifier=Modifier.heightIn(min=48.dp),colors=ButtonDefaults.textButtonColors(contentColor=RemoteColors.Warning)) {Text("删除") } }
-                    }
-                } else FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                    ManagementIconButton(ManagementIcons.Upload,"上传文件",tag="files-upload") { tools("transfer") }
-                    onCreateDirectory?.let { ManagementIconButton(ManagementIcons.AddFolder,"新建目录",directoryAvailable && !state.loading,"files-create-directory-bottom") { showDirectory=true } }
-                    ManagementIconButton(ManagementIcons.Storage,"存储分析",tag="files-storage") { tools("storage") }
-                }
+                    FileActionBar(buildList {
+                        if (previewContent != null && filePreviewKind(selected) != null) add(FileBarAction("在主控设备预览 / 播放", ManagementIcons.Play, "files-preview", enabled) { previewName = selected.name })
+                        add(FileBarAction("文件属性", ManagementIcons.File, "files-properties", enabled) { inspect(selected) })
+                        if (selected.kind == "file") onDownload?.let { action -> add(FileBarAction("下载文件", LibraryIcons.Down, "files-download", enabled) { tools("download") { action(selected) } }) }
+                        if (isTargetMedia(selected.name)) onMedia?.let { action -> add(FileBarAction("在被控设备播放", ManagementIcons.Play, "files-play-target", enabled) { tools("media") { action(selected) } }) }
+                        if (selected.name.endsWith(".apk", true)) onApk?.let { action -> add(FileBarAction("APK 信息", ManagementIcons.Apps, "files-apk", enabled) { tools("apk") { action(selected) } }) }
+                        onDelete?.let { action -> add(FileBarAction("删除", ManagementIcons.Trash, "files-delete", enabled, danger = true) { tools("delete") { action(selected) } }) }
+                    })
+                } else FileActionBar(buildList {
+                    add(FileBarAction("上传文件", ManagementIcons.Upload, "files-upload") { tools("upload") })
+                    add(FileBarAction("网址下载", LibraryIcons.Down, "files-url") { tools("url") })
+                    onCreateDirectory?.let { add(FileBarAction("新建目录", ManagementIcons.AddFolder, "files-create-directory", directoryAvailable && !state.loading) { showDirectory = true }) }
+                    add(FileBarAction("刷新目录", ManagementIcons.Refresh, "files-refresh", enabled, action = onRefresh))
+                    add(FileBarAction(if (grid) "切换列表视图" else "切换网格视图", if (grid) ManagementIcons.List else ManagementIcons.Apps, "files-view") { grid = !grid })
+                    add(FileBarAction("文件操作与任务", ManagementIcons.Transfer, "files-tools") { showTools = true })
+                    add(FileBarAction("存储分析", ManagementIcons.Storage, "files-storage") { tools("storage") })
+                })
             }
         }
     }

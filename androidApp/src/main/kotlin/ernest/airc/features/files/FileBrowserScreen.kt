@@ -76,6 +76,20 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
         onRoot=model.files::selectRoot,
         onNavigate={ model.files.ancestor(it, available) },
         unavailableMessage=if (!state.connected) "设备未连接，连接后即可浏览和管理文件。" else if (state.busy) "设备正在执行操作，请稍后重试。" else "当前服务不支持文件浏览，请更新目标服务。",
+        operationActive=transfer.running || transfer.proposal != null || transfer.readyToSave || installation.busy || installation.proposal != null || apk.busy || download.busy || media.busy || storage.busy,
+        operationSection=when {
+            transfer.running || transfer.proposal != null || transfer.readyToSave -> transfer.operation
+            installation.busy || installation.proposal != null || apk.busy -> "apk"
+            download.busy -> "url"
+            media.busy -> "media"
+            storage.busy -> "storage"
+            download.phase != "idle" -> "url"
+            transfer.phase != "idle" -> transfer.operation
+            installation.message != null || apk.info != null || apk.error != null -> "apk"
+            media.message != null || media.error != null -> "media"
+            storage.report != null || storage.error != null -> "storage"
+            else -> "upload"
+        },
         operationMessage=when {
             transfer.proposal != null || installation.proposal != null -> "有文件操作等待确认"
             download.busy || transfer.running || apk.busy || installation.busy || media.busy || storage.busy -> "文件任务正在进行，可查看进度"
@@ -121,10 +135,10 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
             FileMediaPanel(media,available,model.fileMedia::choose,{model.fileMedia.open(available)},{model.fileMedia.release(available)},onMode={local -> media.players?.let{model.fileMedia.inspect(it.root,it.path,available,local)}},onCancel=model.fileMedia::cancel,onRecover=if("media.publications" in state.tools) ({model.fileMedia.recover(available)})else null,onReleaseCopy={id -> model.fileMedia.releaseCopy(id,available)})
             if (media.players == null && !media.busy) Text("从媒体文件的更多菜单选择在被控设备播放，选择播放器后再执行。", color=RemoteColors.Secondary)
             }
-            if (section == "transfer") {
+            if (section in listOf("upload", "download", "delete")) {
             FileTransferPanel(transfer,files.root,files.path,canTransfer,{select.launch(arrayOf("*/*"))},
                 {name -> message=null;model.transfers.upload(files.root,path(name),canTransfer)},model.transfers::cancel,
-                {model.transfers.prepareExport()?.let { save.launch(it) }},onOverwrite={name -> model.transfers.upload(files.root,path(name),canTransfer,true)},onConfirm=model.transfers::confirm)
+                {model.transfers.prepareExport()?.let { save.launch(it) }},onOverwrite={name -> model.transfers.upload(files.root,path(name),canTransfer,true)},onConfirm=model.transfers::confirm,operation=section)
             message?.let { androidx.compose.material3.Text(it,color=RemoteColors.Secondary) }
             }
         })

@@ -90,6 +90,7 @@ object RemoteDimensions {
     val SettingRowHeight = 56.dp
     val ManagementWidth = 560.dp
     val ManagementDialogHeight = 640.dp
+    val FileActionSlot = 56.dp
     val FileGridThumbnail = 80.dp
     val FilePreviewHeight = 280.dp
     val FileGridHeight = 144.dp

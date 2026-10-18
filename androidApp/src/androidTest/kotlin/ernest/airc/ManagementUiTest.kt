@@ -101,7 +101,7 @@ class ManagementUiTest {
         compose.onNodeWithTag("files-page").performScrollToNode(hasText("sample.apk"))
         compose.onNodeWithText("sample.apk").performClick()
         assertEquals("sample.apk",inspectedApk)
-        compose.onNodeWithTag("files-tool-apk").assertIsSelected()
+        compose.onNodeWithText("APK 信息与安装").assertExists()
     }
 
     @Test fun gridAndCategoryFilterOnlyLoadedEntriesWithoutRequests() {
@@ -129,7 +129,7 @@ class ManagementUiTest {
         compose.onNodeWithText("notes.txt").performTouchInput { longClick() }
         compose.onNodeWithTag("files-clear-selection").assertIsDisplayed()
         assertEquals("",deleted);assertEquals("",inspected)
-        compose.onNodeWithText("删除").performClick()
+        compose.onNodeWithTag("files-delete").performClick()
         assertEquals("notes.txt",deleted)
         compose.onNodeWithTag("files-tools-dialog-close").performClick()
         compose.onNodeWithTag("files-clear-selection").performClick()

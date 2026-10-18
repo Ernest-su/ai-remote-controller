@@ -246,7 +246,7 @@ class DesktopUiTest {
         compose.onNodeWithText("正在推送").assertExists()
         compose.onNodeWithText("17000000 / 34000000 字节").assertExists()
         compose.onNodeWithText("选择本地文件").assertIsNotEnabled()
-        compose.onNodeWithText("取消传输").performClick()
+        compose.onNodeWithText("取消上传").performClick()
         assertTrue(cancelled)
     }
 

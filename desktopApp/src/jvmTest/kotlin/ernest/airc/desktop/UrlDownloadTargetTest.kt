@@ -41,8 +41,13 @@ class UrlDownloadTargetTest {
             runtime.connect("127.0.0.1", port)
             reverse = adb.command("-s", serial, "reverse", "tcp:0", "tcp:${server.port}").trim().toInt()
             val url = "http://127.0.0.1:$reverse/source.bin"
+            server.enqueue(MockResponse().setHeader("Content-Length", 16).setHeader("Content-Disposition", "attachment; filename=$filename"))
+            controller.editUrl(url); controller.inspect(true)
+            val metadata = withTimeout(5000) { controller.state.first { it.infoReady || it.infoError != null } }
+            assertNull(metadata.infoError); assertEquals(filename, metadata.name); assertEquals(16L, metadata.fileSize)
+            assertFalse(metadata.busy)
             server.enqueue(MockResponse().setBody("download fixture"))
-            controller.editUrl(url); controller.editName(filename); controller.start(true)
+            controller.start(true)
             val default = awaitResult()
             assertNull(default.error); assertEquals("completed", default.phase)
             assertEquals("download fixture", shell("cat /storage/emulated/0/Download/$filename"))

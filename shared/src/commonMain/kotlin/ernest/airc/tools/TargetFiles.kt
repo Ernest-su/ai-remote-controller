@@ -34,7 +34,7 @@ data class TransferProgress(val id: String, val direction: String, val name: Str
     val bytesTransferred: Long, val phase: String, val sha256: String? = null, val error: String? = null, val dataPath: String, val root: String = "downloads", val unit: String = "bytes", val result: JsonElement? = null)
 
 
-data class FileTransferState(val sourceName: String? = null, val sourceSize: Long? = null,
+data class FileTransferState(val operation: String = "upload", val sourceName: String? = null, val sourceSize: Long? = null,
     val running: Boolean = false, val phase: String = "idle", val bytes: Long = 0, val total: Long? = null,
     val name: String = "", val root: String = "inbox", val path: String = "", val error: String? = null, val readyToSave: Boolean = false, val proposal: FileActionProposal? = null, val unit: String = "bytes", val result: JsonElement? = null)
 fun fileRootTitle(root: String): String = when(root) { "inbox" -> "服务收件箱"; "full" -> "全盘 /"; else -> "Downloads" }
