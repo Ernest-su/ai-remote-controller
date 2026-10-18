@@ -311,6 +311,7 @@ impl Manager {
                     }
                 }
                 .await;
+                let mut recovery_error = None;
                 if result.is_err() {
                     uncertain.extend(leases.keys().copied());
                     leases.clear();
@@ -318,33 +319,44 @@ impl Manager {
                         eprintln!("persistent input bridge failed: {error:#}");
                     }
                     if !uncertain.is_empty() {
-                        result = result.map_err(|error| error.context("input key outcome uncertain; no automatic replay; release recovery attempted"));
+                        result = result.map_err(|error| anyhow::anyhow!("input key outcome uncertain; no automatic replay; release recovery attempted: {error:#}"));
                     }
                     if let Some(child) = bridge.take() {
                         child.stop().await;
                     }
                     // Recover every possibly held key by sending only UP; never replay a DOWN.
                     if !uncertain.is_empty() {
-                        if let Ok(mut child) = Bridge::start(&spec).await {
-                            for code in uncertain.clone() {
-                                sequence += 1;
-                                if child.request(sequence, "release", code).await.is_err() {
-                                    break;
+                        match Bridge::start(&spec).await {
+                            Ok(mut child) => {
+                                for code in uncertain.clone() {
+                                    sequence += 1;
+                                    if let Err(error) =
+                                        child.request(sequence, "release", code).await
+                                    {
+                                        recovery_error = Some(error);
+                                        break;
+                                    }
+                                    uncertain.remove(&code);
                                 }
-                                uncertain.remove(&code);
+                                if uncertain.is_empty() {
+                                    bridge = Some(child);
+                                } else {
+                                    child.stop().await;
+                                }
                             }
-                            if uncertain.is_empty() {
-                                bridge = Some(child);
-                            } else {
-                                child.stop().await;
-                            }
+                            Err(error) => recovery_error = Some(error),
                         }
                     }
                 }
                 let result = if !uncertain.is_empty() {
-                    Err(anyhow::anyhow!(
-                        "input key outcome uncertain; release recovery pending; no automatic retry"
-                    ))
+                    let cause = result
+                        .err()
+                        .map(|error| format!("{error:#}"))
+                        .unwrap_or_default();
+                    let recovery = recovery_error
+                        .map(|error| format!("; release: {error:#}"))
+                        .unwrap_or_default();
+                    Err(anyhow::anyhow!("input key outcome uncertain; release recovery pending; no automatic retry: {cause}{recovery}"))
                 } else {
                     result
                 };

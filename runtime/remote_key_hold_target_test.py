@@ -83,6 +83,18 @@ def main():
             assert short[0]['downTime'] == short[1]['downTime']
             print('PASS finite accessibility/queued short tap remains one DOWN/UP pair', flush=True)
 
+            # Finite taps use the same path as routine steps and television text actions.
+            for key, code in [('enter', 66), ('delete', 67), ('ok', 23), ('up', 19), ('down', 20), ('left', 21), ('right', 22)]:
+                start = len(events()); sequence += 1
+                await socket.send(json.dumps(dict(id=str(sequence), protocol=1, type='tool', tool='remote.key', arguments=dict(key=key))))
+                reply = json.loads(await socket.recv())
+                assert reply['ok'], reply
+                receipt = json.loads(reply['result'])
+                assert receipt['operation'] == 'key' and receipt['submitted'] and receipt['released'], receipt
+                pair = await received(code, start)
+                assert [(event['action'], event['repeat']) for event in pair] == [(0, 0), (1, 0)], pair
+                print(f'PASS finite {key}: acknowledged exactly one DOWN/UP pair', flush=True)
+
             for key, code in [('menu', 82), ('ok', 23), ('back', 4), ('right', 22), ('delete', 67), ('1', 8)]:
                 identifier = str(uuid.uuid4()); start = len(events())
                 await edge(key, 'down', identifier)

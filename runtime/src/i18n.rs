@@ -40,6 +40,14 @@ impl Language {
             return (*translated).into();
         }
         for (prefix, translated) in [
+            (
+                "input key outcome uncertain; release recovery pending; no automatic retry: ",
+                "按键执行结果不确定，释放恢复尚未完成；不会自动重复执行。详情：",
+            ),
+            (
+                "input key outcome uncertain; no automatic replay; release recovery attempted: ",
+                "按键执行结果不确定，已尝试释放按键；不会自动重复执行。详情：",
+            ),
             ("uinput ioctl failed: ", "uinput 设备操作失败："),
             ("virtual gamepad write failed: ", "虚拟手柄输入写入失败："),
             ("unsupported request type: ", "不支持的请求类型："),

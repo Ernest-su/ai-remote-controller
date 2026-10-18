@@ -27,11 +27,15 @@ for line in sys.stdin:
    if fault=='oversize':
     print('x'*3000,flush=True)
     continue
-   if fault=='bad-ack':
+   if fault in ('bad-ack','recovery-fails'):
     print(json.dumps(dict(id=-1,ok=True,released=True)),flush=True)
     continue
   if code==19: time.sleep(0.1)
   if operation=='key': log('up',code)
+ elif operation=='release' and fault=='recovery-fails':
+  log('up',code)
+  print(json.dumps(dict(id=r['id'],ok=False,error='fixture release rejected')),flush=True)
+  continue
  elif operation=='keep': log('keep',code)
  else: log('up',code)
  print(json.dumps(dict(id=r['id'],ok=True,released=operation not in ('down','keep'))),flush=True)
@@ -334,4 +338,27 @@ async fn malformed_edges_are_rejected_before_accessing_the_bridge() {
             .to_string()
             .contains(expected));
     }
+}
+
+#[tokio::test]
+async fn failed_release_preserves_diagnostics_and_never_replays_a_down() {
+    let fixture = Fixture::new("recovery-fails");
+    let error = fixture
+        .manager
+        .call(Some(20))
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("release recovery pending"), "{error}");
+    assert!(error.contains("fixture release rejected"), "{error}");
+    assert!(fixture.manager.call(Some(21)).await.is_err());
+    assert_eq!(
+        fixture
+            .journal()
+            .iter()
+            .filter(|line| line.starts_with("down:"))
+            .collect::<Vec<_>>(),
+        vec![&"down:20".to_string()]
+    );
+    fixture.manager.stop().await;
 }

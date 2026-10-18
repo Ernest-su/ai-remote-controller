@@ -37,7 +37,7 @@ public final class InputBridge {
         timer.scheduleAtFixedRate(this::tick,10,10,java.util.concurrent.TimeUnit.MILLISECONDS);
     }
     private static boolean allowed(int code) {
-        return (code>=7&&code<=16)||(code>=19&&code<=26)||code==67||code==82||code==85||code==87||code==88||code==164||code==166||code==167||code==3||code==4;
+        return (code>=7&&code<=16)||(code>=19&&code<=26)||code==66||code==67||code==82||code==85||code==87||code==88||code==164||code==166||code==167||code==3||code==4;
     }
     private void send(int code,int action,long down) throws Exception {
         send(code,action,down,0,0);
