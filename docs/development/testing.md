@@ -186,3 +186,5 @@ uv run --with websockets python runtime/remote_key_hold_target_test.py --serial 
 主界面 UI fixture 在启动 Activity 前用 DeviceHistoryIsolation 持久备份设备历史和上次连接项，测试期间清空可自动重连目标，Activity 销毁后恢复；不把原设备当作离线 fixture。中断留下 active 备份时拒绝覆盖，应先调用该类的 restore 恢复原历史。此隔离不修改模型密钥或目标服务。
 
 文件页布局回归使用 `python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite file-page-ui`，检查无重复标题、320dp / 1.5 倍字号的底栏溢出菜单及亮暗截图、按操作打开弹窗、自动识别信息的显示与文件名编辑。`FileWorkflowUiTest` 验证上传表单与下载/删除状态隔离；`UrlDownloadControllerTest` 验证自动探测不启动下载、手动名称保护、快速换址及迟到响应隔离；`UrlMetadataProtocolTest` 使用主机 runtime 和本地 HTTP fixture 验证重定向、响应头识别及识别后下载，`UrlDownloadTargetTest` 在隔离 Android 目录验证相同协议。
+
+标准遥控器顶栏菜单回归使用 `python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite remote-menu-ui`：验证三项带图标竖排菜单、离线可浏览、点击后关闭菜单、旋转不自动打开菜单、设备和类型入口可用，并复用窄屏、大字体及真实软键盘布局回归。`mobile-convenience-ui` 从该菜单进入收藏、电视输入与快捷操作。

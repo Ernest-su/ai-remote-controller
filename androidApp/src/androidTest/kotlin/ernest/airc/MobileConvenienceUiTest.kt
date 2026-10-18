@@ -32,13 +32,15 @@ class MobileConvenienceUiTest {
     @Test fun independentTelevisionInputNeedsNoModelAndRetainsOnlyMemoryDraft() {
         val model = model()
         compose.runOnUiThread { model.disconnect() }
-        compose.onNodeWithText("电视输入").performScrollTo().performClick()
+        compose.onNodeWithTag("remote-more").performClick()
+        compose.onNodeWithText("电视输入").performClick()
         compose.onNodeWithTag("tv-input-draft").performTextInput("中文片名")
         compose.onNodeWithText("发送到电视").assertIsNotEnabled()
         compose.activityRule.scenario.recreate()
         compose.onNodeWithTag("tv-input-draft").assertTextContains("中文片名")
         compose.onNodeWithTag("tv-input-dialog-close").performClick()
-        compose.onNodeWithText("电视输入").performScrollTo().performClick()
+        compose.onNodeWithTag("remote-more").performClick()
+        compose.onNodeWithText("电视输入").performClick()
         compose.onNodeWithTag("tv-input-draft").assertTextContains("中文片名")
         compose.onNodeWithText("清空草稿").performScrollTo().performClick()
         assertEquals("", model.tvInput.state.value.draft)
@@ -116,7 +118,8 @@ class MobileConvenienceUiTest {
         try {
             compose.runOnUiThread { model.discovered(DiscoveredService("fixture", "127.0.0.1", server.port, emptyMap())) }
             compose.waitUntil(10000) { model.state.value.connected && !model.state.value.busy }
-            compose.onNodeWithText("常用应用").performScrollTo().performClick()
+            compose.onNodeWithTag("remote-more").performClick()
+            compose.onNodeWithText("常用应用").performClick()
             compose.waitUntil(10000) { model.state.value.apps.isNotEmpty() }
             compose.onNodeWithTag("app-favorite-fixture.player").assertIsOff().performClick().assertIsOn()
             assertEquals(listOf("fixture.player"), model.state.value.shortcuts.favorites)
@@ -137,7 +140,8 @@ class MobileConvenienceUiTest {
             }
             assertTrue(requests.none { it["key"]?.jsonPrimitive?.content == "volume_down" })
             compose.onNodeWithTag("navigate-back").performClick()
-            compose.onNodeWithText("快捷操作").performScrollTo().performClick()
+            compose.onNodeWithTag("remote-more").performClick()
+            compose.onNodeWithText("快捷操作").performClick()
             compose.onNodeWithContentDescription("新建快捷操作").performClick()
             compose.onNodeWithTag("routine-name").performTextInput("观影组合")
             compose.onNodeWithText("添加步骤").performScrollTo().performClick()

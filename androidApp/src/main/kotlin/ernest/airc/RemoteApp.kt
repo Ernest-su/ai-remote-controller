@@ -158,6 +158,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                     Box(Modifier.size(7.dp).background(if (state.connected) RemoteColors.Brand else RemoteColors.Disabled, CircleShape))
                     Text(if (state.connected) "已连接" else "未连接", style = MaterialTheme.typography.bodyMedium)
                 }
+                if (page == RemotePage.REMOTE) RemoteQuickMenu({ quickApps = true }, { tvInput = true }, { routinesOpen = true })
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
@@ -165,7 +166,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                 pages.SaveableStateProvider(page.name) {
                     when (page) {
                         RemotePage.REMOTE_TYPES -> RemoteTypePicker(RemotePage.valueOf(selectedTypeName), ::navigate)
-                        RemotePage.REMOTE -> RemoteControls(state, model, onQuickApps = { quickApps = true }, onTvInput = { tvInput = true }, onRoutines = { routinesOpen = true }) { navigate(RemotePage.RESULTS) }
+                        RemotePage.REMOTE -> RemoteControls(state, model) { navigate(RemotePage.RESULTS) }
                         RemotePage.DEVICES -> Devices(state, model) { navigate(RemotePage.SCREENSHOT) }
                         RemotePage.MENU -> FeatureMenu(::navigate)
                         RemotePage.APPS -> Applications(state, model) { name -> appDetailsPackage = name; navigate(RemotePage.APP_DETAILS) }
@@ -241,7 +242,7 @@ private fun FeatureMenu(navigate: (RemotePage) -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, onQuickApps: (() -> Unit)? = null, onTvInput: (() -> Unit)? = null, onRoutines: (() -> Unit)? = null, showResults: () -> Unit) {
+internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showResults: () -> Unit) {
     var draft by rememberSaveable { mutableStateOf("") }
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -295,11 +296,6 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, onQuic
                                     RemoteIconButton({ model.key("mute") }, enabled = state.connected, debugName = "mute") { Icon(painterResource(R.drawable.ic_mute), "静音") }
                                     RemoteIconButton({ model.key("volume_up") }, enabled = state.connected, debugName = "volume_up") { Icon(painterResource(R.drawable.ic_volume_up), "音量 +") }
                                 }
-                            }
-                            FlowRow {
-                                onQuickApps?.let { open -> TextButton(open, Modifier.heightIn(min = 48.dp)) { Text("常用应用") } }
-                                onTvInput?.let { open -> TextButton(open, Modifier.heightIn(min = 48.dp)) { Text("电视输入") } }
-                                onRoutines?.let { open -> TextButton(open, Modifier.heightIn(min = 48.dp)) { Text("快捷操作") } }
                             }
                             Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
