@@ -81,7 +81,7 @@ fn start_at(args: &Value, root: &std::path::Path) -> Result<String> {
     Ok(progress)
 }
 
-fn validate_url(url: &reqwest::Url) -> Result<()> {
+pub(super) fn validate_url(url: &reqwest::Url) -> Result<()> {
     if !matches!(url.scheme(), "http" | "https")
         || url.host_str().is_none()
         || !url.username().is_empty()

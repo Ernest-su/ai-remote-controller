@@ -13,7 +13,9 @@ use std::{
 };
 mod http;
 mod url_download;
+mod url_metadata;
 pub(crate) use url_download::start as download_url;
+pub(crate) use url_metadata::inspect as url_info;
 mod state;
 #[cfg(test)]
 mod tests;
