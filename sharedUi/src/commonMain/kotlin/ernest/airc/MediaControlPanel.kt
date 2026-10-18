@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun MediaControlPanel(state: MediaControlState, available: Boolean, onRefresh: () -> Unit, onChoose: (MediaSelection) -> Unit, onSeek: (Long) -> Unit, onCustomAction: (String) -> Unit = {}) {
     var target by rememberSaveable { mutableStateOf("") }
+    var dragging by remember(state.selected) { mutableStateOf<Float?>(null) }
     PageContent(Modifier.testTag("media-control-page")) {
         Panel {
             SectionTitle("播放控制", "选择正在播放的应用，查看进度或跳转到指定位置。")
@@ -29,8 +30,8 @@ fun MediaControlPanel(state: MediaControlState, available: Boolean, onRefresh: (
             val session = state.sessions.singleOrNull { it.selection() == state.selected }
             session?.let {
                 it.description?.let { title -> Text(title) }
-                InfoRow("播放器报告位置", it.positionMs?.let { value -> "$value 毫秒" } ?: "未知")
-                InfoRow("播放器报告时长", it.durationMs?.let { value -> "$value 毫秒" } ?: "未知")
+                InfoRow("播放器报告位置", it.positionMs?.let(::formatPlaybackTime) ?: "未知")
+                InfoRow("播放器报告时长", it.durationMs?.let(::formatPlaybackTime) ?: "未知")
             }
             if(state.customActionAvailable && session?.customActions?.isNotEmpty() == true) {
                 Text("播放器提供的动作", style = MaterialTheme.typography.titleMedium)
@@ -40,19 +41,31 @@ fun MediaControlPanel(state: MediaControlState, available: Boolean, onRefresh: (
             }
             if(state.sessions.isEmpty()) Text("当前未显示活动媒体会话，可刷新并检查目标播放器。", color = RemoteColors.Secondary)
             if(!state.seekAvailable) Text("当前定位接口不可用，仍可通过遥控器使用播放键。", color = RemoteColors.Secondary)
-            val position = target.toLongOrNull()
-            val positionError = when {
-                target.isBlank() -> null
-                position == null || position < 0 -> "请输入大于或等于 0 的整数毫秒值"
-                session?.durationMs?.takeIf { it > 0 }?.let { position > it } == true -> "目标位置不能超过播放器报告时长"
-                else -> null
+            val duration = session?.durationMs?.takeIf { it > 0 }
+            val position = session?.positionMs?.takeIf { it >= 0 }
+            val canSeek = available && !state.busy && state.seekAvailable && session?.seekSupported == true
+            if (duration != null && position != null) {
+                Slider(value = dragging ?: (position.toDouble() / duration).toFloat().coerceIn(0f, 1f),
+                    onValueChange = { dragging = it }, onValueChangeFinished = {
+                        dragging?.let { onSeek((duration * it.toDouble()).toLong().coerceIn(0, duration)) }; dragging = null
+                    }, enabled = canSeek, modifier = Modifier.heightIn(min = 48.dp).testTag("media-seek-slider"))
+                dragging?.let { Text(formatPlaybackTime((duration * it.toDouble()).toLong())) }
             }
-            if (session != null && session.seekSupported != true) Text("此播放器未声明支持定位，可选择其他会话。", color = RemoteColors.Secondary)
-            OutlinedTextField(target, { target = it }, label = { Text("目标位置（毫秒）") }, singleLine = true, isError = positionError != null,
-                supportingText = { Text(positionError ?: "以播放器报告的时长为准，单位为毫秒") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth().testTag("media-seek-position"))
-            val valid = position != null && position >= 0 && session?.durationMs?.takeIf { it > 0 }?.let { position > it } != true
-            ActionButton("提交播放定位", available && !state.busy && state.seekAvailable && session?.seekSupported == true && valid) { position?.let(onSeek) }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(-30L, -10L, 10L, 30L).forEach { seconds ->
+                    OutlinedButton(onClick = { position?.let { onSeek(relativePlaybackPosition(it, seconds, duration)) } },
+                        enabled = canSeek && position != null, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(if (seconds < 0) "后退 ${-seconds} 秒" else "前进 $seconds 秒")
+                    }
+                }
+            }
+            if (session != null && session.seekSupported != true) Text("此播放器未声明支持定位。", color = RemoteColors.Secondary)
+            val requested = parsePlaybackTime(target)
+            val valid = requested != null && (duration == null || requested <= duration)
+            OutlinedTextField(target, { target = it }, label = { Text("跳转时间（分:秒）") }, singleLine = true,
+                isError = target.isNotBlank() && !valid, supportingText = { Text("例如 12:30，也支持 时:分:秒") },
+                modifier = Modifier.fillMaxWidth().testTag("media-seek-position"))
+            ActionButton("跳转", canSeek && valid) { requested?.let(onSeek) }
             state.message?.let { Text(it, color = RemoteColors.Secondary) }; state.error?.let { Text(it, color = RemoteColors.Warning) }
         }
     }
