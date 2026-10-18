@@ -61,7 +61,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     private val connector = AdbConnector(application)
     private val installer = RuntimeInstaller(application)
     private val runtime = RuntimeConnection { application.resources.configuration.locales[0].toLanguageTag() }
-    val tvInput = TvInputController(viewModelScope, getApplication(), runtime) {
+    val tvInput = TvInputController(viewModelScope, getApplication(), runtime, { state.value.selected }) {
         val record = state.value.history.find { it.id == state.value.selected } ?: error("请先选择电视")
         val host = record.host ?: error("没有保存电视地址")
         val port = record.adbPort ?: error("请先在设备页通过 ADB 连接电视")
@@ -356,6 +356,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
         val history = withContext(Dispatchers.IO) { store.remember(record, previousId) }
         releasePreferences.edit().putString("last-connected-device", record.id).apply()
         automaticReconnectEnabled = true
+        tvInput.selectTarget(record.id)
         mutable.update { it.copy(status = "已连接 ${history.first { it.id == record.id }.visibleName}", selected = record.id, version = status.version, tools = status.tools, runtimeUid = status.uid, modelConfigured = status.modelConfigured, history = history, shortcuts = readShortcuts(record.id), routines = readRoutines(record.id)) }
     }
 

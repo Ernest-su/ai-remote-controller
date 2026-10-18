@@ -53,7 +53,7 @@ gh secret list --repo Ernest-su/ai-remote-controller
 
 ## 版本与触发
 
-先同步 `androidApp/build.gradle.kts` 的 `versionName`、递增 `versionCode`，以及 `runtime/Cargo.toml` 的版本。标签必须为 `v` 加相同版本，例如 `v0.1.0`；清单兼容范围限定为该 APK versionCode。
+先同步 `androidApp/build.gradle.kts` 与 `tvInputMethod/build.gradle.kts` 的 `versionName`、递增两者 `versionCode`，以及 `runtime/Cargo.toml` 的版本。标签必须为 `v` 加相同版本，例如 `v0.1.0`；清单兼容范围限定为该 APK versionCode。
 
 提交源码、公钥和 workflow 后创建并推送版本标签：
 

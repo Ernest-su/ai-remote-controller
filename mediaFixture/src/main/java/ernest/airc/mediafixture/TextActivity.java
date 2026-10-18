@@ -10,12 +10,15 @@ import java.nio.charset.StandardCharsets;
 
 /** Records only synthetic input in this disposable fixture's private directory. */
 public final class TextActivity extends Activity {
+    static volatile android.content.ClipData originalClipboard;
+    static volatile boolean clipboardChanged;
+    private boolean initializedClipboard;
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         EditText field = new EditText(this);
         field.setSingleLine(true);
-        field.setRawInputType(getIntent().getBooleanExtra("paste", false) ? android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS : android.text.InputType.TYPE_NULL);
-        field.setShowSoftInputOnFocus(false);
+        field.setRawInputType((getIntent().getBooleanExtra("paste", false) || getIntent().getBooleanExtra("ime", false)) ? android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS : android.text.InputType.TYPE_NULL);
+        field.setShowSoftInputOnFocus(getIntent().getBooleanExtra("ime", false));
         field.setTextSize(24);
         field.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence s,int start,int count,int after) {}
@@ -28,5 +31,16 @@ public final class TextActivity extends Activity {
         });
         setContentView(field);
         field.requestFocus();
+    }
+    @Override public void onWindowFocusChanged(boolean focused) {
+        super.onWindowFocusChanged(focused);
+        String text = getIntent().getStringExtra("clipboard");
+        if (focused && text != null && !initializedClipboard) {
+            initializedClipboard = true;
+            android.content.ClipboardManager manager = getSystemService(android.content.ClipboardManager.class);
+            originalClipboard = manager.getPrimaryClip();
+            clipboardChanged = true;
+            manager.setPrimaryClip(android.content.ClipData.newPlainText("fixture", text));
+        }
     }
 }

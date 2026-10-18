@@ -188,3 +188,7 @@ uv run --with websockets python runtime/remote_key_hold_target_test.py --serial 
 文件页布局回归使用 `python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite file-page-ui`，检查无重复标题、320dp / 1.5 倍字号的底栏溢出菜单及亮暗截图、按操作打开弹窗、自动识别信息的显示与文件名编辑。`FileWorkflowUiTest` 验证上传表单与下载/删除状态隔离；`UrlDownloadControllerTest` 验证自动探测不启动下载、手动名称保护、快速换址及迟到响应隔离；`UrlMetadataProtocolTest` 使用主机 runtime 和本地 HTTP fixture 验证重定向、响应头识别及识别后下载，`UrlDownloadTargetTest` 在隔离 Android 目录验证相同协议。
 
 标准遥控器顶栏菜单回归使用 `python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite remote-menu-ui`：验证三项带图标竖排菜单、离线可浏览、点击后关闭菜单、旋转不自动打开菜单、设备和类型入口可用，并复用窄屏、大字体及真实软键盘布局回归。`mobile-convenience-ui` 从该菜单进入收藏、电视输入与快捷操作。
+
+电视输入双通道验证：`TvInputControllerTest` 覆盖按电视保存方式、确认后清草稿、拒绝重复提交、失败不回退、取消和换目标隔离，以及中文/Shell 字符编码边界。构建 App/测试 APK 后，`python3 scripts/test-phone-target.py --phone <自有模拟器> --suite tv-input-ui` 检查 320dp / 1.5 倍字号的亮暗单选、安装与发送禁用、恢复入口、错误与处理中反馈并保存截图；`mobile-convenience-ui` 覆盖真实入口、旋转、草稿保留和软键盘展开/全局状态更新后的标题与关闭按钮可见性。
+
+执行 `python3 scripts/test-tv-input-method.py --serial <自有模拟器>` 可安装 fixture、运行真实输入法专项并恢复原 Activity、清理自建包。专项 `TvInputMethodTargetTest` 仅在显式传入 `ownedImeTarget=true` 的自有 API 31+ 模拟器运行。先确认 `ernest.airc.ime` 和 `ernest.airc.mediafixture` 均未安装，再安装自建 mediaFixture。专项使用模拟器 shell 权限运行生产输入法安装、摘要检查、启用、中文/表情/字面 Shell 字符提交、剪贴板不变、普通应用越权拒绝、无输入框拒绝和原输入法恢复，结束卸载自建输入法；外层调用者须卸载自建 mediaFixture 并恢复原 Activity。该专项不证明厂商电视或第三方自绘输入框兼容。

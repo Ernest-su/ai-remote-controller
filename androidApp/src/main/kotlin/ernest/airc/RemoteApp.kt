@@ -43,7 +43,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
     var routinesOpen by rememberSaveable { mutableStateOf(false) }
     if (routinesOpen) QuickRoutinesPanel(state, model) { routinesOpen = false }
     var tvInput by rememberSaveable { mutableStateOf(false) }
-    if (tvInput) ManagementDialog("电视输入", "tv-input-dialog", { tvInput = false }) { TvInputPanel(state, model) }
+    if (tvInput) ManagementDialog("电视输入", "tv-input-dialog", { tvInput = false }, grouped = true) { TvInputPanel(state, model) }
     var quickApps by rememberSaveable { mutableStateOf(false) }
     if (quickApps) LibraryDialog("常用应用", "quick-apps-dialog", { quickApps = false }, subtitle = state.history.find { it.id == state.selected }?.visibleName) { AppShortcutsPanel(state, model) }
     var appDetailsPackage by rememberSaveable { mutableStateOf("") }

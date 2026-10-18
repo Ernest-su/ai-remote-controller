@@ -15,6 +15,25 @@ public final class TextJournalProvider extends ContentProvider {
         if (!"r".equals(mode) || !"/text".equals(uri.getPath())) throw new FileNotFoundException("read only text journal");
         return ParcelFileDescriptor.open(new File(getContext().getFilesDir(), "remote-text.txt"), ParcelFileDescriptor.MODE_READ_ONLY);
     }
+    @Override public android.os.Bundle call(String method, String arg, android.os.Bundle extras) {
+        int uid = android.os.Binder.getCallingUid();
+        if (uid != 2000 && uid != 0) throw new SecurityException("ADB shell required");
+        if ("restoreClipboard".equals(method)) {
+            android.content.ClipboardManager manager = getContext().getSystemService(android.content.ClipboardManager.class);
+            if (TextActivity.clipboardChanged) {
+                if (TextActivity.originalClipboard != null) manager.setPrimaryClip(TextActivity.originalClipboard);
+                else if (android.os.Build.VERSION.SDK_INT >= 28) manager.clearPrimaryClip();
+                TextActivity.originalClipboard = null;
+                TextActivity.clipboardChanged = false;
+            }
+            return new android.os.Bundle();
+        }
+        if (!"clipboard".equals(method)) throw new UnsupportedOperationException();
+        android.content.ClipData clip = getContext().getSystemService(android.content.ClipboardManager.class).getPrimaryClip();
+        android.os.Bundle result = new android.os.Bundle();
+        result.putString("clipboard", clip == null ? "" : clip.getItemAt(0).coerceToText(getContext()).toString());
+        return result;
+    }
     public String getType(Uri uri) { return "text/plain"; }
     public Cursor query(Uri uri, String[] projection, String selection, String[] args, String order) { return null; }
     public Uri insert(Uri uri, ContentValues values) { throw new UnsupportedOperationException("read only"); }

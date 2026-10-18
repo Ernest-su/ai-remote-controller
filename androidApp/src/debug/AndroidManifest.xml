@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Let the permission-boundary test resolve the companion before asserting denial. -->
+    <queries><provider android:authorities="ernest.airc.ime.control" /></queries>
     <application>
         <!-- Empty host for panel tests; excluded from release APKs. -->
         <activity android:name="androidx.activity.ComponentActivity"

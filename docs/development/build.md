@@ -16,7 +16,7 @@ export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
 ./gradlew :androidApp:assembleDebug :shared:jvmTest --no-daemon
 ```
 
-`local.properties` 可设置 Android SDK 路径，但不要提交个人配置。Gradle 的 preBuild 会执行 `scripts/build-runtime.py`，构建 ARM64、ARMv7、x86_64 程序及清单，打包进 APK。
+`local.properties` 可设置 Android SDK 路径，但不要提交个人配置。Gradle 的 preBuild 会执行 `scripts/build-runtime.py`，构建 ARM64、ARMv7、x86_64 程序及清单，打包进 APK。构建同时生成 `tvInputMethod` 配套电视输入法，将同构建类型的已签名 APK 嵌入 `assets/airc-input-method.apk`；debug 使用开发证书，release 与控制端共用生产签名配置。电视安装由“电视输入 → 输入法提交 → 安装并启用”明确触发，按 APK 摘要校验与更新。
 
 | 产物 | 路径 |
 | --- | --- |

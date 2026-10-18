@@ -12,3 +12,6 @@ include(":shared", ":client", ":sharedUi", ":androidApp", ":desktopApp")
 include(":mediaFixture")
 include(":inputFixture")
 include(":ascrcpy")
+
+// Companion IME installed on the controlled television for Unicode text submission.
+include(":tvInputMethod")

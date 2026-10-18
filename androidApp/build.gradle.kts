@@ -132,3 +132,17 @@ val validateProductionSigning by tasks.registering {
     }
 }
 tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(validateProductionSigning) }
+
+// Bundle the matching, signed companion rather than relying on an installed older IME.
+listOf("debug", "release").forEach { variant ->
+    val capitalized = variant.replaceFirstChar { it.uppercase() }
+    val imeAssets = layout.buildDirectory.dir("generated/${variant}ImeAssets")
+    val prepareIme = tasks.register<Copy>("prepare${capitalized}Ime") {
+        dependsOn(":tvInputMethod:assemble$capitalized")
+        from(project(":tvInputMethod").layout.buildDirectory.file("outputs/apk/$variant/tvInputMethod-$variant.apk"))
+        rename { "airc-input-method.apk" }
+        into(imeAssets)
+    }
+    android.sourceSets.getByName(variant).assets.directories.add(imeAssets.get().asFile.absolutePath)
+    tasks.matching { it.name == "merge${capitalized}Assets" }.configureEach { dependsOn(prepareIme) }
+}

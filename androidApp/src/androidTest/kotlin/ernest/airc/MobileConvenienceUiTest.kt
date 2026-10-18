@@ -34,9 +34,23 @@ class MobileConvenienceUiTest {
         compose.runOnUiThread { model.disconnect() }
         compose.onNodeWithTag("remote-more").performClick()
         compose.onNodeWithText("电视输入").performClick()
-        compose.onNodeWithTag("tv-input-draft").performTextInput("中文片名")
-        compose.onNodeWithText("发送到电视").assertIsNotEnabled()
+        captureLibrary("tv-input-dialog", "tv-input-dialog")
+        compose.onNodeWithTag("tv-input-mode-ime").performScrollTo().performClick().assertIsSelected()
+        compose.onNodeWithTag("tv-input-enable").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("tv-input-draft").performScrollTo().performClick().performTextInput("中文片名")
+        compose.onNodeWithTag("tv-input-send").performScrollTo().assertIsDisplayed().assertIsNotEnabled()
+        captureLibrary("tv-input-dialog", "tv-input-editing")
+        File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "tv-input-keyboard-screen.png").outputStream().use {
+            InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot().compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        val oldVolumeSetting = model.state.value.volumeKeysEnabled
+        try {
+            // Global state updates must preserve the editor window's resize policy.
+            compose.runOnUiThread { model.setVolumeKeysEnabled(!oldVolumeSetting) }
+            compose.onNodeWithTag("tv-input-dialog-close").assertIsDisplayed()
+        } finally { compose.runOnUiThread { model.setVolumeKeysEnabled(oldVolumeSetting) } }
         compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("tv-input-mode-ime").assertIsSelected()
         compose.onNodeWithTag("tv-input-draft").assertTextContains("中文片名")
         compose.onNodeWithTag("tv-input-dialog-close").performClick()
         compose.onNodeWithTag("remote-more").performClick()

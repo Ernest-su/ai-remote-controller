@@ -23,7 +23,7 @@ internal fun AndroidScreenMirror(
 ) {
     val quality by model.ascrcpyPreview.quality.collectAsState()
     var input by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
-    if (input) ManagementDialog("电视输入", "mirror-tv-input", { input = false }) { TvInputPanel(state, model) }
+    if (input) ManagementDialog("电视输入", "mirror-tv-input", { input = false }, grouped = true) { TvInputPanel(state, model) }
     val mirror by model.ascrcpyPreview.state.collectAsState()
     val surfaceEpoch by model.ascrcpyPreview.surfaceEpoch.collectAsState()
     val shot by model.screenshots.state.collectAsState()
