@@ -35,8 +35,11 @@ class LibraryLayoutUiTest {
                         when (screen) {
                             "apps" -> ApplicationLibraryPanel(apps, favorites, true, false, null, {}, {},
                                 onFavorite = { pkg -> favorites = if (pkg in favorites) favorites - pkg else favorites + pkg })
-                            "saved" -> RoutineLibraryContent(listOf(QuickRoutine("movie", "开始客厅电视观影", listOf(RoutineStep("app", "fixture.player"), RoutineStep("wait", "1500")))), apps, true, RoutineRunState(), {}, {}, {}, {}, {}, false, null, {}, {}, true)
+                            "saved" -> RoutineLibraryContent(listOf(QuickRoutine("movie", "开始客厅电视观影", listOf(RoutineStep("app", "fixture.player"), RoutineStep("wait", "1500")))), apps, true, RoutineRunState(), emptyMap(), {}, {}, {}, {}, {}, {}, true)
                             "routines" -> RoutineEditorContent("下班后开始观影", {}, listOf(RoutineStep("app", "fixture.player"), RoutineStep("wait", "1500"), RoutineStep("key", "play_pause")), apps, true, {}, {}, { _, _ -> }, {}, {}, {})
+                            "details" -> RoutineExecutionDetails(RoutineExecution(QuickRoutine("failed", "客厅电视的快捷操作", listOf(RoutineStep("key", "ok"))),
+                                targetName = "客厅电视", startedAt = 1, finishedAt = 2, status = RoutineStatus.FAILED,
+                                steps = listOf(RoutineStepExecution(RoutineStepStatus.FAILED, startedAt = 1, finishedAt = 2, error = "按键释放未确认，请核对电视画面。", output = "fixture-receipt"))), apps, false, {}, {})
                             else -> RoutineStepEditorContent(kind, { kind = it; value = "" }, value, { value = it }, apps, true, {}, true, {})
                         }
                     }
@@ -57,6 +60,7 @@ class LibraryLayoutUiTest {
             capture("routine-list", mode)
             compose.runOnIdle { screen = "routines" }
             compose.onNodeWithText("添加步骤").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+            compose.onNodeWithTag("routine-step-type-2", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
             capture("routine-editor", mode)
             compose.onNodeWithTag("routine-step-menu-0").performScrollTo().performClick()
             compose.onNodeWithText("编辑步骤").assertIsDisplayed()
@@ -69,6 +73,10 @@ class LibraryLayoutUiTest {
             compose.onNodeWithTag("routine-kind-wait").performScrollTo().performClick()
             compose.onNodeWithTag("routine-wait-seconds").assertTextContains("2")
             capture("routine-wait", mode)
+            compose.runOnIdle { screen = "details" }
+            compose.onNodeWithText("查看返回详情").performScrollTo().performClick()
+            compose.onNodeWithText("fixture-receipt").performScrollTo().assertIsDisplayed()
+            capture("routine-details", mode)
         }
     }
 

@@ -28,21 +28,19 @@ internal fun QuickRoutinesPanel(state: RemoteUiState, model: RemoteViewModel, on
     var originalKind by rememberSaveable { mutableStateOf("app") }
     var originalValue by rememberSaveable { mutableStateOf("") }
     var discardTo by remember { mutableStateOf<String?>(null) }
-    var pendingRun by remember { mutableStateOf<QuickRoutine?>(null) }
+    val executions by model.quickRoutines.history.collectAsState()
+    val lastRuns = executions.filter { it.deviceId == state.selected }.associateBy { it.routine.id }
+    var detailsId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingDelete by remember { mutableStateOf<QuickRoutine?>(null) }
-    var resultVisible by rememberSaveable { mutableStateOf(true) }
-    var runningName by rememberSaveable { mutableStateOf<String?>(null) }
     val device = state.selected
     var editingDevice by rememberSaveable { mutableStateOf(device) }
     LaunchedEffect(device) {
-        if (editingDevice != device) { route = "list"; editing = null; name = ""; steps = emptyList(); pendingRun = null; pendingDelete = null; discardTo = null; editingDevice = device }
+        if (editingDevice != device) { route = "list"; editing = null; name = ""; steps = emptyList(); detailsId = null; pendingDelete = null; discardTo = null; editingDevice = device }
     }
     LaunchedEffect(state.connected) {
-        pendingRun = null
         if (state.connected && state.apps.isEmpty() && !state.appsLoading && state.appsError == null) model.listApps()
     }
-    LaunchedEffect(run.busy, run.index, run.message, run.error) { if (run.busy) resultVisible = true }
-    val screen = if (route == "run" && pendingRun == null) "list" else route
+    val screen = if (route == "details" && lastRuns[detailsId] == null) "list" else route
     fun edit(routine: QuickRoutine? = null, copy: Boolean = false) {
         editing = routine?.id?.takeUnless { copy }; name = routine?.name?.let { if (copy) "$it 副本".take(40) else it }.orEmpty()
         steps = routine?.steps.orEmpty(); originalName = if (copy) "" else name; originalSteps = if (copy) emptyList() else steps; route = "edit"
@@ -56,7 +54,7 @@ internal fun QuickRoutinesPanel(state: RemoteUiState, model: RemoteViewModel, on
             "apps" -> route = "step"
             "step" -> if (kind != originalKind || value != originalValue) discardTo = "edit" else route = "edit"
             "edit" -> if (name != originalName || steps != originalSteps) discardTo = "list" else route = "list"
-            "run" -> { pendingRun = null; route = "list" }
+            "details" -> route = "list"
             else -> onClose()
         }
     }
@@ -69,7 +67,7 @@ internal fun QuickRoutinesPanel(state: RemoteUiState, model: RemoteViewModel, on
     val appIcon: @Composable (String) -> Unit = { packageName ->
         key(iconRevision) { ApplicationIcon(packageName, state.connected && "apps.icon" in state.tools, model.appIcons.cached(packageName), model.appIcons::load) }
     }
-    val title = when (screen) { "edit" -> if (editing == null) "新建快捷操作" else "编辑快捷操作"; "step" -> if (stepIndex < 0) "添加步骤" else "编辑第 ${stepIndex + 1} 步"; "apps" -> "选择应用"; "run" -> "运行确认"; else -> "快捷操作" }
+    val title = when (screen) { "edit" -> if (editing == null) "新建快捷操作" else "编辑快捷操作"; "step" -> if (stepIndex < 0) "添加步骤" else "编辑第 ${stepIndex + 1} 步"; "apps" -> "选择应用"; "details" -> "最后一次执行详情"; else -> "快捷操作" }
     LibraryDialog(title, "quick-routines-dialog", ::back,
         subtitle = state.history.find { it.id == device }?.visibleName ?: "请选择目标电视",
         actions = {
@@ -81,11 +79,6 @@ internal fun QuickRoutinesPanel(state: RemoteUiState, model: RemoteViewModel, on
                 model.saveRoutine(draft.copy(id = editing ?: java.util.UUID.randomUUID().toString())); route = "list"
             } })
             "step" -> ({ ActionButton(if (stepIndex < 0) "添加此步骤" else "保存步骤", canSaveStep) { steps = updatedSteps; route = "edit" } })
-            "run" -> ({ Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton({ pendingRun = null; route = "list" }, Modifier.weight(1f).heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("取消执行") }
-                Button({ pendingRun?.let { runningName = it.name; model.quickRoutines.start(it, state.connected) }; pendingRun = null; resultVisible = true; route = "list" },
-                    shape = MaterialTheme.shapes.small, enabled = state.connected && !run.busy, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("确认执行") }
-            } })
             else -> null
         }) {
         when (screen) {
@@ -97,11 +90,14 @@ internal fun QuickRoutinesPanel(state: RemoteUiState, model: RemoteViewModel, on
                 { route = "apps" }, canSaveStep, appIcon)
             "apps" -> ApplicationLibraryPanel(state.apps, state.shortcuts.favorites, state.connected, state.appsLoading, state.appsError,
                 model::listApps, { value = it.packageName; route = "step" }, appIcon, selected = value, selectLabel = "选择应用", selectionAvailable = true)
-            "run" -> pendingRun?.let { RoutineRunPreview(it, state.apps, state.history.find { item -> item.id == device }?.visibleName ?: "当前电视", appIcon) }
-            else -> RoutineLibraryContent(state.routines, state.apps, state.connected, run,
+            "details" -> lastRuns[detailsId]?.let { RoutineExecutionDetails(it, state.apps, run.routineId == detailsId && run.busy, model.quickRoutines::cancel, appIcon) }
+            else -> RoutineLibraryContent(state.routines, state.apps, state.connected, run, lastRuns,
                 { edit() }, { edit(it) }, { edit(it, copy = true) }, { pendingDelete = it },
-                { pendingRun = it; route = "run" }, resultVisible, runningName,
-                model.quickRoutines::cancel, { resultVisible = false }, device != null)
+                { routine ->
+                    if (run.busy && run.routineId == routine.id) {
+                        if (run.pauseRequested) model.quickRoutines.resume() else model.quickRoutines.pause()
+                    } else model.quickRoutines.start(routine, state.connected, device, state.history.find { it.id == device }?.visibleName)
+                }, { detailsId = it.id; route = "details" }, device != null)
         }
     }
     if (discardTo != null) AlertDialog(onDismissRequest = { discardTo = null }, title = { Text("放弃未保存的修改？") },

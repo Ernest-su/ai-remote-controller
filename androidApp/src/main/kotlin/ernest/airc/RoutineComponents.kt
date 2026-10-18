@@ -36,7 +36,10 @@ internal fun RoutineStepRow(step: RoutineStep, index: Int, apps: List<InstalledA
                     }
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(routineStepTitle(step, apps), style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text(routineStepKind(step), style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(painterResource(routineStepIcon(step.type)), null, Modifier.size(20.dp).testTag("routine-step-type-$index"), tint = RemoteColors.Secondary)
+                            Text(routineStepKind(step), style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
+                        }
                     }
                     if (step.type == "app" && onEdit == null) Box(Modifier.size(RemoteDimensions.ApplicationIcon), contentAlignment = Alignment.Center) { appIcon(step.value) }
                 }
@@ -54,29 +57,6 @@ internal fun RoutineStepRow(step: RoutineStep, index: Int, apps: List<InstalledA
                 }
             }
             HorizontalDivider(Modifier.padding(start = 60.dp), color = RemoteColors.Divider, thickness = 0.5.dp)
-        }
-    }
-}
-
-@Composable
-internal fun RoutineResultCard(run: RoutineRunState, name: String?, onStop: () -> Unit, onDismiss: () -> Unit) {
-    var details by remember { mutableStateOf(false) }
-    Surface(color = RemoteColors.Surface, shape = MaterialTheme.shapes.small) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(if (run.busy) "正在执行${name?.let { " · $it" }.orEmpty()}" else if (run.error != null) "执行遇到问题" else "执行结果", style = MaterialTheme.typography.titleMedium)
-                    Text("第 ${run.index} / ${run.total} 步", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
-                }
-                if (!run.busy) IconButton(onDismiss, Modifier.size(48.dp)) { Icon(painterResource(R.drawable.ic_close), "收起执行结果") }
-            }
-            if (run.busy) LinearProgressIndicator(progress = { ((run.index - 1).coerceAtLeast(0).toFloat() / run.total.coerceAtLeast(1)).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-            Text(if (run.error != null) "后续步骤已停止，可检查后重试。" else run.message.orEmpty(), style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
-            if (run.error != null) {
-                TextButton({ details = !details }) { Text(if (details) "收起错误详情" else "查看错误详情") }
-                if (details) Text(checkNotNull(run.error), style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Warning)
-            }
-            if (run.busy) OutlinedButton(onStop, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("停止后续步骤", color = RemoteColors.Warning) }
         }
     }
 }

@@ -80,6 +80,7 @@ class MobileConvenienceUiTest {
         val model = model()
         val device = "mobile-fixture-${UUID.randomUUID()}"
         val requests = CopyOnWriteArrayList<JsonObject>()
+        val failNextKey = java.util.concurrent.atomic.AtomicBoolean(false)
         val server = MockWebServer()
         server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
@@ -100,7 +101,11 @@ class MobileConvenienceUiTest {
                             }
                             else -> "fixture"
                         }
-                        socket.send(buildJsonObject { put("id", message.getValue("id")); put("protocol", 1); put("ok", true); put("result", result) }.toString())
+                        val failed = tool == "remote.key" && args["key"]?.jsonPrimitive?.content == "ok" && failNextKey.getAndSet(false)
+                        socket.send(buildJsonObject {
+                            put("id", message.getValue("id")); put("protocol", 1); put("ok", !failed)
+                            if (failed) put("error", "fixture key failed") else put("result", result)
+                        }.toString())
                     }
                 })
                 else -> MockResponse().setResponseCode(404)
@@ -163,9 +168,41 @@ class MobileConvenienceUiTest {
             compose.onNodeWithText("观影组合").assertExists()
             captureLibrary("quick-routines-dialog", "routines-page")
             compose.onNodeWithContentDescription("运行 观影组合").performClick()
-            captureLibrary("quick-routines-dialog", "routine-confirm-page")
-            compose.onNodeWithText("取消执行").performClick()
+            compose.onNodeWithTag("routine-library").assertExists()
+            compose.onNodeWithTag("routine-run-preview").assertDoesNotExist()
+            compose.onNodeWithContentDescription("暂停 观影组合").performClick()
+            compose.waitUntil(3000) { model.quickRoutines.state.value.paused }
             assertTrue(requests.none { it["key"]?.jsonPrimitive?.content == "ok" })
+            compose.activityRule.scenario.recreate()
+            compose.onNodeWithContentDescription("继续 观影组合").assertExists().performClick()
+            compose.waitUntil(5000) { !model.quickRoutines.state.value.busy }
+            assertEquals(1, requests.count { it["key"]?.jsonPrimitive?.content == "ok" })
+            compose.onNodeWithContentDescription("更多 观影组合").performClick()
+            compose.onNodeWithText("最后一次执行详情").performClick()
+            compose.onNodeWithTag("routine-execution-details").assertExists()
+            compose.onNodeWithText("执行完成").assertExists()
+            captureLibrary("quick-routines-dialog", "routine-details-page")
+            compose.activityRule.scenario.recreate()
+            compose.onNodeWithTag("routine-execution-details").assertExists()
+            compose.onNodeWithTag("quick-routines-dialog-close").performClick()
+            failNextKey.set(true)
+            compose.onNodeWithContentDescription("运行 观影组合").performClick()
+            compose.waitUntil(5000) { !model.quickRoutines.state.value.busy }
+            compose.onNodeWithContentDescription("重新执行 观影组合").assertExists()
+            assertEquals(2, requests.count { it["key"]?.jsonPrimitive?.content == "ok" })
+            captureLibrary("quick-routines-dialog", "routine-error-page")
+            compose.onNodeWithContentDescription("更多 观影组合").performClick()
+            compose.onNodeWithText("最后一次执行详情").performClick()
+            compose.onNodeWithText("执行失败").assertExists()
+            compose.onNodeWithText("fixture key failed").assertExists()
+            compose.onNodeWithTag("quick-routines-dialog-close").performClick()
+            compose.onNodeWithContentDescription("重新执行 观影组合").performClick()
+            compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+            compose.waitUntil(3000) { !model.quickRoutines.state.value.busy }
+            assertEquals(RoutineStatus.STOPPED, model.quickRoutines.history.value.single { it.deviceId == device }.status)
+            compose.activityRule.scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+            compose.onNodeWithContentDescription("运行 观影组合").assertExists()
+            assertEquals(2, requests.count { it["key"]?.jsonPrimitive?.content == "ok" })
             compose.onNodeWithContentDescription("更多 观影组合").performClick()
             compose.onNodeWithText("编辑组合").performClick()
             compose.onNodeWithTag("routine-name").performTextReplacement("未保存名称")

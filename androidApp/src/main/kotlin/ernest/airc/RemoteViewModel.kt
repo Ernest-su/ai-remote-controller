@@ -78,7 +78,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     val urlDownloads = UrlDownloadController(viewModelScope, runtime)
     val downloadDirectories = FileBrowserController(viewModelScope, runtime)
     val files = FileBrowserController(viewModelScope,runtime)
-    val quickRoutines = QuickRoutineController(viewModelScope, runtime)
+    val quickRoutines = QuickRoutineController(viewModelScope, runtime, readRoutineHistory(), ::writeRoutineHistory)
     val mediaControl = MediaControlController(viewModelScope, runtime)
     val virtualGamepad = VirtualGamepadController(viewModelScope, runtime)
     val remoteKeys = RemoteKeyController(viewModelScope, runtime, ::showMessage)
@@ -408,6 +408,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
             listOf("app-shortcuts", "quick-routines").forEach { file ->
                 getApplication<Application>().getSharedPreferences(file, android.content.Context.MODE_PRIVATE).edit().remove(id).apply()
             }
+            quickRoutines.forget(id)
             mutable.update { it.copy(history = history, shortcuts = if (it.selected == id) AppShortcuts() else it.shortcuts, routines = if (it.selected == id) emptyList() else it.routines) }
         }
     }
@@ -496,6 +497,14 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
             result
         }
     }
+    private fun readRoutineHistory(): List<RoutineExecution> {
+        val value = getApplication<Application>().getSharedPreferences("quick-routine-history", 0).getString("runs", null) ?: return emptyList()
+        return runCatching { Json.decodeFromString<List<RoutineExecution>>(value).filter { it.routine.valid() && it.steps.size == it.routine.steps.size }.take(100) }.getOrDefault(emptyList())
+    }
+    private fun writeRoutineHistory(runs: List<RoutineExecution>) {
+        getApplication<Application>().getSharedPreferences("quick-routine-history", 0).edit()
+            .putString("runs", Json.encodeToString(kotlinx.serialization.builtins.ListSerializer(RoutineExecution.serializer()), runs)).apply()
+    }
     private fun readRoutines(device: String?): List<QuickRoutine> {
         if (device == null) return emptyList()
         val value = getApplication<Application>().getSharedPreferences("quick-routines", android.content.Context.MODE_PRIVATE).getString(device, null) ?: return emptyList()
@@ -507,7 +516,11 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
         if (current.size >= 20 && current.none { it.id == routine.id }) return
         writeRoutines(current.filterNot { it.id == routine.id } + routine)
     }
-    fun removeRoutine(id: String) { if (!quickRoutines.state.value.busy) writeRoutines(readRoutines(state.value.selected).filterNot { it.id == id }) }
+    fun removeRoutine(id: String) {
+        if (quickRoutines.state.value.busy) return
+        writeRoutines(readRoutines(state.value.selected).filterNot { it.id == id })
+        state.value.selected?.let { quickRoutines.forget(it, id) }
+    }
     private fun writeRoutines(value: List<QuickRoutine>) {
         val device = state.value.selected ?: return
         getApplication<Application>().getSharedPreferences("quick-routines", android.content.Context.MODE_PRIVATE).edit()

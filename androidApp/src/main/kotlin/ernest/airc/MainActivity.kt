@@ -58,7 +58,7 @@ class MainActivity : ComponentActivity() {
         if (!hasFocus && ::model.isInitialized) model.releaseHardwareKeys()
     }
     override fun onPause() {
-        model.releaseHardwareKeys(); model.tvInput.cancel(); model.quickRoutines.cancel()
+        model.releaseHardwareKeys(); model.tvInput.cancel()
         super.onPause()
     }
     override fun onNewIntent(intent: android.content.Intent) {
@@ -67,5 +67,9 @@ class MainActivity : ComponentActivity() {
         model.receiveShare(intent)
     }
     override fun onStart() { super.onStart(); model.startDiscovery() }
-    override fun onStop() { model.stopDiscovery(); super.onStop() }
+    override fun onStop() {
+        if (!isChangingConfigurations) model.quickRoutines.cancel()
+        model.stopDiscovery()
+        super.onStop()
+    }
 }

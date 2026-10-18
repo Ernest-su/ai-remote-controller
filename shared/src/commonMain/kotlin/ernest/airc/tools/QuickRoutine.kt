@@ -21,7 +21,8 @@ data class QuickRoutine(val id: String, val name: String, val steps: List<Routin
         steps.size in 1..24 && steps.all { it.valid() } && steps.filter { it.type == "wait" }.sumOf { it.value.toLong() } <= 60000
 }
 
-data class RoutineRunState(val busy: Boolean = false, val index: Int = 0, val total: Int = 0, val message: String? = null, val error: String? = null)
+data class RoutineRunState(val busy: Boolean = false, val index: Int = 0, val total: Int = 0, val message: String? = null, val error: String? = null,
+    val routineId: String? = null, val paused: Boolean = false, val pauseRequested: Boolean = false)
 
 fun routineKeyLabel(key: String): String = when (key) {
     "up" -> "向上"; "down" -> "向下"; "left" -> "向左"; "right" -> "向右"; "ok" -> "确认"
@@ -48,4 +49,20 @@ fun moveRoutineStep(steps: List<RoutineStep>, index: Int, direction: Int): List<
     val next = index + direction
     if (index !in steps.indices || next !in steps.indices || direction !in listOf(-1, 1)) return steps
     return steps.toMutableList().apply { this[index] = steps[next]; this[next] = steps[index] }
+}
+
+@Serializable
+enum class RoutineStatus { RUNNING, PAUSED, SUCCEEDED, STOPPED, FAILED }
+@Serializable
+enum class RoutineStepStatus { PENDING, RUNNING, SUCCEEDED, FAILED, INTERRUPTED }
+@Serializable
+data class RoutineStepExecution(val status: RoutineStepStatus = RoutineStepStatus.PENDING, val startedAt: Long? = null,
+    val finishedAt: Long? = null, val output: String? = null, val error: String? = null)
+@Serializable
+data class RoutineExecution(val routine: QuickRoutine, val deviceId: String? = null, val targetName: String? = null,
+    val startedAt: Long, val finishedAt: Long? = null, val status: RoutineStatus = RoutineStatus.RUNNING,
+    val steps: List<RoutineStepExecution> = routine.steps.map { RoutineStepExecution() }, val error: String? = null) {
+    fun afterRestart(): RoutineExecution = if (status in listOf(RoutineStatus.RUNNING, RoutineStatus.PAUSED)) copy(
+        status = RoutineStatus.STOPPED, error = "应用已重启，执行未继续；请核对电视上已提交的动作。",
+        steps = steps.map { if (it.status == RoutineStepStatus.RUNNING) it.copy(status = RoutineStepStatus.INTERRUPTED) else it }) else this
 }

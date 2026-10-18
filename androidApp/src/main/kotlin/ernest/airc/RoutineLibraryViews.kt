@@ -11,19 +11,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 @Composable
-internal fun RoutineLibraryContent(routines: List<QuickRoutine>, apps: List<InstalledApp>, connected: Boolean, run: RoutineRunState,
+internal fun RoutineLibraryContent(routines: List<QuickRoutine>, apps: List<InstalledApp>, connected: Boolean, run: RoutineRunState, lastRuns: Map<String, RoutineExecution>,
     onCreate: () -> Unit, onEdit: (QuickRoutine) -> Unit, onCopy: (QuickRoutine) -> Unit, onDelete: (QuickRoutine) -> Unit,
-    onRun: (QuickRoutine) -> Unit, resultVisible: Boolean, runningName: String?, onStop: () -> Unit, onDismiss: () -> Unit, deviceSelected: Boolean) {
+    onRun: (QuickRoutine) -> Unit, onDetails: (QuickRoutine) -> Unit, deviceSelected: Boolean) {
     LazyColumn(Modifier.fillMaxSize().testTag("routine-library"), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (resultVisible && (run.busy || run.message != null || run.error != null)) item("result") { RoutineResultCard(run, runningName, onStop, onDismiss) }
         item("heading") {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("我的快捷操作", style = MaterialTheme.typography.titleMedium)
-                Text(if (routines.isEmpty()) "把常用的操作连成一步" else "${routines.size} 个组合 · 运行前可预览步骤", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
+                Text(if (routines.isEmpty()) "把常用的操作连成一步" else "${routines.size} 个组合 · 点右侧按钮执行", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
                 if (!connected) Text("设备离线，连接后可运行。", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
             }
         }
@@ -39,6 +40,12 @@ internal fun RoutineLibraryContent(routines: List<QuickRoutine>, apps: List<Inst
         }
         items(routines, key = { it.id }) { routine ->
             var menu by remember { mutableStateOf(false) }
+            val active = run.busy && run.routineId == routine.id
+            val record = lastRuns[routine.id]
+            val status = if (active) when { run.paused -> "已暂停 · 第 ${run.index} / ${run.total} 步"; run.pauseRequested -> "当前步骤结束后暂停"; else -> "执行中 · 第 ${run.index} / ${run.total} 步" }
+                else record?.let { routineStatusLabel(it.status) }
+            val action = if (active) { if (run.pauseRequested) "继续" else "暂停" } else if (record?.status == RoutineStatus.FAILED) "重新执行" else "运行"
+            val drawable = if (active && !run.pauseRequested) R.drawable.ic_pause else if (!active && record?.status == RoutineStatus.FAILED) R.drawable.ic_error else R.drawable.ic_play
             Surface(color = RemoteColors.Surface, shape = MaterialTheme.shapes.small) {
                 Row(Modifier.fillMaxWidth().heightIn(min = 88.dp).testTag("routine-row-${routine.id}"), verticalAlignment = Alignment.CenterVertically) {
                     Row(Modifier.weight(1f).clickable(enabled = !run.busy, role = Role.Button) { onEdit(routine) }.padding(start = 16.dp, top = 16.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -47,16 +54,20 @@ internal fun RoutineLibraryContent(routines: List<QuickRoutine>, apps: List<Inst
                         }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(routine.name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            if (status != null) Text(status, style = MaterialTheme.typography.bodySmall, color = if (record?.status == RoutineStatus.FAILED && !active) RemoteColors.Warning else RemoteColors.Secondary)
                             Text("${routine.steps.size} 个步骤 · ${routine.steps.take(2).joinToString(" · ") { routineStepTitle(it, apps) }}", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                     }
-                    IconButton({ onRun(routine) }, enabled = connected && !run.busy, modifier = Modifier.size(48.dp)) { Icon(painterResource(R.drawable.ic_play), "运行 ${routine.name}", tint = if (connected && !run.busy) RemoteColors.Action else RemoteColors.Disabled) }
+                    IconButton({ onRun(routine) }, enabled = active || (connected && !run.busy), modifier = Modifier.size(48.dp).testTag("routine-run-${routine.id}").semantics { stateDescription = status ?: "尚未执行" }) {
+                        Icon(painterResource(drawable), "$action ${routine.name}", tint = if (!active && (!connected || run.busy)) RemoteColors.Disabled else if (drawable == R.drawable.ic_error) RemoteColors.Warning else RemoteColors.Action)
+                    }
                     Box {
-                        IconButton({ menu = true }, enabled = !run.busy, modifier = Modifier.size(48.dp)) { Icon(painterResource(R.drawable.ic_more), "更多 ${routine.name}") }
+                        IconButton({ menu = true }, modifier = Modifier.size(48.dp)) { Icon(painterResource(R.drawable.ic_more), "更多 ${routine.name}") }
                         DropdownMenu(menu, { menu = false }) {
-                            DropdownMenuItem(text = { Text("编辑组合") }, onClick = { menu = false; onEdit(routine) })
-                            DropdownMenuItem(text = { Text("创建副本") }, enabled = routines.size < 20, onClick = { menu = false; onCopy(routine) })
-                            DropdownMenuItem(text = { Text("删除组合", color = RemoteColors.Warning) }, onClick = { menu = false; onDelete(routine) })
+                            DropdownMenuItem(text = { Text("最后一次执行详情") }, enabled = record != null, onClick = { menu = false; onDetails(routine) })
+                            DropdownMenuItem(text = { Text("编辑组合") }, enabled = !run.busy, onClick = { menu = false; onEdit(routine) })
+                            DropdownMenuItem(text = { Text("创建副本") }, enabled = !run.busy && routines.size < 20, onClick = { menu = false; onCopy(routine) })
+                            DropdownMenuItem(text = { Text("删除组合", color = RemoteColors.Warning) }, enabled = !run.busy, onClick = { menu = false; onDelete(routine) })
                         }
                     }
                 }
@@ -103,22 +114,5 @@ internal fun RoutineEditorContent(name: String, onName: (String) -> Unit, steps:
             }
             if (steps.size >= 24) Text("已达到 24 个步骤，请编辑或移除已有步骤。", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
         }
-    }
-}
-
-@Composable
-internal fun RoutineRunPreview(routine: QuickRoutine, apps: List<InstalledApp>, target: String, appIcon: @Composable (String) -> Unit) {
-    LazyColumn(Modifier.fillMaxSize().testTag("routine-run-preview"), contentPadding = PaddingValues(16.dp)) {
-        item("summary") {
-            Surface(color = RemoteColors.Surface, shape = MaterialTheme.shapes.small) {
-                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(routine.name, style = MaterialTheme.typography.titleMedium)
-                    InfoRow("目标电视", target)
-                    Text("确认后将依次提交以下 ${routine.steps.size} 个步骤。执行中可停止后续步骤，已提交动作不会撤销。", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-        }
-        itemsIndexed(routine.steps) { index, step -> RoutineStepRow(step, index, apps, appIcon = appIcon) }
     }
 }
