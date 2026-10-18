@@ -13,7 +13,6 @@ import kotlinx.coroutines.*
 @Composable
 internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
     val download by model.urlDownloads.state.collectAsState()
-    val downloadDirectory by model.downloadDirectories.state.collectAsState()
     val storage by model.storageAnalysis.state.collectAsState()
     val files by model.files.state.collectAsState()
     val installation by model.appInstallation.state.collectAsState()
@@ -96,20 +95,7 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
         previewContent=if("files.preview" in state.tools) ({entry -> AndroidFilePreview(entry,model.filePreviews,files.root,path(entry.name))}) else null,
         transfer={ section ->
             if(section == "url") {
-                UrlDownloadPanel(download, available && listOf("files.download_url", "task.progress", "task.cancel").all { it in state.tools },
-                    validDownloadUrl(download.url), model.urlDownloads::editUrl, model.urlDownloads::editName,
-                    { model.urlDownloads.start(available) }, model.urlDownloads::cancel,
-                    { model.urlDownloads.directory("downloads", "") }) { selected ->
-                    LaunchedEffect(available, downloadDirectory.root) {
-                        if(available && !downloadDirectory.loaded && !downloadDirectory.loading && downloadDirectory.error == null) model.downloadDirectories.refresh(true)
-                    }
-                    FileBrowserPanel(downloadDirectory, available, { model.downloadDirectories.refresh(available) },
-                        { model.downloadDirectories.parent(available) }, { model.downloadDirectories.more(available) },
-                        { model.downloadDirectories.enter(it, available) }, {},
-                        onRoot=model.downloadDirectories::selectRoot,
-                        onNavigate={ model.downloadDirectories.ancestor(it, available) },
-                        onSelectDirectory={ model.urlDownloads.directory(downloadDirectory.root, downloadDirectory.path); selected() })
-                }
+                DownloadPanel(state, model)
             }
             if (section == "storage") {
             if("storage.analyze" in state.tools) StorageAnalysisPanel(storage, available && "task.progress" in state.tools && "task.cancel" in state.tools,

@@ -54,13 +54,13 @@ class ProductInteractionUiTest {
             MediaControlPanel(MediaControlState(listOf(session), session.selection(), seekAvailable = true), true, {}, {}, {})
         } } }
         compose.onNodeWithTag("media-seek-position").performScrollTo().performTextInput("-1")
-        compose.onNodeWithText("请输入大于或等于 0 的整数毫秒值").assertExists()
-        compose.onNodeWithText("提交播放定位").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithTag("media-seek-position").performTextReplacement("20001")
+        compose.onNodeWithText("请输入有效的分:秒或时:分:秒").assertExists()
+        compose.onNodeWithText("跳转").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("media-seek-position").performTextReplacement("0:21")
         compose.onNodeWithText("目标位置不能超过播放器报告时长").assertExists()
-        compose.onNodeWithText("提交播放定位").performScrollTo().assertIsNotEnabled()
-        compose.onNodeWithTag("media-seek-position").performTextReplacement("20000")
-        compose.onNodeWithText("提交播放定位").performScrollTo().assertIsEnabled()
+        compose.onNodeWithText("跳转").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("media-seek-position").performTextReplacement("0:20")
+        compose.onNodeWithText("跳转").performScrollTo().assertIsEnabled()
     }
 
     @Test fun offlineSystemProposalRemainsReadableButCannotBeConfirmed() {

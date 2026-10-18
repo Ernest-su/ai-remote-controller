@@ -54,10 +54,10 @@ class DesktopUiTest {
         var requested: Long? = null
         val session = MediaSession("com.test.player", true, 2, 1000, 20000, seekSupported = true, sessionTag = "fixture")
         compose.setContent { RemoteTheme { MediaControlPanel(MediaControlState(listOf(session), session.selection(), seekAvailable = true), true, {}, {}, { requested = it }) } }
-        compose.onNodeWithText("1000 毫秒").assertExists()
-        compose.onNodeWithText("20000 毫秒").assertExists()
-        compose.onNodeWithTag("media-seek-position").performTextInput("7000")
-        compose.onNodeWithText("提交播放定位").performScrollTo().performClick(); assertEquals(7000L, requested)
+        compose.onNodeWithText("0:01").assertExists()
+        compose.onNodeWithText("0:20").assertExists()
+        compose.onNodeWithTag("media-seek-position").performTextInput("0:07")
+        compose.onNodeWithText("跳转").performScrollTo().performClick(); assertEquals(7000L, requested)
     }
 
     @Test fun cacheCleanupConfirmationIsDistinctFromUninstallAndCanBeRejected() {

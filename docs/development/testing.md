@@ -176,3 +176,9 @@ uv run --with websockets python runtime/remote_key_hold_target_test.py --serial 
 ```
 
 专项创建 UUID 服务目录，拒绝覆盖已有媒体 fixture；验证名称与图标的重复读取、跨服务重启复用、同版本重装/更新失效、损坏缓存重建、卸载清理及实时权限/启用状态。资源配置检查临时切换目标亮暗模式并恢复原设置，结束卸载自建 fixture、停止自建服务并清理转发和目录。控制端版本标识、未变化图标复用和晚到响应边界由 `InstalledAppsTest`、`AppIconControllerTest` 验证。
+
+手机快捷功能回归：先构建 App 与测试 APK，执行 `python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite mobile-convenience-ui`。覆盖独立电视输入的离线禁用与旋转草稿、系统分享不自动执行、内容 URI 元数据与拒绝文件 URI、收藏恢复及音量键页面范围。`QuickRoutineControllerTest` 覆盖组合顺序、失败/取消中断与重连隔离；`ClipboardPasteMessageTest` 覆盖 UTF-8 包格式与长度边界。
+
+中文粘贴专项使用 `ScrcpyTextInputTargetTest`，需显式传入 `textTargetHost` / `textTargetPort`，在自有目标预先安装原本不存在的 mediaFixture，并在测试后卸载。专项打开 TextActivity 的 paste 模式，核对中文、表情和 Shell 字符按字面写入，以及临时 server 文件被清理；不证明厂商播放器或密码输入框允许粘贴。
+
+文字接收 fixture 通过仅允许 shell DUMP 权限读取的 `content://ernest.airc.mediafixture.text/text` 返回合成测试文字，不依赖目标 `run-as` 能力，不暴露其他应用文件。

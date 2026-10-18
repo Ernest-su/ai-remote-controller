@@ -10,6 +10,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".TouchActivity" android:exported="true"/>
+        <provider android:name=".TextJournalProvider" android:authorities="ernest.airc.mediafixture.text" android:exported="true" android:readPermission="android.permission.DUMP" />
         <activity android:name=".TextActivity" android:exported="true"/>
         <activity android:name=".GamepadActivity" android:exported="true"/>
         <activity android:name=".NoiseActivity" android:exported="true"/>

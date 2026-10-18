@@ -53,7 +53,7 @@ internal fun ManagementIconButton(icon: ImageVector, label: String, enabled: Boo
 }
 
 @Composable
-internal fun ManagementDialog(title: String, tag: String, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+fun ManagementDialog(title: String, tag: String, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.widthIn(max = RemoteDimensions.ManagementWidth).fillMaxWidth().padding(16.dp)
             .heightIn(max = RemoteDimensions.ManagementDialogHeight).testTag(tag), shape = MaterialTheme.shapes.small, color = RemoteColors.Surface) {

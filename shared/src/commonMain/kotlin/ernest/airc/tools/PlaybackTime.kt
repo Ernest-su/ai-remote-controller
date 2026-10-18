@@ -15,6 +15,9 @@ fun parsePlaybackTime(value: String): Long? {
     return numbers.fold(0L) { total, number -> total * 60 + number } * 1000
 }
 
-fun relativePlaybackPosition(position: Long, seconds: Long, duration: Long?): Long =
-    (position.coerceAtLeast(0) + seconds.coerceIn(-30, 30) * 1000)
-        .coerceIn(0, duration?.takeIf { it > 0 } ?: Long.MAX_VALUE)
+fun relativePlaybackPosition(position: Long, seconds: Long, duration: Long?): Long {
+    val delta = seconds.coerceIn(-30, 30) * 1000
+    val start = position.coerceAtLeast(0)
+    val next = if (delta > 0 && start > Long.MAX_VALUE - delta) Long.MAX_VALUE else start + delta
+    return next.coerceIn(0, duration?.takeIf { it > 0 } ?: Long.MAX_VALUE)
+}

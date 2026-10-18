@@ -43,7 +43,11 @@ data class RemoteUiState(
     val qr: PairingQr? = null,
     val preferRoot: Boolean = false,
     val keyHapticsEnabled: Boolean = true,
+    val volumeKeysEnabled: Boolean = false,
+    val keepAwake: Boolean = false,
     val runtimeUid: Int? = null,
+    val routines: List<QuickRoutine> = emptyList(),
+    val shortcuts: AppShortcuts = AppShortcuts(),
     val apps: List<InstalledApp> = emptyList(),
     val appsLoading: Boolean = false,
     val appsError: String? = null,
@@ -57,6 +61,12 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     private val connector = AdbConnector(application)
     private val installer = RuntimeInstaller(application)
     private val runtime = RuntimeConnection { application.resources.configuration.locales[0].toLanguageTag() }
+    val tvInput = TvInputController(viewModelScope, getApplication(), runtime) {
+        val record = state.value.history.find { it.id == state.value.selected } ?: error("请先选择电视")
+        val host = record.host ?: error("没有保存电视地址")
+        val port = record.adbPort ?: error("请先在设备页通过 ADB 连接电视")
+        record.wirelessGuid?.let { connector.wireless(it, host, port) } ?: connector.tcp(host, port)
+    }
     val screenshots = ScreenshotController(viewModelScope, runtime::screenshot)
     val ascrcpyPreview = AscrcpyPreviewController(getApplication(),viewModelScope) {
         val record=state.value.history.find{it.id==state.value.selected} ?: error("请先选择目标设备")
@@ -68,6 +78,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     val urlDownloads = UrlDownloadController(viewModelScope, runtime)
     val downloadDirectories = FileBrowserController(viewModelScope, runtime)
     val files = FileBrowserController(viewModelScope,runtime)
+    val quickRoutines = QuickRoutineController(viewModelScope, runtime)
     val mediaControl = MediaControlController(viewModelScope, runtime)
     val virtualGamepad = VirtualGamepadController(viewModelScope, runtime)
     val remoteKeys = RemoteKeyController(viewModelScope, runtime, ::showMessage)
@@ -85,9 +96,14 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     val appCache = AppCacheController(viewModelScope,runtime)
     val diagnostics = NetworkDiagnostics(viewModelScope)
     internal val profiles = ModelProfileController(EncryptedModelProfileStore(application), ModelCatalogClient(), viewModelScope)
+    private val adbSessionMutable = MutableStateFlow<AdbSession?>(null)
+    private val adbStatusMutable = MutableStateFlow("尚无授权会话")
+    val adbStatus = adbStatusMutable.asStateFlow()
     private var adb: AdbSession? = null
+        set(value) { field = value; adbSessionMutable.value = value }
     private var automaticReconnectEnabled = true
     private var connectionJob: Job? = null
+    private var connectionGeneration = 0L
     private val automaticConnection = AutomaticConnection(viewModelScope) { device ->
         if (!state.value.busy && !state.value.connected) {
             reconnectDevice(device, automatic = true)
@@ -105,7 +121,9 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     private val feedbackGeneration = AtomicLong()
     private val releasePreferences = application.getSharedPreferences("runtime-release", android.content.Context.MODE_PRIVATE)
     private val mutable = MutableStateFlow(RemoteUiState(history = store.read(), preferRoot = releasePreferences.getBoolean("prefer-root", false),
-        keyHapticsEnabled = application.getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).getBoolean("key-haptics", true)))
+        keyHapticsEnabled = application.getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).getBoolean("key-haptics", true),
+        volumeKeysEnabled = application.getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).getBoolean("volume-keys", false),
+        keepAwake = application.getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).getBoolean("keep-awake", false)))
     val state = mutable.asStateFlow()
     private val discovery = ServiceDiscovery(application, RUNTIME_SERVICE_TYPE,
         onFound = { service ->
@@ -117,12 +135,20 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
         onError = { error -> mutable.update { it.copy(status = "局域网发现：$error") } },
     )
     init {
+        viewModelScope.launch {
+            adbSessionMutable.collectLatest { session ->
+                if (session == null) adbStatusMutable.value = "尚无授权会话"
+                else session.client.state.collect { connection ->
+                    adbStatusMutable.value = if (connection is ernest.ascrcpy.adb.AdbConnectionState.Connected) "已连接" else "未连接，请恢复 ADB"
+                }
+            }
+        }
         discovery.start()
         viewModelScope.launch {
             runtime.connected.collect { connected ->
                 val lostConnection = state.value.connected && !connected
                 if (!connected) { deviceInfoGeneration++; deviceInfoJob?.cancel(); appsGeneration++; appsJob?.cancel(); gestureGeneration++ }
-                mutable.update { if (connected) it.copy(connected = true)
+                mutable.update { if (connected) it.copy(connected = true, shortcuts = readShortcuts(it.selected), routines = readRoutines(it.selected))
                     else it.copy(connected = false, tools = emptyList(), touchBusy = false, deviceInfo = null, deviceInfoLoading = false, deviceInfoError = null, apps = emptyList(), appsLoading = false, appsError = null) }
                 if (lostConnection && automaticReconnectEnabled) {
                     state.value.history.find { it.id == state.value.selected }?.let(automaticConnection::start)
@@ -137,7 +163,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     private val mediaMonitor = viewModelScope.launch {
         runtime.session.collectLatest { session ->
             if (session == null) {
-                appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll()
+                quickRoutines.cancel(); tvInput.cancel(); appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll()
                 mutable.update { it.copy(mediaStatus = "未连接设备") }
             } else while (true) {
                 if (runtime.session.value != session) return@collectLatest
@@ -171,6 +197,32 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
         getApplication<Application>().getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE)
             .edit().putBoolean("key-haptics", enabled).apply()
         mutable.update { it.copy(keyHapticsEnabled = enabled) }
+    }
+    fun setVolumeKeysEnabled(value: Boolean) {
+        getApplication<Application>().getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).edit().putBoolean("volume-keys", value).apply()
+        if (!value) releaseHardwareKeys()
+        mutable.update { it.copy(volumeKeysEnabled = value) }
+    }
+    fun setKeepAwake(value: Boolean) {
+        getApplication<Application>().getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).edit().putBoolean("keep-awake", value).apply()
+        mutable.update { it.copy(keepAwake = value) }
+    }
+    private var hardwareRemoteActive = false
+    private val hardwarePresses = mutableMapOf<Int, String>()
+    fun hardwareRemoteActive(value: Boolean) { hardwareRemoteActive = value; if (!value) releaseHardwareKeys() }
+    fun releaseHardwareKeys() { hardwarePresses.values.forEach { remoteKeys.up(it, true) }; hardwarePresses.clear() }
+    fun hardwareVolume(event: android.view.KeyEvent): Boolean {
+        if (event.keyCode !in listOf(android.view.KeyEvent.KEYCODE_VOLUME_UP, android.view.KeyEvent.KEYCODE_VOLUME_DOWN)) return false
+        // Consume the matching release even if the setting or connection changed mid-press.
+        if (event.action == android.view.KeyEvent.ACTION_UP) {
+            hardwarePresses.remove(event.keyCode)?.let { remoteKeys.up(it, event.isCanceled); return true }
+            return hardwareRemoteActive && state.value.volumeKeysEnabled && state.value.connected
+        }
+        if (!hardwareRemoteActive || !state.value.volumeKeysEnabled || !state.value.connected) return false
+        if (event.action == android.view.KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            remoteKeys.down(if (event.keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP) "volume_up" else "volume_down")?.let { hardwarePresses[event.keyCode] = it }
+        }
+        return true
     }
     fun showMessage(message: String) {
         mutable.update { it.copy(output = message) }
@@ -207,6 +259,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     private fun connection(disconnectRuntime: Boolean = true, automatic: Boolean = false, action: suspend () -> Unit) {
         if (state.value.busy) return
         if (!automatic && disconnectRuntime) { automaticReconnectEnabled = false; automaticConnection.stop() }
+        val connectionToken = ++connectionGeneration
         connectionJob = viewModelScope.launch {
             mutable.update { it.copy(busy = true, status = "正在连接…") }
             try {
@@ -217,13 +270,28 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 action()
             }
-            catch (e: CancellationException) { mutable.update { it.copy(status = "已取消") }; throw e }
+            catch (e: CancellationException) { if (connectionToken == connectionGeneration) mutable.update { it.copy(status = "已取消") }; throw e }
             catch (e: Exception) {
+                if (connectionToken != connectionGeneration) return@launch
                 val message = e.message ?: "连接失败"
                 mutable.update { it.copy(status = message) }
                 feedback(FeedbackPhase.ERROR, message)
             }
-            finally { mutable.update { it.copy(busy = false, qr = null) } }
+            finally { if (connectionToken == connectionGeneration) mutable.update { it.copy(busy = false, qr = null) } }
+        }
+    }
+    fun reconnectCurrentDevice() {
+        state.value.history.find { it.id == state.value.selected }?.let { reconnectDevice(it, automatic = false) }
+    }
+    fun reconnectAdbOnly() {
+        val record = state.value.history.find { it.id == state.value.selected } ?: return
+        val host = record.host ?: return
+        val port = record.adbPort ?: return
+        connection(disconnectRuntime = false) {
+            val session = record.wirelessGuid?.let { connector.wireless(it, host, port) } ?: connector.tcp(host, port)
+            if (state.value.selected != record.id) { session.close(); error("目标已改变，请重新操作") }
+            adb?.close(); adb = session
+            mutable.update { it.copy(status = "ADB 已恢复，遥控服务保持当前连接") }
         }
     }
     fun diagnose(host: String, port: Int) {
@@ -279,7 +347,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private suspend fun attachRuntime(host: String, port: Int, method: ConnectionMethod?, adbPort: Int?, guid: String?, model: String?, previousId: String? = null, expectedRelease: RuntimeRelease? = null) {
-        appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll()
+        quickRoutines.cancel(); tvInput.cancel(); appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll()
         val status = runtime.connect(host, port, expectedRelease ?: withContext(Dispatchers.IO) { installer.bundledRelease() })
         val previous = state.value.history.find { it.id == status.deviceId }
         val record = RememberedDevice(status.deviceId, model?.ifBlank { null } ?: previous?.name ?: status.name ?: "AI 设备",
@@ -288,7 +356,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
         val history = withContext(Dispatchers.IO) { store.remember(record, previousId) }
         releasePreferences.edit().putString("last-connected-device", record.id).apply()
         automaticReconnectEnabled = true
-        mutable.update { it.copy(status = "已连接 ${history.first { it.id == record.id }.visibleName}", selected = record.id, version = status.version, tools = status.tools, runtimeUid = status.uid, modelConfigured = status.modelConfigured, history = history) }
+        mutable.update { it.copy(status = "已连接 ${history.first { it.id == record.id }.visibleName}", selected = record.id, version = status.version, tools = status.tools, runtimeUid = status.uid, modelConfigured = status.modelConfigured, history = history, shortcuts = readShortcuts(record.id), routines = readRoutines(record.id)) }
     }
 
     fun discovered(service: DiscoveredService, adbPort: Int? = null) = connection {
@@ -334,7 +402,15 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
         } catch (e: Exception) { mutable.update { it.copy(status = e.message ?: "无法保存设备显示名") } }
     } }
 
-    fun forget(id: String) { viewModelScope.launch(Dispatchers.IO) { val history = store.remove(id); mutable.update { it.copy(history = history) } } }
+    fun forget(id: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val history = store.remove(id)
+            listOf("app-shortcuts", "quick-routines").forEach { file ->
+                getApplication<Application>().getSharedPreferences(file, android.content.Context.MODE_PRIVATE).edit().remove(id).apply()
+            }
+            mutable.update { it.copy(history = history, shortcuts = if (it.selected == id) AppShortcuts() else it.shortcuts, routines = if (it.selected == id) emptyList() else it.routines) }
+        }
+    }
     private fun execute(feedbackToken: Long? = null, action: suspend () -> String) {
         val session = runtime.session.value
         viewModelScope.launch {
@@ -401,7 +477,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
             try {
                 val apps = decodeInstalledApps(send("apps.list", buildJsonObject {}))
                 if (generation == appsGeneration && state.value.connected && state.value.selected == deviceId) appIcons.updateApps(apps)
-                mutable.update { if (generation == appsGeneration && it.connected && it.selected == deviceId) it.copy(apps = apps) else it }
+                mutable.update { if (generation == appsGeneration && it.connected && it.selected == deviceId) it.copy(apps = apps, shortcuts = readShortcuts(deviceId)) else it }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
                 mutable.update { if (generation == appsGeneration) it.copy(appsError = e.message ?: "无法查询应用列表") else it }
@@ -413,7 +489,54 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     fun openApp(packageName: String) {
         if (!state.value.connected) return
         val send = runCatching { runtime.toolWriter() }.getOrNull() ?: return
-        execute { send("apps.open", buildJsonObject { put("package", packageName.trim()) }) }
+        val device = state.value.selected
+        execute {
+            val result = send("apps.open", buildJsonObject { put("package", packageName.trim()) })
+            if (state.value.selected == device) updateShortcuts { it.launched(packageName.trim()) }
+            result
+        }
+    }
+    private fun readRoutines(device: String?): List<QuickRoutine> {
+        if (device == null) return emptyList()
+        val value = getApplication<Application>().getSharedPreferences("quick-routines", android.content.Context.MODE_PRIVATE).getString(device, null) ?: return emptyList()
+        return runCatching { Json.decodeFromString<List<QuickRoutine>>(value).filter { it.valid() }.distinctBy { it.id }.take(20) }.getOrDefault(emptyList())
+    }
+    fun saveRoutine(routine: QuickRoutine) {
+        if (!routine.valid() || quickRoutines.state.value.busy) return
+        val current = readRoutines(state.value.selected)
+        if (current.size >= 20 && current.none { it.id == routine.id }) return
+        writeRoutines(current.filterNot { it.id == routine.id } + routine)
+    }
+    fun removeRoutine(id: String) { if (!quickRoutines.state.value.busy) writeRoutines(readRoutines(state.value.selected).filterNot { it.id == id }) }
+    private fun writeRoutines(value: List<QuickRoutine>) {
+        val device = state.value.selected ?: return
+        getApplication<Application>().getSharedPreferences("quick-routines", android.content.Context.MODE_PRIVATE).edit()
+            .putString(device, Json.encodeToString(kotlinx.serialization.builtins.ListSerializer(QuickRoutine.serializer()), value)).apply()
+        mutable.update { it.copy(routines = value) }
+    }
+    private fun readShortcuts(device: String?): AppShortcuts {
+        if (device == null) return AppShortcuts()
+        val value = getApplication<Application>().getSharedPreferences("app-shortcuts", android.content.Context.MODE_PRIVATE).getString(device, null) ?: return AppShortcuts()
+        return runCatching { Json.decodeFromString<AppShortcuts>(value) }.getOrDefault(AppShortcuts())
+    }
+    fun updateShortcuts(change: (AppShortcuts) -> AppShortcuts) {
+        val device = state.value.selected ?: return
+        val updated = change(readShortcuts(device))
+        getApplication<Application>().getSharedPreferences("app-shortcuts", android.content.Context.MODE_PRIVATE).edit()
+            .putString(device, Json.encodeToString(AppShortcuts.serializer(), updated)).apply()
+        mutable.update { it.copy(shortcuts = updated) }
+    }
+
+    private val shareMutable = MutableStateFlow<IncomingShare?>(null)
+    val incomingShare = shareMutable.asStateFlow()
+    private var shareId = 0L
+    fun receiveShare(intent: android.content.Intent) {
+        runCatching { incomingShare(intent, ++shareId) }.getOrElse { IncomingShare(shareId, error = "无法读取分享内容，请重新分享。") }?.let { shareMutable.value = it }
+    }
+    fun discardShare() { shareMutable.value = null }
+    suspend fun prepareSharedUpload(uri: android.net.Uri) {
+        check(!transfers.state.value.running) { "请等待当前传输完成。" }
+        transfers.select(sharedUploadSource(getApplication(), uri))
     }
     private var textSubmissionGeneration = 0L
     fun text(text: String): Boolean {
@@ -497,12 +620,11 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     fun disconnect() {
         automaticReconnectEnabled = false
         automaticConnection.stop()
-        connectionJob?.cancel()
-        ascrcpyPreview.stop()
-        viewModelScope.launch {
-            runtime.disconnect(); adb?.close(); adb = null
-            mutable.update { it.copy(status = "已断开", runtimeUid = null) }
-        }
+        connectionGeneration++
+        connectionJob?.cancel(); connectionJob = null
+        ascrcpyPreview.stop(); tvInput.cancel(); quickRoutines.cancel(); releaseHardwareKeys()
+        runtime.disconnect(); adb?.close(); adb = null
+        mutable.update { it.copy(status = "已断开", runtimeUid = null, busy = false, qr = null) }
     }
 
     override fun onCleared() {

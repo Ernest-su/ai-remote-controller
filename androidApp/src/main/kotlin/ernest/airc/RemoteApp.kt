@@ -36,6 +36,16 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
     val state by model.state.collectAsState()
     val gamepad by model.virtualGamepad.state.collectAsState()
     val gamepadEnabled = gamepadAvailable(state.connected, state.tools)
+    val shared by model.incomingShare.collectAsState()
+    var shareOpen by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(shared?.id) { if (shared != null) shareOpen = true }
+    var sharedDownload by rememberSaveable { mutableStateOf(false) }
+    var routinesOpen by rememberSaveable { mutableStateOf(false) }
+    if (routinesOpen) ManagementDialog("快捷操作组合", "quick-routines-dialog", { routinesOpen = false }) { QuickRoutinesPanel(state, model) }
+    var tvInput by rememberSaveable { mutableStateOf(false) }
+    if (tvInput) ManagementDialog("电视输入", "tv-input-dialog", { tvInput = false }) { TvInputPanel(state, model) }
+    var quickApps by rememberSaveable { mutableStateOf(false) }
+    if (quickApps) ManagementDialog("常用应用", "quick-apps-dialog", { quickApps = false }) { AppShortcutsPanel(state, model) }
     var appDetailsPackage by rememberSaveable { mutableStateOf("") }
     var pageName by rememberSaveable { mutableStateOf(RemotePage.REMOTE.name) }
     var deviceOriginName by rememberSaveable { mutableStateOf(RemotePage.REMOTE.name) }
@@ -72,13 +82,37 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
         if (page == RemotePage.SCREENSHOT) { pages.removeState(RemotePage.SCREENSHOT.name); mirrorFullscreen = false }
         if (target == RemotePage.DEVICES) deviceOriginName = page.name
         if (remoteTypes.any { it.page == target }) selectedTypeName = target.name
+        model.hardwareRemoteActive(remoteTypes.any { it.page == target } || target == RemotePage.SCREENSHOT)
         pageName = target.name
     }
+    if (shareOpen) shared?.let { share ->
+        ManagementDialog("分享至电视", "incoming-share-dialog", { shareOpen = false }) {
+            SharePanel(share, state, model,
+                { shareOpen = false; navigate(RemotePage.DEVICES) },
+                { shareOpen = false; sharedDownload = true },
+                { shareOpen = false; tvInput = true })
+            TextButton({ model.discardShare(); shareOpen = false }) { Text("移除分享内容") }
+        }
+    }
+    if (sharedDownload) ManagementDialog("下载到电视", "shared-download-dialog", { sharedDownload = false }) { DownloadPanel(state, model) }
     fun back() { navigate(page.androidBackDestination(deviceOrigin)) }
     BackHandler(enabled = page != RemotePage.REMOTE) { back() }
 
     val context = androidx.compose.ui.platform.LocalContext.current
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    val remoteActive = isRemoteType || page == RemotePage.SCREENSHOT
+    DisposableEffect(remoteActive, model) {
+        model.hardwareRemoteActive(remoteActive)
+        onDispose { model.hardwareRemoteActive(false) }
+    }
+    val view = androidx.compose.ui.platform.LocalView.current
+    DisposableEffect(view, lifecycle, remoteActive, state.keepAwake, state.connected) {
+        val old = view.keepScreenOn
+        fun update() { view.keepScreenOn = old || (remoteActive && state.keepAwake && state.connected && lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) }
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, _ -> update() }
+        lifecycle.addObserver(observer); update()
+        onDispose { lifecycle.removeObserver(observer); view.keepScreenOn = old }
+    }
     val hapticScope = rememberCoroutineScope()
     val haptics = remember(context, hapticScope) { AndroidRemoteHaptics(context, hapticScope) }
     DisposableEffect(haptics, lifecycle, state.keyHapticsEnabled, page) {
@@ -109,6 +143,9 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                         GamepadTypeSelector(gamepad, model.virtualGamepad::selectType)
                     }
                 }
+                if (shared != null) IconButton({ shareOpen = true }, Modifier.size(48.dp)) {
+                    Icon(painterResource(R.drawable.ic_files), "待处理的分享", Modifier.size(24.dp))
+                }
                 if (isRemoteType) IconButton({ navigate(RemotePage.REMOTE_TYPES) }, Modifier.size(48.dp).testTag("open-remote-types")) {
                     Icon(painterResource(R.drawable.ic_remote_types), "切换遥控器类型", Modifier.size(24.dp))
                 }
@@ -128,8 +165,8 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                 pages.SaveableStateProvider(page.name) {
                     when (page) {
                         RemotePage.REMOTE_TYPES -> RemoteTypePicker(RemotePage.valueOf(selectedTypeName), ::navigate)
-                        RemotePage.REMOTE -> RemoteControls(state, model) { navigate(RemotePage.RESULTS) }
-                        RemotePage.DEVICES -> Devices(state, model)
+                        RemotePage.REMOTE -> RemoteControls(state, model, onQuickApps = { quickApps = true }, onTvInput = { tvInput = true }, onRoutines = { routinesOpen = true }) { navigate(RemotePage.RESULTS) }
+                        RemotePage.DEVICES -> Devices(state, model) { navigate(RemotePage.SCREENSHOT) }
                         RemotePage.MENU -> FeatureMenu(::navigate)
                         RemotePage.APPS -> Applications(state, model) { name -> appDetailsPackage = name; navigate(RemotePage.APP_DETAILS) }
                         RemotePage.APP_DETAILS -> ApplicationDetails(appDetailsPackage, state, model) { navigate(RemotePage.APPS) }
@@ -141,6 +178,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                         RemotePage.RESULTS -> PageContent(Modifier.testTag("results-page")) { ResultPanel(state.output) }
                         RemotePage.HELP -> HelpScreen()
                         RemotePage.SETTINGS -> AppearanceSettings(themeMode, onThemeChange) {
+                            RemoteComfortSettings(state, model)
                             Panel {
                                 Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("remote-key-haptics")
                                     .toggleable(value = state.keyHapticsEnabled, role = Role.Switch, onValueChange = model::setKeyHapticsEnabled)
@@ -201,8 +239,9 @@ private fun FeatureMenu(navigate: (RemotePage) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showResults: () -> Unit) {
+internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, onQuickApps: (() -> Unit)? = null, onTvInput: (() -> Unit)? = null, onRoutines: (() -> Unit)? = null, showResults: () -> Unit) {
     var draft by rememberSaveable { mutableStateOf("") }
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
@@ -256,6 +295,11 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
                                     RemoteIconButton({ model.key("mute") }, enabled = state.connected, debugName = "mute") { Icon(painterResource(R.drawable.ic_mute), "静音") }
                                     RemoteIconButton({ model.key("volume_up") }, enabled = state.connected, debugName = "volume_up") { Icon(painterResource(R.drawable.ic_volume_up), "音量 +") }
                                 }
+                            }
+                            FlowRow {
+                                onQuickApps?.let { open -> TextButton(open, Modifier.heightIn(min = 48.dp)) { Text("常用应用") } }
+                                onTvInput?.let { open -> TextButton(open, Modifier.heightIn(min = 48.dp)) { Text("电视输入") } }
+                                onRoutines?.let { open -> TextButton(open, Modifier.heightIn(min = 48.dp)) { Text("快捷操作") } }
                             }
                             Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {

@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun Devices(state: RemoteUiState, model: RemoteViewModel) {
+internal fun Devices(state: RemoteUiState, model: RemoteViewModel, onPreview: () -> Unit = {}) {
     var connectionExpanded by rememberSaveable { mutableStateOf(false) }
     var method by rememberSaveable { mutableStateOf(ConnectionMethod.TCP) }
     var host by rememberSaveable { mutableStateOf("") }
@@ -50,6 +50,7 @@ internal fun Devices(state: RemoteUiState, model: RemoteViewModel) {
         onDispose { lifecycle.removeObserver(observer); model.cancelAdbScan() }
     }
     PageContent(Modifier.testTag("devices-page")) {
+        ConnectionChannelsPanel(state, model, onPreview)
         Panel {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Icon(painterResource(R.drawable.ic_device_tv), null, Modifier.size(RemoteDimensions.DeviceIcon), tint = RemoteColors.Secondary)

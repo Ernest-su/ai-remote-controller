@@ -58,7 +58,7 @@ internal fun BoxScope.MirrorFloatingRemote(state: RemoteUiState, model: RemoteVi
                     }
                     MirrorToolbarIcon(R.drawable.ic_close,"收起悬浮遥控","mirror-close-remote",onClick=onClose)
                 }
-                ScaledMirrorRemote(Modifier.fillMaxWidth().height(controlsHeight)) { RemoteControls(state,model,onResults) }
+                ScaledMirrorRemote(Modifier.fillMaxWidth().height(controlsHeight)) { RemoteControls(state,model,showResults=onResults) }
             }
         }
     }

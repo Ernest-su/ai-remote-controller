@@ -24,7 +24,7 @@ fun ApplicationsPanel(apps: List<InstalledApp>, connected: Boolean, loading: Boo
     onRefresh: () -> Unit, onOpen: (String) -> Unit, onInspect: ((String) -> Unit)? = null,
     onUninstall: ((String) -> Unit)? = null, onClearCache: ((String) -> Unit)? = null,
     management: @Composable ColumnScope.() -> Unit = {}, icon: @Composable (String) -> Unit = {},
-    actionsBusy: Boolean = false, operationMessage: String? = null, onDetails: ((String) -> Unit)? = null) {
+    actionsBusy: Boolean = false, operationMessage: String? = null, onDetails: ((String) -> Unit)? = null, quickActions: @Composable () -> Unit = {}) {
     var packageName by rememberSaveable { mutableStateOf("") }
     var query by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf("all") }
@@ -62,6 +62,7 @@ fun ApplicationsPanel(apps: List<InstalledApp>, connected: Boolean, loading: Boo
         }
     }
     LazyColumn(Modifier.fillMaxSize().testTag("apps-page"), state = list, contentPadding = PaddingValues(16.dp)) {
+        item(key = "quick-actions") { quickActions() }
         item(key = "tools") {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

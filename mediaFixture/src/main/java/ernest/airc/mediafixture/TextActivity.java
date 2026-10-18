@@ -14,7 +14,7 @@ public final class TextActivity extends Activity {
         super.onCreate(state);
         EditText field = new EditText(this);
         field.setSingleLine(true);
-        field.setRawInputType(android.text.InputType.TYPE_NULL);
+        field.setRawInputType(getIntent().getBooleanExtra("paste", false) ? android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS : android.text.InputType.TYPE_NULL);
         field.setShowSoftInputOnFocus(false);
         field.setTextSize(24);
         field.addTextChangedListener(new TextWatcher() {

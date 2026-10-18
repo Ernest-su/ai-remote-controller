@@ -28,7 +28,7 @@ class RemoteTextTargetTest {
             assertFalse(result["contentVerified"]!!.jsonPrimitive.boolean)
             var actual=""
             withTimeoutOrNull(10000) {
-                do {actual=adb.command("-s",serial,"shell","run-as $pkg cat files/remote-text.txt");if(actual!=text)delay(100)}while(actual!=text)
+                do {actual=adb.command("-s",serial,"shell","content read --uri content://ernest.airc.mediafixture.text/text");if(actual!=text)delay(100)}while(actual!=text)
             }
             assertEquals(text,actual)
             val hierarchy=Json.parseToJsonElement(runtime.request("tool","device.ui_hierarchy")).jsonObject
@@ -38,7 +38,7 @@ class RemoteTextTargetTest {
             assertTrue(xml.contains(text));assertTrue(xml.contains("android.widget.EditText"))
             assertFails { runtime.request("tool","device.ui_hierarchy",buildJsonObject{put("path","/sdcard/arbitrary.xml")}) }
             assertFails { runtime.request("tool","remote.text",buildJsonObject{put("text","中文")}) }
-            assertEquals(text,adb.command("-s",serial,"shell","run-as $pkg cat files/remote-text.txt"))
+            assertEquals(text,adb.command("-s",serial,"shell","content read --uri content://ernest.airc.mediafixture.text/text"))
         }finally {
             runtime.close()
             try {if(installed)check(adb.command("-s",serial,"uninstall",pkg).contains("Success"))}

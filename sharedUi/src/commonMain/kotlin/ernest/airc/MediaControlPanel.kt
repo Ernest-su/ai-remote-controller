@@ -1,13 +1,11 @@
 package ernest.airc
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -63,7 +61,7 @@ fun MediaControlPanel(state: MediaControlState, available: Boolean, onRefresh: (
             val requested = parsePlaybackTime(target)
             val valid = requested != null && (duration == null || requested <= duration)
             OutlinedTextField(target, { target = it }, label = { Text("跳转时间（分:秒）") }, singleLine = true,
-                isError = target.isNotBlank() && !valid, supportingText = { Text("例如 12:30，也支持 时:分:秒") },
+                isError = target.isNotBlank() && !valid, supportingText = { Text(if (target.isNotBlank() && requested == null) "请输入有效的分:秒或时:分:秒" else if (target.isNotBlank() && !valid) "目标位置不能超过播放器报告时长" else "例如 12:30，也支持 时:分:秒") },
                 modifier = Modifier.fillMaxWidth().testTag("media-seek-position"))
             ActionButton("跳转", canSeek && valid) { requested?.let(onSeek) }
             state.message?.let { Text(it, color = RemoteColors.Secondary) }; state.error?.let { Text(it, color = RemoteColors.Warning) }

@@ -21,7 +21,7 @@
 | `device.ui_hierarchy` | `device_ui_hierarchy` | 空对象 | 默认显示器当前 UI XML，只读、128 KiB 上限 |
 | `device.shell` | `device_shell` | `command` | 直接专家请求执行 shell 文本；模型仅固定只读诊断、无 shell 解释器 |
 
-`key` 支持 `up`、`down`、`left`、`right`、`ok`、`back`、`home`、`menu`、`power`、`volume_up`、`volume_down`、`mute`、`play_pause`、`media_previous`、`media_next`、`0`…`9`、`channel_up`、`channel_down`、`delete`。
+`key` 支持 `up`、`down`、`left`、`right`、`ok`、`back`、`home`、`menu`、`power`、`volume_up`、`volume_down`、`mute`、`play_pause`、`media_previous`、`media_next`、`0`…`9`、`channel_up`、`channel_down`、`delete`、`enter`。
 
 ```json
 {"id":"open-settings","protocol":1,"type":"tool","tool":"apps.open","arguments":{"package":"com.android.settings"}}

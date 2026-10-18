@@ -30,6 +30,7 @@ pub(super) fn code(key: &str) -> Result<u32> {
         "channel_up" => 166,
         "channel_down" => 167,
         "delete" => 67,
+        "enter" => 66,
         key => bail!("unsupported remote key: {key}"),
     })
 }
@@ -45,6 +46,7 @@ mod tests {
         assert_eq!(code("channel_up").unwrap(), 166);
         assert_eq!(code("channel_down").unwrap(), 167);
         assert_eq!(code("delete").unwrap(), 67);
+        assert_eq!(code("enter").unwrap(), 66);
         assert!(code("7;reboot").is_err());
     }
 }
