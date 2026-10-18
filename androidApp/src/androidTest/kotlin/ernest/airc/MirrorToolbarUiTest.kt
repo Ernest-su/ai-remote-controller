@@ -21,7 +21,8 @@ import org.junit.Test
 
 /** Real Android view/IME/layout fixtures; offline remote actions never leave the controller. */
 class MirrorToolbarUiTest {
-    @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
+    val compose=createAndroidComposeRule<ComponentActivity>()
+    @get:Rule val rules: org.junit.rules.TestRule = org.junit.rules.RuleChain.outerRule(DeviceHistoryIsolation()).around(compose)
     private fun model():RemoteViewModel {
         lateinit var result:RemoteViewModel
         compose.runOnUiThread {result=ViewModelProvider(compose.activity)[RemoteViewModel::class.java]}
@@ -54,6 +55,18 @@ class MirrorToolbarUiTest {
         compose.onNodeWithText("停止屏幕镜像").assertDoesNotExist()
         compose.onNodeWithText("预览尺寸").assertDoesNotExist()
         compose.onNodeWithText("1920 · 8 Mbps · 60 fps").assertDoesNotExist()
+        val previous = model.ascrcpyPreview.quality.value
+        try {
+            compose.onNodeWithText("流畅").performScrollTo().performClick()
+            assertEquals(PreviewQuality.FLUENT, model.ascrcpyPreview.quality.value)
+            val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob())
+            try {
+                val restored = AscrcpyPreviewController(compose.activity, scope) { error("Offline fixture must not connect") }
+                assertEquals(PreviewQuality.FLUENT, restored.quality.value)
+            } finally { scope.coroutineContext[kotlinx.coroutines.Job]?.cancel() }
+            compose.onNodeWithText("均衡").performClick()
+            assertEquals(PreviewQuality.BALANCED, model.ascrcpyPreview.quality.value)
+        } finally { compose.runOnUiThread { model.ascrcpyPreview.selectQuality(previous) } }
     }
     @Test fun fullscreenKeepsNativeViewAndFloatingRemoteDraftAndScalesBothOrientations() {
         val model=model()
@@ -67,8 +80,16 @@ class MirrorToolbarUiTest {
         compose.waitUntil(5000) {surface()?.holder?.surface?.isValid==true}
         val before=checkNotNull(surface())
         compose.onNodeWithTag("mirror-toggle-remote").performClick()
+        compose.onNodeWithTag("mirror-floating-remote").assertWidthIsEqualTo(androidx.compose.ui.unit.Dp(240f))
+        compose.onNodeWithTag("compact-mirror-remote").assertExists()
+        compose.onNodeWithContentDescription("向上").assertHeightIsAtLeast(androidx.compose.ui.unit.Dp(48f))
+        compose.onNodeWithText("完整").performClick()
         compose.onNodeWithTag("mirror-floating-remote").assertWidthIsEqualTo(androidx.compose.ui.unit.Dp(120f))
         compose.onNodeWithTag("remote-command-input").performTextInput("悬浮草稿")
+        compose.onNodeWithText("紧凑").performClick()
+        compose.onNodeWithTag("compact-mirror-remote").assertExists()
+        compose.onNodeWithText("完整").performClick()
+        compose.onNodeWithTag("remote-command-input").assertTextContains("悬浮草稿")
         compose.runOnIdle {full=true}
         compose.onNodeWithTag("mirror-floating-remote").assertExists()
         compose.onNodeWithTag("remote-command-input").assertTextContains("悬浮草稿")

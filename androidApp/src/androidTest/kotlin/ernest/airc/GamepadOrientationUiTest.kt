@@ -12,7 +12,8 @@ import org.junit.Test
 import org.junit.Assert.*
 
 class GamepadOrientationUiTest {
-    @get:Rule val compose=createAndroidComposeRule<MainActivity>()
+    val compose=createAndroidComposeRule<MainActivity>()
+    @get:Rule val rules: org.junit.rules.TestRule = org.junit.rules.RuleChain.outerRule(DeviceHistoryIsolation()).around(compose)
     private fun transition(orientation:Int,policy:Int?=null,action:()->Unit) {
         val before=compose.activity
         val requiresRecreation=before.resources.configuration.orientation!=orientation

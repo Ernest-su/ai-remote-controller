@@ -8,7 +8,8 @@ import org.junit.Test
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 class SystemActionUiTest {
-    @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
+    val compose=createAndroidComposeRule<ComponentActivity>()
+    @get:Rule val rules: org.junit.rules.TestRule = org.junit.rules.RuleChain.outerRule(DeviceHistoryIsolation()).around(compose)
     @Test fun confirmationNamesTargetAndCancellationIsExplicit(){
         var decision:Boolean?=null
         val p=SystemActionProposal("12345678-1234-1234-1234-123456789abc","system_action","shutdown",0,true,true,120)

@@ -8,12 +8,27 @@ import ernest.ascrcpy.scrcpy.ScrcpyState
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
+enum class PreviewQuality(val title: String, val config: ScrcpyConfig) {
+    FLUENT("流畅", ScrcpyConfig(720, 2_000_000, 30)),
+    BALANCED("均衡", ScrcpyConfig(1280, 4_000_000, 30)),
+    CLEAR("清晰", ScrcpyConfig()),
+}
+
 /** Owns a dedicated ADB session; preview cleanup never closes the runtime's ADB connection. */
 class AscrcpyPreviewController(
     private val context:Context,
     private val scope:CoroutineScope,
     private val connect:suspend ()->AdbSession,
 ) {
+    private val preferences = context.getSharedPreferences("preview", Context.MODE_PRIVATE)
+    private val qualityMutable = MutableStateFlow(PreviewQuality.entries.find { it.name == preferences.getString("quality", null) } ?: PreviewQuality.CLEAR)
+    val quality = qualityMutable.asStateFlow()
+    @Synchronized fun selectQuality(value: PreviewQuality) {
+        if (qualityMutable.value == value) return
+        qualityMutable.value = value
+        preferences.edit().putString("quality", value.name).apply()
+        stop()
+    }
     private val mutable=MutableStateFlow<ScrcpyState>(ScrcpyState.Idle)
     val state:StateFlow<ScrcpyState> = mutable.asStateFlow()
     private val retired=MutableStateFlow(0L)
@@ -25,6 +40,7 @@ class AscrcpyPreviewController(
     @Synchronized fun start(surface:Surface) {
         stop()
         val token=++generation
+        val config=quality.value.config
         mutable.value=ScrcpyState.InstallingServer
         job=scope.launch(Dispatchers.IO){
             var session:AdbSession?=null;var client:ScrcpyClient?=null
@@ -32,7 +48,7 @@ class AscrcpyPreviewController(
                 session=connect();ensureActive()
                 client=ScrcpyClient(session.client)
                 withTimeout(45_000){
-                    context.assets.open("scrcpy-server-v4.0").use{client.start(it,surface,ScrcpyConfig())}
+                    context.assets.open("scrcpy-server-v4.0").use{client.start(it,surface,config)}
                     client.state.first{
                         publish(token,it)
                         it is ScrcpyState.Failed || (it is ScrcpyState.Streaming && it.renderedFrames>0)

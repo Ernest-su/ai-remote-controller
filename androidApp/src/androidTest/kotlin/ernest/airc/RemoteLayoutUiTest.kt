@@ -26,7 +26,8 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class RemoteLayoutUiTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rules: org.junit.rules.TestRule = org.junit.rules.RuleChain.outerRule(DeviceHistoryIsolation()).around(compose)
 
     @Test fun systemBarIconsMatchEffectiveThemeAfterRecreation() {
         fun verify() {

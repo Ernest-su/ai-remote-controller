@@ -17,7 +17,8 @@ import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 
 class MobileConvenienceUiTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rules: org.junit.rules.TestRule = org.junit.rules.RuleChain.outerRule(DeviceHistoryIsolation()).around(compose)
     private fun model(): RemoteViewModel {
         lateinit var result: RemoteViewModel
         compose.runOnUiThread { result = ViewModelProvider(compose.activity)[RemoteViewModel::class.java] }

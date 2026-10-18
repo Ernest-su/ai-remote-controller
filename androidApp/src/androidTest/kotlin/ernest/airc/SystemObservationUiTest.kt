@@ -7,7 +7,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.Assert.*
 class SystemObservationUiTest {
-    @get:Rule val compose=createAndroidComposeRule<ComponentActivity>()
+    val compose=createAndroidComposeRule<ComponentActivity>()
+    @get:Rule val rules: org.junit.rules.TestRule = org.junit.rules.RuleChain.outerRule(DeviceHistoryIsolation()).around(compose)
     @Test fun unknownObservationsAndOfflineRefreshDoNotClaimCompletion(){
         var queried=false
         compose.setContent{RemoteTheme{PageContent{SystemObservationPanel(SystemObservationState(observation=TargetSystemState(2000,true,false,"android_framework")),false){queried=true}}}}

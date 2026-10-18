@@ -10,7 +10,8 @@ import org.junit.runner.RunWith
 /** Navigation uses the real activity; these tests never connect or deploy to an external target. */
 @RunWith(AndroidJUnit4::class)
 class RemoteNavigationUiTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rules: org.junit.rules.TestRule = org.junit.rules.RuleChain.outerRule(DeviceHistoryIsolation()).around(compose)
 
     @Test fun dynamicSurfaceRecreatesWithoutStartingOfflineCapture() {
         compose.onNodeWithTag("open-menu").performClick()
@@ -65,10 +66,10 @@ class RemoteNavigationUiTest {
     @Test fun mediaControlDraftSurvivesRotationAndBackReturnsThroughMenu() {
         compose.onNodeWithTag("open-remote-types").performClick()
         compose.onNodeWithTag("remote-type-media_control").performScrollTo().performClick()
-        compose.onNodeWithTag("media-seek-position").performScrollTo().performTextInput("7000")
-        compose.onNodeWithText("提交播放定位").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("media-seek-position").performScrollTo().performTextInput("0:07")
+        compose.onNodeWithText("跳转").performScrollTo().assertIsNotEnabled()
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithTag("media-seek-position").performScrollTo().assertTextContains("7000")
+        compose.onNodeWithTag("media-seek-position").performScrollTo().assertTextContains("0:07")
         compose.onNodeWithTag("device-status").performClick()
         compose.onNodeWithTag("navigate-back").performClick()
         compose.onNodeWithTag("media-control-page").assertIsDisplayed()

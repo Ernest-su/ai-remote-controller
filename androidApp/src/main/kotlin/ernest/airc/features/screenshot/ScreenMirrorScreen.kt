@@ -14,12 +14,16 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import ernest.ascrcpy.scrcpy.ScrcpyState
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun AndroidScreenMirror(
     state: RemoteUiState, model: RemoteViewModel, fullscreen: Boolean = false,
     onFullscreen: (Boolean) -> Unit = {}, modifier: Modifier = Modifier,
     onRemote: () -> Unit = {}, remoteVisible: Boolean = false,
 ) {
+    val quality by model.ascrcpyPreview.quality.collectAsState()
+    var input by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    if (input) ManagementDialog("电视输入", "mirror-tv-input", { input = false }) { TvInputPanel(state, model) }
     val mirror by model.ascrcpyPreview.state.collectAsState()
     val surfaceEpoch by model.ascrcpyPreview.surfaceEpoch.collectAsState()
     val shot by model.screenshots.state.collectAsState()
@@ -44,8 +48,14 @@ internal fun AndroidScreenMirror(
     Column(modifier.then(if(fullscreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth())) {
         if (!fullscreen) Row(Modifier.fillMaxWidth().testTag("mirror-toolbar"), verticalAlignment = Alignment.CenterVertically) {
             Text("动态预览", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+            MirrorToolbarIcon(R.drawable.ic_text, "电视输入", "mirror-tv-input-open") { input = true }
             MirrorToolbarIcon(R.drawable.ic_remote_types, if(remoteVisible) "收起悬浮遥控" else "悬浮遥控", "mirror-toggle-remote", onClick = onRemote)
             MirrorToolbarIcon(R.drawable.ic_fullscreen, "全屏预览", "mirror-fullscreen", active) { onFullscreen(true) }
+        }
+        if (!fullscreen) FlowRow {
+            PreviewQuality.entries.forEach { value ->
+                FilterChip(quality == value, { model.ascrcpyPreview.selectQuality(value) }, label = { Text(value.title) }, modifier = Modifier.heightIn(min = 48.dp).padding(end = 8.dp))
+            }
         }
         BoxWithConstraints(if(fullscreen) Modifier.weight(1f).fillMaxWidth() else Modifier.fillMaxWidth().height(RemoteDimensions.MirrorPreviewHeight), contentAlignment = Alignment.Center) {
             val videoWidth = minOf(maxWidth, maxHeight * ratio)

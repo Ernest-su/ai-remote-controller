@@ -18,7 +18,8 @@ import org.junit.runner.RunWith
 /** Local protocol fixture only; does not prove Android command support on the target. */
 @RunWith(AndroidJUnit4::class)
 class InputToolsUiTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rules: org.junit.rules.TestRule = org.junit.rules.RuleChain.outerRule(DeviceHistoryIsolation()).around(compose)
 
     @Test fun tapSwipeLongPressAndKeypadUseDirectTools() {
         val calls = java.util.concurrent.CopyOnWriteArrayList<RuntimeRequest>()

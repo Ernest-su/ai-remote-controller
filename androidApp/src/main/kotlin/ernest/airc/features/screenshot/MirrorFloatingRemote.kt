@@ -31,13 +31,15 @@ internal fun BoxScope.MirrorFloatingRemote(state: RemoteUiState, model: RemoteVi
     val configuration=LocalConfiguration.current
     val screenWidth=configuration.screenWidthDp.dp
     val screenHeight=configuration.screenHeightDp.dp
+    val layouts = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+    var compact by rememberSaveable { mutableStateOf(true) }
     var offsetX by rememberSaveable { mutableFloatStateOf(0f) }
     var offsetY by rememberSaveable { mutableFloatStateOf(0f) }
     val density=LocalDensity.current
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val panelWidth=minOf(maxWidth,mirrorFloatingRemoteWidth(screenWidth,screenHeight))
-        val controlsHeight=minOf((maxHeight-48.dp).coerceAtLeast(0.dp),RemoteDimensions.MirrorRemoteSourceHeight*(panelWidth/RemoteDimensions.Width))
-        val panelHeight=controlsHeight+48.dp
+        val panelWidth=minOf(maxWidth,if (compact) RemoteDimensions.CompactRemoteWidth else mirrorFloatingRemoteWidth(screenWidth,screenHeight))
+        val controlsHeight=minOf((maxHeight-RemoteDimensions.MirrorRemoteHeaderHeight).coerceAtLeast(0.dp),if (compact) RemoteDimensions.CompactRemoteHeight else RemoteDimensions.MirrorRemoteSourceHeight*(panelWidth/RemoteDimensions.Width))
+        val panelHeight=controlsHeight+RemoteDimensions.MirrorRemoteHeaderHeight
         val limitX=with(density) {(maxWidth-panelWidth).toPx().coerceAtLeast(0f)}
         val limitY=with(density) {(maxHeight-panelHeight).toPx().coerceAtLeast(0f)}
         Surface(Modifier.align(Alignment.TopStart)
@@ -58,7 +60,9 @@ internal fun BoxScope.MirrorFloatingRemote(state: RemoteUiState, model: RemoteVi
                     }
                     MirrorToolbarIcon(R.drawable.ic_close,"收起悬浮遥控","mirror-close-remote",onClick=onClose)
                 }
-                ScaledMirrorRemote(Modifier.fillMaxWidth().height(controlsHeight)) { RemoteControls(state,model,showResults=onResults) }
+                TextButton({ compact = !compact }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text(if (compact) "完整" else "紧凑") }
+                if (compact) CompactMirrorRemote(state, model, Modifier.height(controlsHeight))
+                else layouts.SaveableStateProvider("full") { ScaledMirrorRemote(Modifier.fillMaxWidth().height(controlsHeight)) { RemoteControls(state,model,showResults=onResults) } }
             }
         }
     }

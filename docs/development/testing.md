@@ -74,7 +74,7 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite profil
 | `gamepad-ui` | NES/双摇杆类型选择、方向与跳跃多指组合、类型旋转保留、标题启停/重连图标、重连可停止且游戏按键禁用、固定无滚动视口、多指操作与取消释放、横屏方向及离页恢复；只验证控制端界面 |
 | `controller-ui` | 页面导航、提交与执行反馈、键盘间距、离线、大字体、旋转与输入工具 |
 | `management-ui` | 文件/应用列表、搜索筛选、按需面板、离线与草稿恢复 |
-| `mirror-toolbar-ui` | 动态预览标题图标、全屏原生视图复用、悬浮遥控横竖屏比例及草稿保留；不连接目标 |
+| `mirror-toolbar-ui` | 动态预览标题图标、画质档位保存、紧凑按键至少 48dp、全屏原生视图复用、布局切换及横竖屏草稿保留；不连接目标 |
 | `file-preview-ui` | 主控端图片受限解码、文本范围读取及关闭释放、音频播放/后台暂停；仅使用本机回环媒体 fixture |
 | `app-packages-ui` | 图标显示、多包安装清单与显式提交 |
 | `models` | API 配置、模型选择、真实 Keystore 持久化与手动同步边界 |
@@ -182,3 +182,5 @@ uv run --with websockets python runtime/remote_key_hold_target_test.py --serial 
 中文粘贴专项使用 `ScrcpyTextInputTargetTest`，需显式传入 `textTargetHost` / `textTargetPort`，在自有目标预先安装原本不存在的 mediaFixture，并在测试后卸载。专项打开 TextActivity 的 paste 模式，核对中文、表情和 Shell 字符按字面写入，以及临时 server 文件被清理；不证明厂商播放器或密码输入框允许粘贴。
 
 文字接收 fixture 通过仅允许 shell DUMP 权限读取的 `content://ernest.airc.mediafixture.text/text` 返回合成测试文字，不依赖目标 `run-as` 能力，不暴露其他应用文件。
+
+主界面 UI fixture 在启动 Activity 前用 DeviceHistoryIsolation 持久备份设备历史和上次连接项，测试期间清空可自动重连目标，Activity 销毁后恢复；不把原设备当作离线 fixture。中断留下 active 备份时拒绝覆盖，应先调用该类的 restore 恢复原历史。此隔离不修改模型密钥或目标服务。

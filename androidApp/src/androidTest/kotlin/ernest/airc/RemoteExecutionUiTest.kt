@@ -31,7 +31,8 @@ import java.util.concurrent.CopyOnWriteArrayList
 /** Local WS fixture verifies text submission and feedback/navigation and captures review images. */
 @RunWith(AndroidJUnit4::class)
 class RemoteExecutionUiTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rules: org.junit.rules.TestRule = org.junit.rules.RuleChain.outerRule(DeviceHistoryIsolation()).around(compose)
     private fun withPreview(adbPort: Int? = null, modelConfigured: Boolean = true, action: (RemoteViewModel, List<RuntimeRequest>) -> Unit) {
         val types = CopyOnWriteArrayList<RuntimeRequest>()
         val languages = CopyOnWriteArrayList<String?>()
