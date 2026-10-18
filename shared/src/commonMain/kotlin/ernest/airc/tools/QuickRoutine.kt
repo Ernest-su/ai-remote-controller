@@ -29,3 +29,23 @@ fun routineKeyLabel(key: String): String = when (key) {
     "media_previous" -> "上一曲"; "media_next" -> "下一曲"; "volume_down" -> "音量 −"; "volume_up" -> "音量 +"; "mute" -> "静音"
     else -> key
 }
+
+fun parseRoutineSeconds(text: String): Long? {
+    val parts = text.trim().split('.')
+    if (parts.size !in 1..2 || parts[0].isEmpty() || parts[0].length > 2 || parts[0].any { it !in '0'..'9' }) return null
+    val fraction = parts.getOrNull(1).orEmpty()
+    if (parts.size == 2 && (fraction.isEmpty() || fraction.length > 3 || fraction.any { it !in '0'..'9' })) return null
+    val millis = parts[0].toLong() * 1000 + fraction.padEnd(3, '0').toLong()
+    return millis.takeIf { it in 100..10000 }
+}
+
+fun routineSeconds(milliseconds: Long): String {
+    val fraction = (milliseconds % 1000).toString().padStart(3, '0').trimEnd('0')
+    return (milliseconds / 1000).toString() + if (fraction.isEmpty()) "" else ".$fraction"
+}
+
+fun moveRoutineStep(steps: List<RoutineStep>, index: Int, direction: Int): List<RoutineStep> {
+    val next = index + direction
+    if (index !in steps.indices || next !in steps.indices || direction !in listOf(-1, 1)) return steps
+    return steps.toMutableList().apply { this[index] = steps[next]; this[next] = steps[index] }
+}

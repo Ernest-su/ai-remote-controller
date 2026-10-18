@@ -26,3 +26,9 @@ fun filterInstalledApps(apps: List<InstalledApp>, query: String): List<Installed
     return apps.filter { term.isEmpty() || it.packageName.contains(term, ignoreCase = true) ||
         it.label?.contains(term, ignoreCase = true) == true }
 }
+
+/** Stable ordering preserves the user's favorite order and the server order for other entries. */
+fun favoriteFirstApps(apps: List<InstalledApp>, favorites: List<String>): List<InstalledApp> {
+    val order = favorites.withIndex().associate { it.value to it.index }
+    return apps.sortedBy { order[it.packageName] ?: Int.MAX_VALUE }
+}

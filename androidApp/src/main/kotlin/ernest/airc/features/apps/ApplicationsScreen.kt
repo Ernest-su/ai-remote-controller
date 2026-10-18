@@ -17,7 +17,8 @@ internal fun Applications(state: RemoteUiState, model: RemoteViewModel, onDetail
     ApplicationsPanel(state.apps, state.connected, state.appsLoading, state.appsError, state.output,
         model::listApps, model::openApp,
         onDetails = onDetails,
-        quickActions = { AppShortcutsPanel(state, model) },
+        favorites = state.shortcuts.favorites,
+        onFavorite = { name -> model.updateShortcuts { it.toggle(name) } },
         actionsBusy = control.busy || state.busy || state.submitting || management.busy || installation.busy || cache.busy,
         operationMessage = when {
             management.proposal != null || cache.proposal != null || installation.proposal != null -> "有应用操作等待确认"

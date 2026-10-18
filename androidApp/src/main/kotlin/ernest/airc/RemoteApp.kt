@@ -41,11 +41,11 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
     LaunchedEffect(shared?.id) { if (shared != null) shareOpen = true }
     var sharedDownload by rememberSaveable { mutableStateOf(false) }
     var routinesOpen by rememberSaveable { mutableStateOf(false) }
-    if (routinesOpen) ManagementDialog("快捷操作组合", "quick-routines-dialog", { routinesOpen = false }) { QuickRoutinesPanel(state, model) }
+    if (routinesOpen) QuickRoutinesPanel(state, model) { routinesOpen = false }
     var tvInput by rememberSaveable { mutableStateOf(false) }
     if (tvInput) ManagementDialog("电视输入", "tv-input-dialog", { tvInput = false }) { TvInputPanel(state, model) }
     var quickApps by rememberSaveable { mutableStateOf(false) }
-    if (quickApps) ManagementDialog("常用应用", "quick-apps-dialog", { quickApps = false }) { AppShortcutsPanel(state, model) }
+    if (quickApps) LibraryDialog("常用应用", "quick-apps-dialog", { quickApps = false }, subtitle = state.history.find { it.id == state.selected }?.visibleName) { AppShortcutsPanel(state, model) }
     var appDetailsPackage by rememberSaveable { mutableStateOf("") }
     var pageName by rememberSaveable { mutableStateOf(RemotePage.REMOTE.name) }
     var deviceOriginName by rememberSaveable { mutableStateOf(RemotePage.REMOTE.name) }

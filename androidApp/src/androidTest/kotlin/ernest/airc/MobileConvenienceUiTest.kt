@@ -1,5 +1,8 @@
 package ernest.airc
 
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import java.io.File
 import android.content.Intent
 import android.net.Uri
 import android.view.KeyEvent
@@ -110,9 +113,9 @@ class MobileConvenienceUiTest {
             compose.waitUntil(10000) { model.state.value.connected && !model.state.value.busy }
             compose.onNodeWithText("常用应用").performScrollTo().performClick()
             compose.waitUntil(10000) { model.state.value.apps.isNotEmpty() }
-            compose.onNodeWithText("管理收藏与顺序").performClick()
-            compose.onNodeWithText("收藏 收藏测试").performScrollTo().performClick()
+            compose.onNodeWithTag("app-favorite-fixture.player").assertIsOff().performClick().assertIsOn()
             assertEquals(listOf("fixture.player"), model.state.value.shortcuts.favorites)
+            captureLibrary("quick-apps-dialog", "favorites-page")
             compose.activityRule.scenario.recreate()
             compose.onNodeWithText("收藏测试").assertExists()
             compose.onNodeWithTag("quick-apps-dialog-close").performClick()
@@ -130,21 +133,65 @@ class MobileConvenienceUiTest {
             assertTrue(requests.none { it["key"]?.jsonPrimitive?.content == "volume_down" })
             compose.onNodeWithTag("navigate-back").performClick()
             compose.onNodeWithText("快捷操作").performScrollTo().performClick()
-            compose.onNodeWithText("名称").performTextInput("观影组合")
-            compose.onNodeWithText("遥控按键").performScrollTo().performClick()
-            compose.onNodeWithText("确认").performScrollTo().performClick()
+            compose.onNodeWithContentDescription("新建快捷操作").performClick()
+            compose.onNodeWithTag("routine-name").performTextInput("观影组合")
             compose.onNodeWithText("添加步骤").performScrollTo().performClick()
-            compose.onNodeWithText("保存组合").performScrollTo().performClick()
+            compose.onNodeWithTag("routine-choose-app").performClick()
+            compose.onNodeWithText("收藏测试").performClick()
+            compose.onNodeWithText("添加此步骤").performClick()
+            compose.activityRule.scenario.recreate()
+            compose.onNodeWithTag("routine-name").assertTextContains("观影组合")
+            compose.onNodeWithText("收藏测试").assertExists()
+            compose.onNodeWithText("添加步骤").performScrollTo().performClick()
+            compose.onNodeWithTag("routine-kind-key").performClick()
+            compose.onNodeWithTag("routine-key-ok").performClick()
+            compose.onNodeWithText("添加此步骤").performClick()
+            compose.onNodeWithText("添加步骤").performScrollTo().performClick()
+            compose.onNodeWithTag("routine-kind-wait").performClick()
+            compose.onNodeWithText("2 秒").performClick()
+            compose.onNodeWithText("添加此步骤").performClick()
+            compose.onNodeWithTag("routine-step-menu-2").performScrollTo().performClick()
+            compose.onNodeWithText("向前移动").performClick()
+            compose.onNodeWithText("等待 2 秒").performScrollTo().performClick()
+            compose.onNodeWithTag("routine-wait-seconds").assertTextContains("2").performTextReplacement("1.5")
+            compose.onNodeWithText("保存步骤").performClick()
+            captureLibrary("quick-routines-dialog", "routine-editor-page")
+            compose.onNodeWithText("保存组合").performClick()
             assertEquals("观影组合", model.state.value.routines.single().name)
+            assertEquals(listOf(RoutineStep("app", "fixture.player"), RoutineStep("wait", "1500"), RoutineStep("key", "ok")), model.state.value.routines.single().steps)
             compose.activityRule.scenario.recreate()
             compose.onNodeWithText("观影组合").assertExists()
-            compose.onNodeWithText("运行").performScrollTo().performClick()
-            compose.onNodeWithText("取消执行").performScrollTo().performClick()
+            captureLibrary("quick-routines-dialog", "routines-page")
+            compose.onNodeWithContentDescription("运行 观影组合").performClick()
+            captureLibrary("quick-routines-dialog", "routine-confirm-page")
+            compose.onNodeWithText("取消执行").performClick()
             assertTrue(requests.none { it["key"]?.jsonPrimitive?.content == "ok" })
+            compose.onNodeWithContentDescription("更多 观影组合").performClick()
+            compose.onNodeWithText("编辑组合").performClick()
+            compose.onNodeWithTag("routine-name").performTextReplacement("未保存名称")
+            compose.onNodeWithTag("quick-routines-dialog-close").performClick()
+            compose.onNodeWithText("继续编辑").performClick()
+            compose.onNodeWithTag("routine-name").assertTextContains("未保存名称")
+            compose.onNodeWithTag("quick-routines-dialog-close").performClick()
+            compose.onNodeWithText("放弃修改").performClick()
+            assertEquals("观影组合", model.state.value.routines.single().name)
+            compose.onNodeWithContentDescription("更多 观影组合").performClick()
+            compose.onNodeWithText("删除组合").performClick()
+            compose.onNodeWithText("取消").performClick()
+            assertEquals(1, model.state.value.routines.size)
+            compose.onNodeWithContentDescription("更多 观影组合").performClick()
+            compose.onNodeWithText("删除组合").performClick()
+            compose.onNodeWithText("删除", substring = false).performClick()
+            assertTrue(model.state.value.routines.isEmpty())
         } finally {
             compose.runOnUiThread { model.setVolumeKeysEnabled(oldVolume); model.disconnect(); model.forget(device) }
             compose.activity.getSharedPreferences("app-shortcuts", 0).edit().remove(device).commit()
             server.shutdown()
         }
     }
+    private fun captureLibrary(tag: String, name: String) {
+        val output = File(requireNotNull(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null)), "$name.png")
+        output.outputStream().use { compose.onNodeWithTag(tag).captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
 }

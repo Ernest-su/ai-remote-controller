@@ -1,7 +1,5 @@
 package ernest.airc
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,8 +11,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
@@ -24,7 +20,8 @@ fun ApplicationsPanel(apps: List<InstalledApp>, connected: Boolean, loading: Boo
     onRefresh: () -> Unit, onOpen: (String) -> Unit, onInspect: ((String) -> Unit)? = null,
     onUninstall: ((String) -> Unit)? = null, onClearCache: ((String) -> Unit)? = null,
     management: @Composable ColumnScope.() -> Unit = {}, icon: @Composable (String) -> Unit = {},
-    actionsBusy: Boolean = false, operationMessage: String? = null, onDetails: ((String) -> Unit)? = null, quickActions: @Composable () -> Unit = {}) {
+    actionsBusy: Boolean = false, operationMessage: String? = null, onDetails: ((String) -> Unit)? = null,
+    favorites: List<String> = emptyList(), onFavorite: ((String) -> Unit)? = null) {
     var packageName by rememberSaveable { mutableStateOf("") }
     var query by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf("all") }
@@ -39,7 +36,7 @@ fun ApplicationsPanel(apps: List<InstalledApp>, connected: Boolean, loading: Boo
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val enabled = connected && !loading && !actionsBusy
-    val matches = filterInstalledApps(apps, query).filter {
+    val matches = favoriteFirstApps(filterInstalledApps(apps, query), favorites).filter {
         when (category) { "user" -> it.system == false; "system" -> it.system == true; else -> true }
     }
     fun launchApp(app: String) { launchName = app; onOpen(app) }
@@ -62,7 +59,6 @@ fun ApplicationsPanel(apps: List<InstalledApp>, connected: Boolean, loading: Boo
         }
     }
     LazyColumn(Modifier.fillMaxSize().testTag("apps-page"), state = list, contentPadding = PaddingValues(16.dp)) {
-        item(key = "quick-actions") { quickActions() }
         item(key = "tools") {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -79,7 +75,7 @@ fun ApplicationsPanel(apps: List<InstalledApp>, connected: Boolean, loading: Boo
                         }
                     }
                 }
-                OutlinedTextField(query, { query = it; visibleCount = 30 }, label = { Text("搜索名称或包名") }, singleLine = true,
+                OutlinedTextField(query, { query = it; visibleCount = 30 }, label = { Text("搜索应用") }, placeholder = { Text("名称或包名") }, singleLine = true,
                     leadingIcon = { Icon(ManagementIcons.Search, null, Modifier.size(24.dp)) },
                     trailingIcon = { if (query.isNotEmpty()) ManagementIconButton(ManagementIcons.Close, "清除应用搜索", tag = "apps-clear-search") { query = "" } },
                     modifier = Modifier.fillMaxWidth().testTag("apps-search"))
@@ -89,6 +85,7 @@ fun ApplicationsPanel(apps: List<InstalledApp>, connected: Boolean, loading: Boo
                             label = { Text(label, style = MaterialTheme.typography.bodyMedium) }, modifier = Modifier.heightIn(min = 48.dp).testTag("apps-filter-$value"))
                     }
                 }
+                if (onFavorite != null && favorites.size >= 12) Text("收藏已满，取消一个收藏后可继续添加。", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
                 if (!connected) ManagementMessage("设备未连接，可浏览已有列表；连接后即可刷新和管理应用。")
                 if (loading) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("正在读取应用列表…", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary) }
                 error?.let { message -> ManagementMessage(message, error = true, actionLabel = if (enabled) "重新加载" else null, action = onRefresh) }
@@ -111,7 +108,8 @@ fun ApplicationsPanel(apps: List<InstalledApp>, connected: Boolean, loading: Boo
                 if (onDetails != null) { { onDetails(app.packageName) } } else onInspect?.let { action -> { manage(app.packageName, action) } },
                 if (app.system == false) onClearCache?.let { action -> { manage(app.packageName, action) } } else null,
                 if (app.system == false) onUninstall?.let { action -> { manage(app.packageName, action) } } else null,
-                { icon(app.packageName) })
+                { icon(app.packageName) },
+                onFavorite?.let { { AppFavoriteButton(app, app.packageName in favorites, app.packageName in favorites || favorites.size < 12) { it(app.packageName) } } })
         }
         if (matches.size > visibleCount) item(key = "more") {
             TextButton({ visibleCount += 30 }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("显示更多应用") }
@@ -122,36 +120,20 @@ fun ApplicationsPanel(apps: List<InstalledApp>, connected: Boolean, loading: Boo
 
 @Composable
 private fun ApplicationManagementRow(app: InstalledApp, enabled: Boolean, onDetail: () -> Unit, onOpen: () -> Unit,
-    onInspect: (() -> Unit)?, onCache: (() -> Unit)?, onUninstall: (() -> Unit)?, icon: @Composable () -> Unit) {
+    onInspect: (() -> Unit)?, onCache: (() -> Unit)?, onUninstall: (() -> Unit)?, icon: @Composable () -> Unit, favorite: (@Composable () -> Unit)? = null) {
     var menu by remember { mutableStateOf(false) }
-    Surface(color = RemoteColors.Surface) {
-        Column {
-            Row(Modifier.fillMaxWidth().heightIn(min = RemoteDimensions.ManagementRowHeight).testTag("app-row-${app.packageName}"), verticalAlignment = Alignment.CenterVertically) {
-                Row(Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = "查看应用") { onDetail() }
-                    .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.size(RemoteDimensions.ApplicationIcon).background(RemoteColors.Fill, MaterialTheme.shapes.small), contentAlignment = Alignment.Center) {
-                        Icon(ManagementIcons.Apps, null, Modifier.size(24.dp), tint = RemoteColors.Action)
-                        icon()
-                    }
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(app.label ?: app.packageName, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        if (app.label != null) Text(app.packageName, style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(when (app.system) { true -> "系统应用"; false -> "用户应用"; null -> "类型未知" }, style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
-                    }
-                }
-                ManagementIconButton(ManagementIcons.Play, "启动 ${app.label ?: app.packageName}", enabled, "app-open-${app.packageName}", onOpen)
-                Box {
-                    ManagementIconButton(ManagementIcons.More, "更多 ${app.label ?: app.packageName}", tag = "app-more-${app.packageName}") { menu = true }
-                    DropdownMenu(menu, { menu = false }) {
-                        DropdownMenuItem(text = { Text("应用详情") }, onClick = { menu = false; onDetail() })
-                        onInspect?.let { DropdownMenuItem(text = { Text("查看应用信息") }, enabled = enabled, onClick = { menu = false; it() }) }
-                        onCache?.let { DropdownMenuItem(text = { Text("清理缓存") }, enabled = enabled, onClick = { menu = false; it() }) }
-                        onUninstall?.let { DropdownMenuItem(text = { Text("卸载", color = RemoteColors.Warning) }, enabled = enabled, onClick = { menu = false; it() }) }
-                    }
-                }
+    ApplicationListRow(app, onDetail, icon, clickLabel = "查看应用") {
+        if (favorite == null) ManagementIconButton(ManagementIcons.Play, "启动 ${app.label ?: app.packageName}", enabled, "app-open-${app.packageName}", onOpen)
+        favorite?.invoke()
+        Box {
+            ManagementIconButton(ManagementIcons.More, "更多 ${app.label ?: app.packageName}", tag = "app-more-${app.packageName}") { menu = true }
+            DropdownMenu(menu, { menu = false }) {
+                if (favorite != null) DropdownMenuItem(text = { Text("启动应用") }, enabled = enabled, onClick = { menu = false; onOpen() })
+                DropdownMenuItem(text = { Text("应用详情") }, onClick = { menu = false; onDetail() })
+                onInspect?.let { DropdownMenuItem(text = { Text("查看应用信息") }, enabled = enabled, onClick = { menu = false; it() }) }
+                onCache?.let { DropdownMenuItem(text = { Text("清理缓存") }, enabled = enabled, onClick = { menu = false; it() }) }
+                onUninstall?.let { DropdownMenuItem(text = { Text("卸载", color = RemoteColors.Warning) }, enabled = enabled, onClick = { menu = false; it() }) }
             }
-            HorizontalDivider(Modifier.padding(start = 68.dp), color = RemoteColors.Divider, thickness = 0.5.dp)
         }
     }
 }
