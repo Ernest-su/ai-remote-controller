@@ -127,7 +127,7 @@ class RuntimeConnection(private val language: () -> String = { java.util.Locale.
         return artifact.name to bytes
     }
 
-    internal suspend fun appIcon(target: RuntimeTransferTarget, packageName: String): ByteArray {
+    internal suspend fun appIcon(target: RuntimeTransferTarget, packageName: String, expectedCacheKey: String?, checkCurrent: () -> Unit): ByteArray {
         currentCoroutineContext().ensureActive()
         // A canceled row cannot retract a sent WebSocket request. Keep its icon permit
         // until the reply, disconnect or the request's existing timeout; only this
@@ -139,6 +139,8 @@ class RuntimeConnection(private val language: () -> String = { java.util.Locale.
         checkTransferTarget(target)
         val fields = json.parseToJsonElement(output).jsonObject
         check(fields["package"]?.jsonPrimitive?.content == packageName) { "应用图标对象不匹配" }
+        if(expectedCacheKey != null) check(fields["cacheKey"]?.jsonPrimitive?.content == expectedCacheKey) { "应用已更新，请刷新应用列表" }
+        checkCurrent()
         val artifact = json.decodeFromString<BinaryArtifact>(output)
         check(artifact.width == 96 && artifact.height == 96 && artifact.sizeBytes in 1..128*1024) { "应用图标尺寸无效" }
         checkTransferTarget(target)

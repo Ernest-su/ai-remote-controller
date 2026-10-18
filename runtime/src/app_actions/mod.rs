@@ -58,7 +58,14 @@ pub async fn execute(tool: &str, args: &Value) -> Result<String> {
     if object.len() != 1 || !object.contains_key("package") {
         bail!("only package name accepted");
     }
-    let app = info::read(args["package"].as_str().context("package required")?).await?;
+    let package = args["package"].as_str().context("package required")?;
+    if tool == "apps.info" && cfg!(target_os = "android") {
+        if !info::valid_package(package) {
+            bail!("invalid package name");
+        }
+        return crate::platform_bridge::app_info(info::current_user().await?, package).await;
+    }
+    let app = info::read(package).await?;
     if tool == "apps.info" {
         return Ok(serde_json::to_string(&app)?);
     }

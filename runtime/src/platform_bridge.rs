@@ -14,6 +14,7 @@ use std::{
     sync::OnceLock,
 };
 static BRIDGE: OnceLock<PathBuf> = OnceLock::new();
+static APP_CACHE: OnceLock<PathBuf> = OnceLock::new();
 const DEX: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/classes.dex"));
 fn verify(path: &Path) -> Result<()> {
     let mut file = OpenOptions::new()
@@ -97,6 +98,17 @@ pub(crate) fn initialize(state: &Path) -> Result<()> {
     }
     verify(&path)?;
     let _ = BRIDGE.set(path);
+    let cache = directory.join("apps-cache-v1");
+    fs::create_dir_all(&cache)?;
+    let cache_dir = OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+        .open(&cache)?;
+    if cache_dir.metadata()?.uid() != unsafe { libc::geteuid() } {
+        bail!("application cache directory has a different owner");
+    }
+    cache_dir.set_permissions(fs::Permissions::from_mode(0o700))?;
+    let _ = APP_CACHE.set(cache);
     Ok(())
 }
 pub(crate) async fn invoke(operation: &str, arguments: &[String]) -> Result<String> {
@@ -128,7 +140,15 @@ pub(crate) async fn gamepad(operation: &str, arguments: &[String]) -> Result<Str
     invoke_class("ernest.airc.bridge.GamepadBridge", operation, arguments).await
 }
 pub(crate) async fn apps(arguments: &[String]) -> Result<String> {
-    invoke_class("ernest.airc.bridge.AppsBridge", "list", arguments).await
+    let mut arguments = arguments.to_vec();
+    arguments.push(
+        APP_CACHE
+            .get()
+            .context("application cache unavailable")?
+            .to_string_lossy()
+            .into_owned(),
+    );
+    invoke_class("ernest.airc.bridge.AppsBridge", "list", &arguments).await
 }
 pub(crate) async fn app_control(user: u32, package: &str) -> Result<String> {
     invoke_class(
@@ -142,7 +162,31 @@ pub(crate) async fn app_icon(user: u32, package: &str) -> Result<String> {
     invoke_class(
         "ernest.airc.bridge.AppsBridge",
         "icon",
-        &[user.to_string(), package.to_owned()],
+        &[
+            user.to_string(),
+            package.to_owned(),
+            APP_CACHE
+                .get()
+                .context("application cache unavailable")?
+                .to_string_lossy()
+                .into_owned(),
+        ],
+    )
+    .await
+}
+pub(crate) async fn app_info(user: u32, package: &str) -> Result<String> {
+    invoke_class(
+        "ernest.airc.bridge.AppsBridge",
+        "info",
+        &[
+            user.to_string(),
+            package.to_owned(),
+            APP_CACHE
+                .get()
+                .context("application cache unavailable")?
+                .to_string_lossy()
+                .into_owned(),
+        ],
     )
     .await
 }

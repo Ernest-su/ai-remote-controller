@@ -10,6 +10,8 @@ struct InstalledApp {
     package: String,
     label: Option<String>,
     system: bool,
+    #[serde(rename = "cacheKey", skip_serializing_if = "Option::is_none")]
+    cache_key: Option<String>,
 }
 
 fn packages(output: &str) -> Result<BTreeSet<String>> {
@@ -66,20 +68,21 @@ pub(super) async fn list(args: &Value) -> Result<String> {
             system: system.contains(&package),
             package,
             label: None,
+            cache_key: None,
         })
         .collect();
     let result = serde_json::to_string(
         &serde_json::json!({"apps": apps,"source":"pm","labelsAvailable":false}),
     )?;
     if result.len() > 256 * 1024 {
-        bail!("app list exceeds 256 KiB");
+        bail!("app list exceeds 1 MiB");
     }
     Ok(result)
 }
 
 fn validate_standard(output: &str) -> Result<String> {
-    if output.len() > 256 * 1024 {
-        bail!("app list exceeds 256 KiB");
+    if output.len() > 1024 * 1024 {
+        bail!("app list exceeds 1 MiB");
     }
     let value: Value = serde_json::from_str(output)?;
     let apps: Vec<InstalledApp> = serde_json::from_value(value["apps"].clone())?;
@@ -88,6 +91,14 @@ fn validate_standard(output: &str) -> Result<String> {
     }
     let mut seen = BTreeSet::new();
     for app in &apps {
+        if app.cache_key.as_ref().is_none_or(|key| {
+            key.len() != 64
+                || !key
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        }) {
+            bail!("invalid application cache identity");
+        }
         if app.package.len() > 255
             || app.package.is_empty()
             || !app
@@ -117,12 +128,30 @@ mod tests {
 
     #[test]
     fn standard_labels_preserve_unicode_and_reject_duplicate_or_oversized_records() {
-        let value=validate_standard(r#"{"apps":[{"package":"com.test.app","label":"应用名称","system":false}],"source":"package_manager"}"#).unwrap();
-        let value: Value = serde_json::from_str(&value).unwrap();
+        let key = "a".repeat(64);
+        let entry = serde_json::json!({"package":"com.test.app","label":"应用名称","system":false,"cacheKey":key});
+        let output = serde_json::json!({"apps":[entry.clone()],"source":"package_manager"});
+        let value: Value =
+            serde_json::from_str(&validate_standard(&output.to_string()).unwrap()).unwrap();
         assert_eq!(value["apps"][0]["label"], "应用名称");
         assert_eq!(value["labelsAvailable"], true);
-        assert!(validate_standard(r#"{"apps":[{"package":"com.test.app","label":null,"system":false},{"package":"com.test.app","label":null,"system":false}]}"#).is_err());
-        assert!(validate_standard(&serde_json::json!({"apps":[{"package":"com.test.app","label":"a".repeat(257),"system":false}]}).to_string()).is_err());
+        assert_eq!(value["apps"][0]["cacheKey"], key);
+        assert!(validate_standard(
+            &serde_json::json!({"apps":[entry.clone(),entry.clone()]}).to_string()
+        )
+        .is_err());
+        let mut oversized = entry.clone();
+        oversized["label"] = serde_json::json!("a".repeat(257));
+        assert!(validate_standard(&serde_json::json!({"apps":[oversized]}).to_string()).is_err());
+        for key in [
+            Value::Null,
+            serde_json::json!("short"),
+            serde_json::json!("Z".repeat(64)),
+        ] {
+            let mut bad = entry.clone();
+            bad["cacheKey"] = key;
+            assert!(validate_standard(&serde_json::json!({"apps":[bad]}).to_string()).is_err());
+        }
     }
     #[test]
     fn packages_are_sorted_deduplicated_and_validated() {

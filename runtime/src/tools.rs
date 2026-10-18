@@ -303,13 +303,17 @@ pub(crate) async fn run_command_with_input(
     .into_owned())
 }
 pub(crate) async fn run_platform_bridge(argv: &[String], path: &std::path::Path) -> Result<String> {
+    let app_list = argv
+        .get(1)
+        .is_some_and(|v| v == "ernest.airc.bridge.AppsBridge")
+        && argv.get(2).is_some_and(|v| v == "list");
     Ok(String::from_utf8_lossy(
         &run_binary_with_input(
             "app_process",
             argv,
-            256 * 1024,
+            if app_list { 1024 * 1024 } else { 256 * 1024 },
             Stdio::null(),
-            Duration::from_secs(10),
+            Duration::from_secs(if app_list { 30 } else { 10 }),
             Some(path),
         )
         .await?,

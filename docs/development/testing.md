@@ -168,3 +168,11 @@ uv run --with websockets python runtime/remote_key_hold_target_test.py --serial 
 ```
 
 专项只安装原先不存在的接收 fixture，并创建 UUID runtime 目录与临时 ADB 转发；校验方向、菜单、确认、返回、数字及删除的 downTime、重复次数、长按标记、取消与断线释放。短暂暂停经路径验证的自建 runtime，核对 Java 桥接的独立超时释放，随后恢复并清理。接收 fixture 通过只读、要求 shell DUMP 权限的 provider 暴露自身日志，不依赖目标支持 run-as。测试不操作电源/音量，也不证明厂商系统键或第三方应用的最终长按动作。
+
+应用元数据缓存的隔离目标回归：
+
+```sh
+./gradlew :desktopApp:jvmTest --tests ernest.airc.desktop.AppMetadataCacheTargetTest --tests ernest.airc.desktop.AppLabelsTargetTest -PaircTargetSerial=<自有模拟器序列号> --no-daemon
+```
+
+专项创建 UUID 服务目录，拒绝覆盖已有媒体 fixture；验证名称与图标的重复读取、跨服务重启复用、同版本重装/更新失效、损坏缓存重建、卸载清理及实时权限/启用状态。资源配置检查临时切换目标亮暗模式并恢复原设置，结束卸载自建 fixture、停止自建服务并清理转发和目录。控制端版本标识、未变化图标复用和晚到响应边界由 `InstalledAppsTest`、`AppIconControllerTest` 验证。

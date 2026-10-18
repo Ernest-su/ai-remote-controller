@@ -60,7 +60,7 @@ phase 为 thinking 或 tool，text 可为空。最终仍返回原有 ok/result/e
 
 工具命令以独立参数执行；只有明确的 `device.shell` 工具接受 shell 文本。遥控按键支持 up/down/left/right/ok/back/home/menu/power/volume_up/volume_down/mute/play_pause/media_previous/media_next。应用启动参数为 `package`，shell 参数为 `command`。
 
-每条工具命令最长 30 秒，每路输出最多 256 KiB；整体请求最长 170 秒。模型执行期间 WebSocket 仍处理心跳。请求缓冲有限制，防止长任务阻塞连接或无限积累内存。
+每条工具命令最长 30 秒，每路输出最多 256 KiB（应用列表框架查询为 1 MiB）；整体请求最长 170 秒。模型执行期间 WebSocket 仍处理心跳。请求缓冲有限制，防止长任务阻塞连接或无限积累内存。
 
 `remote.key`、其他直接 `tool`/确认操作、文字/配置请求分别使用独立 FIFO 队列。模型 HTTP 请求或普通工具执行期间仍可执行遥控按键；文字决策共用会话历史并串行执行。响应可能跨队列交错，客户端必须按 id 匹配。断开连接时取消尚未开始的输入；已开始的按下/抬起事务独立完成释放，其他工作队列及在途执行按原生命周期取消。
 
@@ -171,7 +171,9 @@ media.status 的标准桥接结果增加 seekAvailable/source/userId 与 session
 
 ## 应用标签来源
 
-apps.list 保持 apps 数组兼容旧控制端，增加 source、labelsAvailable、userId 与 labelErrors。标准包管理器读取失败回退 pm，未知 label=null；完整字段与限额见[工具参考](reference/tools.md#app-labels)。
+apps.list 返回 apps 数组，并提供 source、labelsAvailable、userId 与 labelErrors。标准包管理器读取失败回退 pm，未知 label=null；完整字段与限额见[工具参考](reference/tools.md#app-labels)。
+
+应用元数据缓存：`apps.list` 的框架结果为每条应用提供 `cacheKey`（64 位小写十六进制 SHA-256），由用户、包名、首次安装/更新时间（毫秒）、版本、UID、系统标志、base/split 路径和资源配置生成。被控端每次重新查询 PackageManager 元数据，匹配时复用私有目录中持久化的名称和 96×96 PNG。`apps.icon` 描述符同时携带 `cacheKey`，控制端必须与当前列表标识一致后再下载；标识变化应刷新列表，不缓存该图标。缓存通过进程间锁与原子替换保护，文件限额 64 MiB / 8192 项，PNG 至多 128 KiB 并验证摘要；不持久缓存短时 artifact 地址。`apps.info` 复用静态信息并增加 `firstInstallTime` 字段；`apps.control_info`、待确认操作及实际提交前的身份/权限检查继续实时读取。pm 枚举回退没有 cacheKey，控制端刷新后不能保留这些未知版本的图标。
 
 标准媒体会话可包含 `customActions:[{id,name}]`；顶层 `customActionAvailable` 表示标准动作通道可用。直接工具 `media.custom_action` 及模型 `media_custom_action` 仅接受当前活动会话声明的动作 ID，执行时重新核对会话唯一性和声明；不传私有 Bundle。响应 `submitted:true` 只表示送出请求，`playbackVerified:false` 保留；界面刷新会话并要求核对实际结果。
 

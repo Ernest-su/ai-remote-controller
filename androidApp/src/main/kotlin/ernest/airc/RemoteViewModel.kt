@@ -394,13 +394,13 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     fun listApps() {
         if (!state.value.connected || state.value.appsLoading) return
         val send = runCatching { runtime.toolWriter() }.getOrNull() ?: return
-        appIcons.clear()
         val generation = ++appsGeneration
         val deviceId = state.value.selected
         mutable.update { it.copy(appsLoading = true, appsError = null) }
         appsJob = viewModelScope.launch {
             try {
                 val apps = decodeInstalledApps(send("apps.list", buildJsonObject {}))
+                if (generation == appsGeneration && state.value.connected && state.value.selected == deviceId) appIcons.updateApps(apps)
                 mutable.update { if (generation == appsGeneration && it.connected && it.selected == deviceId) it.copy(apps = apps) else it }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {

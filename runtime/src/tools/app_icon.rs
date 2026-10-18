@@ -9,10 +9,10 @@ pub(super) async fn execute(args: &Value) -> Result<String> {
     }
     let package = args["package"].as_str().context("package required")?;
     if package.len() > 255
-        || !package.contains('.')
-        || !package
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'.')
+        || package.is_empty()
+        || package.split('.').any(|part| {
+            part.is_empty() || !part.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+        })
     {
         bail!("invalid package");
     }
@@ -21,9 +21,15 @@ pub(super) async fn execute(args: &Value) -> Result<String> {
         .trim()
         .parse::<u32>()?;
     let encoded = crate::platform_bridge::app_icon(user, package).await?;
-    let bytes = decode_icon(&encoded)?;
+    let value: Value = serde_json::from_str(&encoded)?;
+    let key = value["cacheKey"]
+        .as_str()
+        .filter(|key| key.len() == 64 && key.bytes().all(|b| b.is_ascii_hexdigit()))
+        .context("invalid application cache identity")?;
+    let bytes = decode_icon(value["icon"].as_str().context("icon required")?)?;
     let mut descriptor = crate::artifacts::insert(bytes, 96, 96);
     descriptor["package"] = serde_json::json!(package);
+    descriptor["cacheKey"] = serde_json::json!(key);
     descriptor["userId"] = serde_json::json!(user);
     Ok(descriptor.to_string())
 }

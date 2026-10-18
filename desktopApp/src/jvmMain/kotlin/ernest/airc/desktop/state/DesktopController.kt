@@ -170,12 +170,11 @@ class DesktopController(
         if (!state.value.connected || state.value.appsLoading) return
         val send = runCatching { runtime.toolWriter() }.getOrNull() ?: return
         val session = generation
-        appIcons.clear()
         mutable.update { it.copy(appsLoading = true, appsError = null) }
         scope.launch {
             try {
                 val apps = decodeInstalledApps(send("apps.list", buildJsonObject {}))
-                if (session == generation) mutable.update { it.copy(apps = apps) }
+                if (session == generation) { appIcons.updateApps(apps); mutable.update { it.copy(apps = apps) } }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (session == generation) mutable.update { it.copy(appsError = e.message ?: "无法查询应用列表") } }
             finally { if (session == generation) mutable.update { it.copy(appsLoading = false) } }

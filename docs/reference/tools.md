@@ -27,7 +27,7 @@
 {"id":"open-settings","protocol":1,"type":"tool","tool":"apps.open","arguments":{"package":"com.android.settings"}}
 ```
 
-工具以服务当前 shell/root 身份执行，Android 权限仍然适用。普通工具使用独立参数，`device.shell` 的直接专家请求接受 shell 文本，模型调用仅用固定诊断参数。每条命令最长 30 秒，每路输出上限 256 KiB；模型工具循环最多 16 轮，整体请求上限 170 秒。
+工具以服务当前 shell/root 身份执行，Android 权限仍然适用。普通工具使用独立参数，`device.shell` 的直接专家请求接受 shell 文本，模型调用仅用固定诊断参数。每条命令最长 30 秒，每路输出上限 256 KiB（应用列表框架查询为 1 MiB）；模型工具循环最多 16 轮，整体请求上限 170 秒。
 
 响应通过请求 `id` 关联，失败返回 `ok: false` 与 `error`。完整格式见[协议](../protocol.md)。
 
@@ -43,7 +43,7 @@
 
 ## 应用列表 {#apps-list}
 
-`apps.list` 的 `result` 为 JSON 字符串，例如 `{"apps":[{"package":"com.android.settings","label":"设置","system":true}],"source":"package_manager","userId":0,"labelErrors":0}`。应用按包名排序、去重；通过目标包管理器读取当前 Android 用户的应用名称与系统/用户类型。名称读取失败时 `label` 为 `null`，并计入 `labelErrors`，不阻塞其他应用。接口整体受 30 秒与 256 KiB 限制，查询期间安装状态变化时应刷新。
+`apps.list` 的 `result` 为 JSON 字符串，例如 `{"apps":[{"package":"com.android.settings","label":"设置","system":true}],"source":"package_manager","userId":0,"labelErrors":0}`。应用按包名排序、去重；通过目标包管理器读取当前 Android 用户的应用名称与系统/用户类型。名称读取失败时 `label` 为 `null`，并计入 `labelErrors`，不阻塞其他应用。框架查询受 30 秒与 1 MiB 限制，查询期间安装状态变化时应刷新。
 
 目标包管理器桥接不可用时，使用 `pm list packages` 读取包名与系统类型；此时 `source` 为 `pm`、`labelsAvailable` 为 false、`label` 为 `null`，不返回 `userId` 与 `labelErrors`。
 
@@ -148,11 +148,13 @@ Android 页面显示名称、包名、图标与类型，支持名称/包名搜�
 
 `media.seek` / `media_seek` 接收 package、非负整数 positionMs 和可选 sessionTag。选择当前 Android 用户活动会话，检查 ACTION_SEEK_TO 和已知正时长边界；多个匹配会话时拒绝猜测。通过标准 TransportControls.seekTo 提交，不用方向/快进键模拟。返回 packageName、requestedMs、submitted=true、playbackVerified=false 和提交时 session 快照。提交不证明执行：控制端随后读取位置核对，播放器拒绝或未及时更新时如实显示未观察到目标位置。接口依据 [MediaSessionManager](https://developer.android.com/reference/android/media/session/MediaSessionManager#getActiveSessions(android.content.ComponentName)) 与 [TransportControls.seekTo](https://developer.android.com/reference/android/media/session/MediaController.TransportControls#seekTo(long))。
 
-常驻服务仍为 Rust 原生二进制。Android 构建时编译并嵌入短时 Java/Dex 桥接，只经系统 app_process 为当前请求调用 framework，不安装服务 APK或后台 Java 服务。初始化到服务私有 platform 目录中的 SHA-256 命名只读资产，核对 owner、模式、长度和内容；子进程每次限时 10 秒、输出 256 KiB。反射只用于获取系统/当前用户上下文与 Android 媒体模块初始化；厂商或权限阻止时返回不可用，不切换或提权。最多 64 会话，标题限 256 字符、tag 超过 128 字符返回 null。Root 身份及其他 Android 版本尚未实机验收。
+常驻服务仍为 Rust 原生二进制。Android 构建时编译并嵌入短时 Java/Dex 桥接，只经系统 app_process 为当前请求调用 framework，不安装服务 APK或后台 Java 服务。初始化到服务私有 platform 目录中的 SHA-256 命名只读资产，核对 owner、模式、长度和内容；子进程默认限时 10 秒、输出 256 KiB；应用列表框架查询限时 30 秒、输出 1 MiB。反射只用于获取系统/当前用户上下文与 Android 媒体模块初始化；厂商或权限阻止时返回不可用，不切换或提权。最多 64 会话，标题限 256 字符、tag 超过 128 字符返回 null。Root 身份及其他 Android 版本尚未实机验收。
 
 ## 真实应用名称 {#app-labels}
 
-apps.list / apps_list 优先通过短时框架桥接读取当前 Android 用户的 PackageManager 安装列表与 getApplicationLabel，返回 package、label 和 system；包名排序。标签按目标资源/配置解析，最多 256 个 UTF-16 单元。返回 source=package_manager、labelsAvailable=true、userId 和 labelErrors，单个标签读取失败时保留 null；这不表示标签完整读取成功。最多 4096 条、整体 256 KiB。桥接不可用或结果无效时回退原 pm 枚举，source=pm、labelsAvailable=false，未知 label 保持 null。它不会启动或修改应用。手机/桌面沿用名称与包名搜索、按准确包名启动。
+apps.list / apps_list 优先通过短时框架桥接读取当前 Android 用户的 PackageManager 安装列表与 getApplicationLabel，返回 package、label 和 system；包名排序。标签按目标资源/配置解析，最多 256 个 UTF-16 单元。返回 source=package_manager、labelsAvailable=true、userId 和 labelErrors，单个标签读取失败时保留 null；这不表示标签完整读取成功。最多 4096 条、整体 1 MiB。桥接不可用或结果无效时回退原 pm 枚举，source=pm、labelsAvailable=false，未知 label 保持 null。它不会启动或修改应用。手机/桌面沿用名称与包名搜索、按准确包名启动。
+
+应用元数据缓存：`apps.list` 的框架结果为每条应用提供 `cacheKey`（64 位小写十六进制 SHA-256），由用户、包名、首次安装/更新时间（毫秒）、版本、UID、系统标志、base/split 路径和资源配置生成。被控端每次重新查询 PackageManager 元数据，匹配时复用私有目录中持久化的名称和 96×96 PNG。`apps.icon` 描述符同时携带 `cacheKey`，控制端必须与当前列表标识一致后再下载；标识变化应刷新列表，不缓存该图标。缓存通过进程间锁与原子替换保护，文件限额 64 MiB / 8192 项，PNG 至多 128 KiB 并验证摘要；不持久缓存短时 artifact 地址。`apps.info` 复用静态信息并增加 `firstInstallTime` 字段；`apps.control_info`、待确认操作及实际提交前的身份/权限检查继续实时读取。pm 枚举回退没有 cacheKey，控制端刷新后不能保留这些未知版本的图标。
 
 框架上下文与媒体桥接共用初始化源码，但应用与媒体操作拆为独立 Java 类。常驻服务仍为 Rust 可执行文件，SDK javac/D8 仅在 Android 构建时生成并嵌入短时适配 Dex，目标按请求运行 app_process。生成资产不提交，标签读取不要求额外服务 APK。
 

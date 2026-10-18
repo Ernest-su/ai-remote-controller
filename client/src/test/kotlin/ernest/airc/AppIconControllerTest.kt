@@ -170,6 +170,42 @@ class AppIconControllerTest {
         } finally { scope.cancel();runtime.close();server.shutdown() }
     }
 
+    @Test fun refreshingRetainsOnlyUnchangedVersionedIconsAndDropsRemovedEntries(): Unit = runBlocking {
+        IconFixture().use { fixture ->
+            val first = "a".repeat(64); val next = "b".repeat(64)
+            fixture.controller.updateApps(listOf(InstalledApp("test.app", cacheKey=first)))
+            val load=async { fixture.controller.load("test.app") }
+            fixture.reply(fixture.nextRequest(),first)
+            assertContentEquals(fixture.png,load.await()); assertEquals(1,fixture.downloads.get())
+            fixture.controller.updateApps(listOf(InstalledApp("test.app", cacheKey=first)))
+            assertContentEquals(fixture.png,withTimeout(500) { fixture.controller.load("test.app") })
+            assertEquals(1,fixture.downloads.get())
+            fixture.controller.updateApps(listOf(InstalledApp("test.app", cacheKey=next)))
+            assertNull(fixture.controller.cached("test.app"))
+            val changed=async { fixture.controller.load("test.app") }
+            fixture.reply(fixture.nextRequest(),next);changed.await()
+            assertEquals(2,fixture.downloads.get())
+            fixture.controller.updateApps(emptyList());assertNull(fixture.controller.cached("test.app"))
+        }
+    }
+
+    @Test fun mismatchedAndLateVersionDescriptorsNeverDownloadOrPopulateCache(): Unit = runBlocking {
+        IconFixture().use { fixture ->
+            val first="a".repeat(64);val next="b".repeat(64)
+            fixture.controller.updateApps(listOf(InstalledApp("test.app",cacheKey=first)))
+            val mismatch=async { runCatching { fixture.controller.load("test.app") } }
+            fixture.reply(fixture.nextRequest(),next)
+            assertTrue(mismatch.await().isFailure);assertEquals(0,fixture.downloads.get())
+            val late=async { runCatching { fixture.controller.load("test.app") } }
+            val request=fixture.nextRequest()
+            fixture.controller.updateApps(listOf(InstalledApp("test.app",cacheKey=next)))
+            fixture.reply(request,first)
+            assertTrue(late.await().isFailure);assertNull(fixture.controller.cached("test.app"));assertEquals(0,fixture.downloads.get())
+            fixture.controller.updateApps(listOf(InstalledApp("test.app")))
+            assertNull(fixture.controller.cached("test.app"))
+        }
+    }
+
     private class IconFixture(private val blockDownloads: Boolean = false) : AutoCloseable {
         val server = MockWebServer()
         val runtime = RuntimeConnection()
@@ -207,11 +243,12 @@ class AppIconControllerTest {
 
         suspend fun nextRequest() = withTimeout(3000) { requests.receive() }
 
-        fun reply(request: Pair<WebSocket, JsonObject>) {
+        fun reply(request: Pair<WebSocket, JsonObject>, cacheKey: String? = null) {
             val artifact = buildJsonObject {
                 put("id", id); put("path", "/artifacts/$id"); put("mimeType", "image/png")
                 put("sizeBytes", png.size); put("width", 96); put("height", 96); put("expiresInSeconds", 60)
                 put("package", request.second.getValue("arguments").jsonObject.getValue("package"))
+                cacheKey?.let { put("cacheKey",it) }
             }
             request.first.send(buildJsonObject {
                 put("id", request.second.getValue("id")); put("protocol", 1); put("ok", true)

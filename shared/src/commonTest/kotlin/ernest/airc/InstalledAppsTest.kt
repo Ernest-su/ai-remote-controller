@@ -6,13 +6,15 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 class InstalledAppsTest {
-    @Test fun structuredAndLegacyListsPreserveMetadata() {
-        val apps = decodeInstalledApps("""{"apps":[{"package":"com.example.tv","label":"电视","system":false}]}""")
-        assertEquals(InstalledApp("com.example.tv", "电视", false), apps.single())
-        val legacy = decodeInstalledApps("package:com.android.settings\n").single()
-        assertNull(legacy.label)
-        assertNull(legacy.system)
+    @Test fun structuredListsPreserveVersionsAndExplicitFallbackMetadata() {
+        val key = "a".repeat(64)
+        val apps = decodeInstalledApps("""{"apps":[{"package":"com.example.tv","label":"电视","system":false,"cacheKey":"$key"}]}""")
+        assertEquals(InstalledApp("com.example.tv", "电视", false, key), apps.single())
+        val fallback = decodeInstalledApps("""{"apps":[{"package":"com.android.settings","label":null,"system":true}],"source":"pm","labelsAvailable":false}""").single()
+        assertNull(fallback.label); assertNull(fallback.cacheKey)
+        assertFailsWith<IllegalArgumentException> { decodeInstalledApps("package:com.android.settings\n") }
         assertFailsWith<IllegalArgumentException> { decodeInstalledApps("Failure [permission denied]") }
+        assertFailsWith<IllegalArgumentException> { decodeInstalledApps("""{"apps":[{"package":"com.example.tv","cacheKey":"bad"}]}""") }
     }
 
     @Test fun searchingMatchesLabelOrPackageIgnoringCaseAndWhitespace() {
