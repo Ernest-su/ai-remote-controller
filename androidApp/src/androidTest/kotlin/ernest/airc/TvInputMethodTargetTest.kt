@@ -38,6 +38,20 @@ class TvInputMethodTargetTest {
             val enabled = device.shell("settings get secure enabled_input_methods").trim()
             val filesBefore = device.shell("find /data/local/tmp -maxdepth 1 -name 'airc-ime-*.apk' -print").trim()
             val transport = TvInputMethodTransport(context, device) {}
+            val focusScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            val input = TvInputController(focusScope, { "native-fixture" }, { "native-fixture" },
+                { TvInputMode.IME }, { _, _ -> }, {
+                    object : TvInputBackend {
+                        override suspend fun status() = transport.status()
+                        override suspend fun focusedEditor() = transport.focusedEditor()
+                        override suspend fun enable(): TvImeStatus = error("Monitoring must not enable IME")
+                        override suspend fun restore(): TvImeStatus = error("Monitoring must not restore IME")
+                        override suspend fun commit(text: String): TvImeStatus = error("Monitoring must not submit")
+                        override suspend fun paste(text: String) = error("Monitoring must not paste")
+                        override fun close() = Unit
+                    }
+                })
+            var monitor: Job? = null
             try {
                 assertFalse(transport.status().installed)
                 val switched = transport.enable()
@@ -45,8 +59,11 @@ class TvInputMethodTargetTest {
                 assertEquals(original, switched.previous)
                 // Enabling an already selected IME must not replace the saved original.
                 assertEquals(original, transport.enable().previous)
+                monitor = focusScope.launch { input.monitorFocus(150, 250) }
                 device.shell("am start -W -n ernest.airc.mediafixture/.TextActivity --ez ime true --es clipboard airc-fixture-clipboard")
-                withTimeout(10000) { while (!transport.status().ready) delay(100) }
+                withTimeout(10000) { while (!transport.focusedEditor().ready) delay(100) }
+                assertTrue(transport.focusedEditor().selected)
+                withTimeout(10000) { while (input.focusedEditor.value == null) delay(100) }
                 val text = "中文片名 🎬 %s; \$(reboot) ' 字面文本"
                 transport.commit(text)
                 var actual = ""
@@ -67,7 +84,10 @@ class TvInputMethodTargetTest {
                 device.shell("content call --uri content://ernest.airc.mediafixture.text --method restoreClipboard")
                 device.shell("am force-stop ernest.airc.mediafixture")
                 device.shell("am start -W -n ernest.airc.mediafixture/.TextActivity")
-                withTimeout(5000) { while (transport.status().ready) delay(100) }
+                withTimeout(5000) { while (transport.focusedEditor().ready) delay(100) }
+                withTimeout(5000) { while (input.focusedEditor.value != null) delay(100) }
+                monitor.cancelAndJoin()
+                assertNull(input.focusedEditor.value)
                 val failure = runCatching { transport.commit("must not be inserted") }.exceptionOrNull()
                 assertNotNull("No focused editor must be rejected", failure)
                 assertEquals(text, device.shell("content read --uri content://ernest.airc.mediafixture.text/text").trim())
@@ -75,6 +95,8 @@ class TvInputMethodTargetTest {
                 assertEquals(original, device.shell("settings get secure default_input_method").trim())
                 assertEquals(filesBefore, device.shell("find /data/local/tmp -maxdepth 1 -name 'airc-ime-*.apk' -print").trim())
             } finally {
+                monitor?.cancelAndJoin()
+                focusScope.cancel()
                 device.shell("content call --uri content://ernest.airc.mediafixture.text --method restoreClipboard")
                 device.shell("ime set '${original.replace("'", "'\\''")}'")
                 device.shell("ime disable $TV_IME")

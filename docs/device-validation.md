@@ -71,3 +71,13 @@ python3 scripts/test-live-model-target.py --target <目标序列号> --host <目
 - 网络：自然 WLAN 故障、设备切换和旧连接回复隔离。
 
 记录中区分模拟器、主机 fixture、物理控制端与实际目标，注明系统/ABI、版本、连接方式和未执行条件。测试结束只清理自己创建的服务、文件、包与转发。
+
+## 电视输入法与焦点联动
+
+仅在明确授权的 API 31+ 物理电视执行：
+
+```sh
+python3 scripts/test-tv-input-method.py --serial <电视ADB序列号> --allow-physical
+```
+
+先构建 App 和 mediaFixture。物理专项从 App 提取配套输入法，只临时安装输入法和媒体 fixture，不在电视运行手机 instrumentation，也不安装控制端 App；拒绝覆盖已有配套输入法或媒体 fixture。必须能读取原输入法与前台 Activity 以便恢复。脚本临时安装所需包，在自建输入框中通过同一输入法接口验证就绪/失焦、中文与字面 Shell 字符提交、电视剪贴板不变、无编辑器拒绝及原输入法恢复；结束移除本次创建的包并恢复原前台页面。不要把这一结果扩展为任意第三方自绘输入框兼容，或控制手机上的预览画面与手势验收。

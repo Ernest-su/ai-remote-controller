@@ -46,6 +46,8 @@ internal class TvInputMethodTransport(private val context: Context, private val 
         while (true) { val count = input.read(buffer); if (count < 0) break; digest.update(buffer, 0, count) }
         digest.digest().joinToString("") { "%02x".format(it) }
     }
+    // Used only after status() verifies the installed package; it never reads editor text.
+    suspend fun focusedEditor(): TvImeStatus = readStatus(user())
     suspend fun status(): TvImeStatus = status(user())
     private suspend fun status(user: Int): TvImeStatus {
         val path = shell("pm path --user $user ernest.airc.ime").lineSequence()
@@ -54,6 +56,9 @@ internal class TvInputMethodTransport(private val context: Context, private val 
         val quoted = "'" + path.replace("'", "'\\''") + "'"
         val digest = shell("sha256sum $quoted").substringBefore(' ')
         if (digest != expectedDigest()) return TvImeStatus(installed = true)
+        return readStatus(user)
+    }
+    private suspend fun readStatus(user: Int): TvImeStatus {
         val reply = call(user, "status")
         val state = imeReplyStatus(reply)
         check(state in setOf("selected", "inactive")) { "无法读取电视输入法状态" }

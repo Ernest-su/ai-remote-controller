@@ -60,9 +60,31 @@ val DarkRemotePalette = RemotePalette(
     Fill = Color(0xff292929), Disabled = Color(0xff737373), Warning = Color(0xffff8585),
     OnWarning = Color(0xff390b0b), Outline = Color(0xff858585),
 )
+/** Local backing protects controls over arbitrary video without obscuring the gaps. */
+object MirrorOverlayStyle {
+    val Canvas = Color.Black
+    val Backing = Color.Black.copy(alpha = 0.60f)
+    val Foreground = Color.White
+    const val BorderAlpha = 0.45f
+    val Border = Color.White.copy(alpha = BorderAlpha)
+    val FrameBorder = Color(0xff808080).copy(alpha = 0.60f)
+    val Disabled = Color.White.copy(alpha = 0.5f)
+    val Danger = Color(0xffffe3df)
+}
+val MirrorOverlayPalette = DarkRemotePalette.copy(
+    Background = Color.Transparent, Header = Color.Transparent, Fill = Color.Transparent,
+    Surface = MirrorOverlayStyle.Backing, Text = MirrorOverlayStyle.Foreground,
+    Secondary = MirrorOverlayStyle.Foreground, Action = MirrorOverlayStyle.Foreground,
+    OnAction = MirrorOverlayStyle.Foreground, ActionContainer = MirrorOverlayStyle.Backing,
+    Divider = MirrorOverlayStyle.Border, Disabled = MirrorOverlayStyle.Disabled,
+    Warning = MirrorOverlayStyle.Danger, Outline = MirrorOverlayStyle.Foreground,
+)
+val LocalMirrorOverlay = staticCompositionLocalOf { false }
 private val LocalRemotePalette = staticCompositionLocalOf { LightRemotePalette }
 
 object RemoteColors {
+    val FloatingBorder: Color @Composable get() = if (LocalMirrorOverlay.current) MirrorOverlayStyle.FrameBorder
+        else LocalRemotePalette.current.Text.copy(alpha = MirrorOverlayStyle.BorderAlpha)
     val Brand: Color @Composable get() = LocalRemotePalette.current.Brand
     val Action: Color @Composable get() = LocalRemotePalette.current.Action
     val ActionContainer: Color @Composable get() = LocalRemotePalette.current.ActionContainer
@@ -80,10 +102,21 @@ object RemoteColors {
 
 /** Dimensions from AIVoice phoneRemoteApp, with scrolling for short windows / large text. */
 object RemoteDimensions {
+    val FloatingRemoteSnapDistance = 24.dp
+    const val FloatingRemoteMinTransparency = 60
+    const val FloatingRemoteMaxTransparency = 90
+    const val FloatingRemoteDefaultTransparency = FloatingRemoteMinTransparency
+    const val FloatingRemoteTransparencyStep = 5
+    const val FloatingRemoteIdleDelayMillis = 5_000L
+    const val FloatingRemoteIdleOpacityFactor = 0.5f
+    const val FloatingRemoteFadeMillis = 200
+    val ModelHintMinimumFontSize = 1.sp
     val MirrorPreviewHeight = 300.dp
     val CompactRemoteWidth = 240.dp
     val CompactRemoteHeight = 304.dp
-    val MirrorRemoteHeaderHeight = 96.dp
+    val MirrorRemoteMinimumWidth = 144.dp
+    val MirrorRemoteHeaderHeight = 48.dp
+    val MirrorRemoteBorderWidth = 1.dp
     val MirrorRemoteSourceHeight = 760.dp
     const val MirrorRemotePortraitFraction = 1f / 3f
     const val MirrorRemoteLandscapeFraction = 0.5f
@@ -133,7 +166,20 @@ object RemoteDimensions {
 
 @Composable
 fun RemoteTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    val colors = if (darkTheme) DarkRemotePalette else LightRemotePalette
+    RemotePaletteTheme(if (darkTheme) DarkRemotePalette else LightRemotePalette, darkTheme, content)
+}
+
+/** Stable provider structure keeps native video and remote drafts in place when toggled. */
+@Composable
+fun MirrorOverlayTheme(enabled: Boolean, content: @Composable () -> Unit) {
+    val current = LocalRemotePalette.current
+    CompositionLocalProvider(LocalMirrorOverlay provides enabled) {
+        RemotePaletteTheme(if (enabled) MirrorOverlayPalette else current, enabled || current == DarkRemotePalette, content)
+    }
+}
+
+@Composable
+private fun RemotePaletteTheme(colors: RemotePalette, darkTheme: Boolean, content: @Composable () -> Unit) {
     val base = if (darkTheme) darkColorScheme() else lightColorScheme()
     CompositionLocalProvider(LocalRemotePalette provides colors) {
         MaterialTheme(

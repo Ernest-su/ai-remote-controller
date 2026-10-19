@@ -27,7 +27,6 @@ internal fun Applications(state: RemoteUiState, model: RemoteViewModel, onDetail
             management.message != null || cache.message != null || installation.message != null -> "有应用任务结果可查看"
             else -> null
         },
-        onInspect = onDetails ?: { model.appManagement.inspect(it, state.connected) },
         onUninstall = { model.appManagement.uninstall(it, state.connected, model::listApps) },
         onClearCache = if("apps.clear_cache" in state.tools) { { model.appCache.prepare(it,state.connected && !management.busy && !installation.busy) } } else null,
         icon = { name -> androidx.compose.runtime.key(iconRevision) { ApplicationIcon(name, state.connected && "apps.icon" in state.tools, model.appIcons.cached(name), model.appIcons::load) } },

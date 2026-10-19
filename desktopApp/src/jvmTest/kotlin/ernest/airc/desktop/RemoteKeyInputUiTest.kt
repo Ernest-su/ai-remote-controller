@@ -6,6 +6,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
@@ -60,4 +62,30 @@ class RemoteKeyInputUiTest {
         key.performSemanticsAction(SemanticsActions.OnClick) { it() }
         compose.runOnIdle { assertEquals(1, taps) }
     }
+    @Test fun parentDragCancelsHeldKeyAndConsumedDownCannotStartAnotherKey() {
+        val sender = Sender()
+        var intercept by mutableStateOf(false)
+        compose.setContent { RemoteTheme { CompositionLocalProvider(LocalRemoteKeySender provides sender) {
+            Box(Modifier.size(160.dp).pointerInput(intercept) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (intercept) event.changes.forEach { it.consume() }
+                    }
+                }
+            }) {
+                Box(Modifier.size(80.dp).testTag("key").remoteKeyInput("ok", true) {}) { Text("OK") }
+            }
+        } } }
+        val key = compose.onNodeWithTag("key")
+        key.performTouchInput { down(center) }
+        compose.runOnIdle { intercept = true }
+        key.performTouchInput { moveBy(Offset(5f, 0f)); up() }
+        compose.runOnIdle { assertEquals(listOf("down:ok", "cancel:ok"), sender.events) }
+        key.performTouchInput { down(center); up() }
+        compose.runOnIdle { assertEquals(2, sender.events.size); intercept = false }
+        key.performTouchInput { down(center); up() }
+        compose.runOnIdle { assertEquals(listOf("down:ok", "cancel:ok", "down:ok", "up:ok"), sender.events) }
+    }
+
 }

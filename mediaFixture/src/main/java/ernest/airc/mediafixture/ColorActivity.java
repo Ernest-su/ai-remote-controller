@@ -6,7 +6,24 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 /** Deterministic screenrecord source, avoiding capture of user applications. */
 public final class ColorActivity extends Activity {
+    private int inputEvents;
+    private void recordInput(String kind, int action, int code) {
+        if (inputEvents++ >= 4096) return;
+        try(java.io.FileOutputStream out = openFileOutput("color-input.jsonl", MODE_APPEND)) {
+            String row = new org.json.JSONObject().put("kind", kind).put("action", action).put("code", code).toString();
+            out.write((row + "\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch(Exception error) { throw new IllegalStateException(error); }
+    }
+    @Override public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        recordInput("key", event.getAction(), event.getKeyCode());
+        return super.dispatchKeyEvent(event);
+    }
+    @Override public boolean dispatchTouchEvent(android.view.MotionEvent event) {
+        recordInput("touch", event.getActionMasked(), 0);
+        return super.dispatchTouchEvent(event);
+    }
     public void onCreate(Bundle state){super.onCreate(state);
+        try(java.io.FileOutputStream out = openFileOutput("color-input.jsonl", MODE_PRIVATE)) {} catch(Exception error) { throw new IllegalStateException(error); }
         applyOrientation(getIntent());
         setContentView(new View(this){
         protected void onDraw(Canvas canvas){Paint p=new Paint();p.setColor(0xff00ffff);canvas.drawRect(0,0,getWidth(),getHeight()/2f,p);p.setColor(0xffff00ff);canvas.drawRect(0,getHeight()/2f,getWidth(),getHeight(),p);p.setColor(0xffffffff);float x=(android.os.SystemClock.uptimeMillis()/10)%Math.max(1,getWidth());canvas.drawRect(x,0,x+20,20,p);long ticks=(android.os.SystemClock.elapsedRealtime()/10)&0xffffffffL;float cell=getWidth()/36f;float top=getHeight()/2f-60;

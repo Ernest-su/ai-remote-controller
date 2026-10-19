@@ -25,7 +25,8 @@ import org.junit.Test
 
 /** Real remote layout and vibrator, with every remote action answered by a local no-op server. */
 class RemoteHapticsInputUiTest {
-    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    val compose = createAndroidComposeRule<ComponentActivity>()
+    @get:Rule val rules: org.junit.rules.TestRule = org.junit.rules.RuleChain.outerRule(DeviceHistoryIsolation()).around(compose)
     private class ObservedHaptics(private val real: AndroidRemoteHaptics) : RemoteHaptics {
         override fun trace(event: String) = real.trace(event)
         val held = mutableSetOf<Any>()

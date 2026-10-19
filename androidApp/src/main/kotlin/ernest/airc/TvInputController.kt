@@ -11,6 +11,7 @@ enum class TvInputMode(val title: String) { PASTE("剪贴板粘贴"), IME("输�
 
 internal interface TvInputBackend : AutoCloseable {
     suspend fun status(): TvImeStatus
+    suspend fun focusedEditor(): TvImeStatus = status()
     suspend fun enable(): TvImeStatus
     suspend fun restore(): TvImeStatus
     suspend fun commit(text: String): TvImeStatus
@@ -37,6 +38,7 @@ class TvInputController internal constructor(private val scope: CoroutineScope,
                 val ime = TvInputMethodTransport(context, session.client, checkTarget)
                 object : TvInputBackend {
                     override suspend fun status() = ime.status()
+                    override suspend fun focusedEditor() = ime.focusedEditor()
                     override suspend fun enable() = ime.enable()
                     override suspend fun restore() = ime.restore()
                     override suspend fun commit(text: String) = ime.commit(text)
@@ -51,12 +53,15 @@ class TvInputController internal constructor(private val scope: CoroutineScope,
         })
     private val mutable = MutableStateFlow(TvInputState())
     val state = mutable.asStateFlow()
+    private val mutableFocus = MutableStateFlow<TvImeStatus?>(null)
+    internal val focusedEditor = mutableFocus.asStateFlow()
+    @Volatile private var focusGeneration = 0L
     private var job: Job? = null
     @Volatile private var boundId: String? = null
     @Volatile private var generation = 0L
     fun selectTarget(id: String?) {
         if (id == boundId) return
-        generation++; job?.cancel(); boundId = id
+        generation++; focusGeneration++; mutableFocus.value = null; job?.cancel(); boundId = id
         mutable.update { TvInputState(draft = it.draft, mode = id?.let(readMode) ?: TvInputMode.PASTE) }
     }
     fun mode(value: TvInputMode) {
@@ -66,7 +71,55 @@ class TvInputController internal constructor(private val scope: CoroutineScope,
         mutable.update { it.copy(mode = value, error = null, message = null) }
     }
     fun edit(value: String) { if (!state.value.busy) mutable.update { it.copy(draft = value, message = null, error = null) } }
-    fun cancel() { job?.cancel(); mutable.update { it.copy(ime = null) } }
+    fun cancel() { job?.cancel(); mutableFocus.value = null; mutable.update { it.copy(ime = null) } }
+
+    /** Read-only, lifecycle-scoped monitoring; each ADB connection belongs to this monitor alone. */
+    internal suspend fun monitorFocus(pollMillis: Long = 1000, retryMillis: Long = 5000) {
+        selectTarget(deviceId())
+        val connection = target() ?: return
+        val id = boundId ?: return
+        val revision = generation
+        val token = ++focusGeneration
+        fun checkTarget() {
+            check(target() == connection && deviceId() == id && generation == revision && focusGeneration == token) {
+                "目标连接已改变"
+            }
+        }
+        try {
+            while (currentCoroutineContext().isActive && generation == revision && focusGeneration == token && target() == connection) {
+                try {
+                    withContext(Dispatchers.IO) {
+                        var opened: TvInputBackend? = null
+                        try {
+                            withTimeout(10_000) { opened = connectBackend(::checkTarget) }
+                            val backend = checkNotNull(opened)
+                            var status = withTimeout(5000) { backend.status() }
+                            var polls = 0
+                            while (currentCoroutineContext().isActive) {
+                                checkTarget()
+                                mutableFocus.value = status.takeIf { it.aligned && it.selected && it.ready }
+                                if (!status.aligned) break
+                                delay(pollMillis)
+                                // Periodically recheck package identity as well as the active Android user.
+                                status = withTimeout(5000) {
+                                    if (++polls % 10 == 0) backend.status() else backend.focusedEditor()
+                                }
+                            }
+                        } finally { opened?.close() }
+                    }
+                } catch (e: TimeoutCancellationException) {
+                    if (focusGeneration == token) mutableFocus.value = null
+                } catch (e: CancellationException) { throw e
+                } catch (_: Exception) {
+                    if (focusGeneration == token) mutableFocus.value = null
+                }
+                if (focusGeneration != token || generation != revision || target() != connection) break
+                delay(retryMillis)
+            }
+        } finally {
+            if (focusGeneration == token) mutableFocus.value = null
+        }
+    }
     fun refresh(available: Boolean) = run(available, "正在检查电视输入法…", { it.status() }) { status ->
         mutable.update { it.copy(ime = status) }
     }

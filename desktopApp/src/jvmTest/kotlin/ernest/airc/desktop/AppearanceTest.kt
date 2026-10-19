@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
@@ -107,6 +108,60 @@ class AppearanceTest {
         compose.runOnIdle { assertFalse(stopped); show = true }
         compose.onNodeWithText("停止服务").performClick()
         compose.runOnIdle { assertTrue(stopped) }
+    }
+
+    @Test fun fullscreenOverlayKeepsReadableControlsOverBothVideoExtremes() {
+        fun contrast(a: Color, b: Color): Float =
+            (maxOf(a.luminance(), b.luminance()) + 0.05f) / (minOf(a.luminance(), b.luminance()) + 0.05f)
+        assertEquals(0f, MirrorOverlayPalette.Background.alpha)
+        assertEquals(0f, MirrorOverlayPalette.Fill.alpha)
+        assertTrue(MirrorOverlayPalette.Surface.alpha > 0f && MirrorOverlayPalette.Surface.alpha < 1f)
+        for (video in listOf(Color.White, Color.Black)) {
+            val backing = MirrorOverlayPalette.Surface.compositeOver(video)
+            for (foreground in listOf(MirrorOverlayPalette.Text, MirrorOverlayPalette.Secondary,
+                MirrorOverlayPalette.Action, MirrorOverlayPalette.Warning)) {
+                assertTrue("Overlay contrast on $video", contrast(foreground, backing) >= 4.5f)
+                assertEquals(1f, foreground.alpha)
+            }
+        }
+    }
+
+    @Test fun fullscreenThemeRestoresInlinePaletteWithoutRecreatingContent() {
+        var full by mutableStateOf(false)
+        var dark by mutableStateOf(false)
+        var token: Any? = null
+        var color: Color? = null
+        var backing: Color? = null
+        var enabled: Boolean? = null
+        compose.setContent {
+            RemoteTheme(dark) {
+                MirrorOverlayTheme(full) {
+                    val instance = remember { Any() }
+                    val current = RemoteColors.Text
+                    val surface = MaterialTheme.colorScheme.surface
+                    val overlay = LocalMirrorOverlay.current
+                    SideEffect { token = instance; color = current; backing = surface; enabled = overlay }
+                }
+            }
+        }
+        val initial = compose.runOnIdle { token }
+        for (isDark in listOf(false, true)) {
+            compose.runOnIdle { dark = isDark; full = false }
+            compose.runOnIdle { assertEquals(if (isDark) DarkRemotePalette.Text else LightRemotePalette.Text, color) }
+            compose.runOnIdle { full = true }
+            compose.runOnIdle {
+                assertEquals(true, enabled)
+                assertEquals(MirrorOverlayPalette.Text, color)
+                assertEquals(MirrorOverlayPalette.Surface, backing)
+                assertSame(initial, token)
+                full = false
+            }
+            compose.runOnIdle {
+                assertEquals(false, enabled)
+                assertEquals(if (isDark) DarkRemotePalette.Surface else LightRemotePalette.Surface, backing)
+                assertSame(initial, token)
+            }
+        }
     }
 
     private fun screenshot(name: String) {

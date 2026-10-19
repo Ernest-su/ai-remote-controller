@@ -45,6 +45,7 @@ data class RemoteUiState(
     val keyHapticsEnabled: Boolean = true,
     val volumeKeysEnabled: Boolean = false,
     val keepAwake: Boolean = false,
+    val floatingRemoteTransparency: Int = RemoteDimensions.FloatingRemoteDefaultTransparency,
     val runtimeUid: Int? = null,
     val routines: List<QuickRoutine> = emptyList(),
     val shortcuts: AppShortcuts = AppShortcuts(),
@@ -123,7 +124,9 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     private val mutable = MutableStateFlow(RemoteUiState(history = store.read(), preferRoot = releasePreferences.getBoolean("prefer-root", false),
         keyHapticsEnabled = application.getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).getBoolean("key-haptics", true),
         volumeKeysEnabled = application.getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).getBoolean("volume-keys", false),
-        keepAwake = application.getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).getBoolean("keep-awake", false)))
+        keepAwake = application.getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).getBoolean("keep-awake", false),
+        floatingRemoteTransparency = application.getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE)
+            .getInt("floating-transparency", RemoteDimensions.FloatingRemoteDefaultTransparency).coerceIn(RemoteDimensions.FloatingRemoteMinTransparency, RemoteDimensions.FloatingRemoteMaxTransparency)))
     val state = mutable.asStateFlow()
     private val discovery = ServiceDiscovery(application, RUNTIME_SERVICE_TYPE,
         onFound = { service ->
@@ -206,6 +209,12 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     fun setKeepAwake(value: Boolean) {
         getApplication<Application>().getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).edit().putBoolean("keep-awake", value).apply()
         mutable.update { it.copy(keepAwake = value) }
+    }
+    fun setFloatingRemoteTransparency(value: Int) {
+        val bounded = value.coerceIn(RemoteDimensions.FloatingRemoteMinTransparency, RemoteDimensions.FloatingRemoteMaxTransparency)
+        getApplication<Application>().getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE)
+            .edit().putInt("floating-transparency", bounded).apply()
+        mutable.update { it.copy(floatingRemoteTransparency = bounded) }
     }
     private var hardwareRemoteActive = false
     private val hardwarePresses = mutableMapOf<Int, String>()

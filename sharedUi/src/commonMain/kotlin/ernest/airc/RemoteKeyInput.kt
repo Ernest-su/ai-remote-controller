@@ -56,6 +56,8 @@ fun Modifier.remoteKeyInput(key: String, enabled: Boolean, onClick: () -> Unit):
         .pointerInput(enabled, key, sender) {
             if (enabled) awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
+                // A parent drag may preempt new pointers before they reach the key.
+                if (down.isConsumed) return@awaitEachGesture
                 var cancelled = true
                 try {
                     down.consume(); start()

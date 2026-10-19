@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ApplicationsPanel(apps: List<InstalledApp>, connected: Boolean, loading: Boolean, error: String?, output: String,
-    onRefresh: () -> Unit, onOpen: (String) -> Unit, onInspect: ((String) -> Unit)? = null,
+    onRefresh: () -> Unit, onOpen: (String) -> Unit,
     onUninstall: ((String) -> Unit)? = null, onClearCache: ((String) -> Unit)? = null,
     management: @Composable ColumnScope.() -> Unit = {}, icon: @Composable (String) -> Unit = {},
     actionsBusy: Boolean = false, operationMessage: String? = null, onDetails: ((String) -> Unit)? = null,
@@ -48,14 +48,13 @@ fun ApplicationsPanel(apps: List<InstalledApp>, connected: Boolean, loading: Boo
             modifier = Modifier.fillMaxWidth().testTag("app-package-input"))
         ActionButton("打开应用", enabled && packageName.isNotBlank()) { showPackage = false; launchApp(packageName.trim()) }
     }
-    if (showManagement) ManagementDialog("应用信息与任务", "app-management-dialog", { showManagement = false }) { drafts.SaveableStateProvider("app-management") { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { management() } } }
+    if (showManagement) ManagementDialog("管理任务", "app-management-dialog", { showManagement = false }) { drafts.SaveableStateProvider("app-management") { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { management() } } }
     if (showResult) ManagementDialog("操作结果", "app-result-dialog", { showResult = false }) { ResultPanel(output) }
     apps.firstOrNull { it.packageName == selectedPackage }?.let { app ->
         ManagementDialog(app.label ?: "应用", "app-detail-dialog", { selectedPackage = null }) {
             InfoRow("包名", app.packageName)
             InfoRow("类型", when (app.system) { true -> "系统应用"; false -> "用户应用"; null -> "类型未知" })
             ActionButton("启动应用", enabled) { selectedPackage = null; launchApp(app.packageName) }
-            onInspect?.let { inspect -> ActionButton("查看应用信息", enabled) { manage(app.packageName, inspect) } }
         }
     }
     LazyColumn(Modifier.fillMaxSize().testTag("apps-page"), state = list, contentPadding = PaddingValues(16.dp)) {
@@ -105,7 +104,6 @@ fun ApplicationsPanel(apps: List<InstalledApp>, connected: Boolean, loading: Boo
         }
         items(matches.take(visibleCount), key = { it.packageName }) { app ->
             ApplicationManagementRow(app, enabled, { if (onDetails != null) onDetails(app.packageName) else selectedPackage = app.packageName }, { launchApp(app.packageName) },
-                if (onDetails != null) { { onDetails(app.packageName) } } else onInspect?.let { action -> { manage(app.packageName, action) } },
                 if (app.system == false) onClearCache?.let { action -> { manage(app.packageName, action) } } else null,
                 if (app.system == false) onUninstall?.let { action -> { manage(app.packageName, action) } } else null,
                 { icon(app.packageName) },
@@ -120,7 +118,7 @@ fun ApplicationsPanel(apps: List<InstalledApp>, connected: Boolean, loading: Boo
 
 @Composable
 private fun ApplicationManagementRow(app: InstalledApp, enabled: Boolean, onDetail: () -> Unit, onOpen: () -> Unit,
-    onInspect: (() -> Unit)?, onCache: (() -> Unit)?, onUninstall: (() -> Unit)?, icon: @Composable () -> Unit, favorite: (@Composable () -> Unit)? = null) {
+    onCache: (() -> Unit)?, onUninstall: (() -> Unit)?, icon: @Composable () -> Unit, favorite: (@Composable () -> Unit)? = null) {
     var menu by remember { mutableStateOf(false) }
     ApplicationListRow(app, onDetail, icon, clickLabel = "查看应用") {
         if (favorite == null) ManagementIconButton(ManagementIcons.Play, "启动 ${app.label ?: app.packageName}", enabled, "app-open-${app.packageName}", onOpen)
@@ -130,7 +128,6 @@ private fun ApplicationManagementRow(app: InstalledApp, enabled: Boolean, onDeta
             DropdownMenu(menu, { menu = false }) {
                 if (favorite != null) DropdownMenuItem(text = { Text("启动应用") }, enabled = enabled, onClick = { menu = false; onOpen() })
                 DropdownMenuItem(text = { Text("应用详情") }, onClick = { menu = false; onDetail() })
-                onInspect?.let { DropdownMenuItem(text = { Text("查看应用信息") }, enabled = enabled, onClick = { menu = false; it() }) }
                 onCache?.let { DropdownMenuItem(text = { Text("清理缓存") }, enabled = enabled, onClick = { menu = false; it() }) }
                 onUninstall?.let { DropdownMenuItem(text = { Text("卸载", color = RemoteColors.Warning) }, enabled = enabled, onClick = { menu = false; it() }) }
             }

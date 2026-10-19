@@ -192,3 +192,15 @@ uv run --with websockets python runtime/remote_key_hold_target_test.py --serial 
 电视输入双通道验证：`TvInputControllerTest` 覆盖按电视保存方式、确认后清草稿、拒绝重复提交、失败不回退、取消和换目标隔离，以及中文/Shell 字符编码边界。构建 App/测试 APK 后，`python3 scripts/test-phone-target.py --phone <自有模拟器> --suite tv-input-ui` 检查 320dp / 1.5 倍字号的亮暗单选、安装与发送禁用、恢复入口、错误与处理中反馈并保存截图；`mobile-convenience-ui` 覆盖真实入口、旋转、草稿保留和软键盘展开/全局状态更新后的标题与关闭按钮可见性。
 
 执行 `python3 scripts/test-tv-input-method.py --serial <自有模拟器>` 可安装 fixture、运行真实输入法专项并恢复原 Activity、清理自建包。专项 `TvInputMethodTargetTest` 仅在显式传入 `ownedImeTarget=true` 的自有 API 31+ 模拟器运行。先确认 `ernest.airc.ime` 和 `ernest.airc.mediafixture` 均未安装，再安装自建 mediaFixture。专项使用模拟器 shell 权限运行生产输入法安装、摘要检查、启用、中文/表情/字面 Shell 字符提交、剪贴板不变、普通应用越权拒绝、无输入框拒绝和原输入法恢复，结束卸载自建输入法；外层调用者须卸载自建 mediaFixture 并恢复原 Activity。该专项不证明厂商电视或第三方自绘输入框兼容。
+
+全屏透明叠层回归使用 `AppearanceTest` 核对半透明衬底在纯白/纯黑视频上的正常文字、图标与危险前景对比度，并核对切换全屏后主题恢复及内容实例保留。`mirror-toolbar-ui` 同时运行 `MirrorOverlayUiTest`：以纯白、纯黑、棋盘格模拟视频，在亮暗主题下检查外框空隙透明、48dp 触控、图标入口、透明空隙阻断目标触控、完整遥控草稿保留并保存截图；原 `MirrorToolbarUiTest` 继续核对原生 Surface 身份、方向缩放和普通布局。`MirrorQualityUiTest` 通过内存 ADB 传入真实视频尺寸头并配置平台解码器，检查连续切换档位后的解码尺寸、分辨率/码率/帧率参数与旧会话清理；该 fixture 不提供视频帧，不证明真实目标编码和画面渲染。
+
+悬浮遥控头部与拖动继续使用 `mirror-toolbar-ui` 专项：`MirrorFloatingDragUiTest` 检查图标顺序和触控尺寸、无文字切换行、手柄快速/慢速连续滑动与长按后移动（不重复位移）、空白/按键/切换/关闭/输入区长按拖动及连续多次位移、边界限制、快速滑动不拖动、静止按住保持按键语义、拖动取消按键及多指介入不再发送 DOWN。桌面 `RemoteKeyInputUiTest` 检查父级手势取消当前按键、已消费 DOWN 不生成新按键；`remote-haptics-input-ui` 回归原有真实按下/抬起、快速点按与震动清理。以上均使用本地 fixture，不证明厂商电视的最终按键消费。
+
+电视输入焦点联动：`TvInputControllerTest` 使用只读 backend fixture 验证就绪/失焦、查询失败后隐藏与恢复、监测取消释放连接，以及换电视拒绝迟到状态，不触发安装或发送。`tv-input-ui` 包含 `TvInputFocusUiTest`，验证显式点击才打开面板和手机焦点、保留草稿及方向操作。`TvInputMethodTargetTest` 同时读取真实输入连接的轻量焦点接口；由 `scripts/test-tv-input-method.py --serial <自有模拟器>` 执行，不证明厂商输入框兼容。
+
+悬浮吸附与淡化：`MirrorRemoteBehaviorTest` 核对四边吸附、自由位置、越界与窄视口；`mirror-toolbar-ui` 包含 `FloatingRemoteBehaviorUiTest`，检查离线透明度设置及重新加载、连续拖动后吸附、5秒闲置淡化与按住恢复后的持续可见。测试使用本地画面 fixture，不连接电视。
+
+真实电视预览与浮层联测使用 `python3 scripts/test-phone-target.py --phone <控制端ADB> --target <电视ADB> --host <电视IP> --suite mirror-floating-target`。先构建 App、AndroidTest 与 mediaFixture；专项创建配套隔离 runtime，在临时 ColorActivity 中核对实际解码像素变化、原生 Surface 保留、连续拖动与吸附、设置透明度、闲置淡化与唤醒、浮层不透传触控、电视实收方向键 DOWN/UP、完整/紧凑切换及后台恢复。退出后核对自建 scrcpy 文件/进程释放，恢复控制端历史和透明度、电视原前台 Activity，并卸载自建 fixture。控制端若是模拟器，应明确报告，不能称为实体手机实测。
+
+首次在新控制端进入全屏时，先关闭 Android 的全屏手势教学提示，避免系统遮罩干扰叠层像素检查。`mirror-floating-target` 支持 `--preview-quality 流畅|均衡|清晰` 选择初始档位；若测试进程被中断，驱动器通过 `DeviceHistoryRecoveryTest` 恢复设备历史与已记录的透明度，避免把临时目标留给自动重连。

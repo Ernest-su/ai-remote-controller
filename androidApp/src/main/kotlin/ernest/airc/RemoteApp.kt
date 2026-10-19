@@ -30,6 +30,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import androidx.lifecycle.repeatOnLifecycle
 
 @Composable
 internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.SYSTEM, onThemeChange: (ThemeMode) -> Unit = {}) {
@@ -42,8 +44,11 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
     var sharedDownload by rememberSaveable { mutableStateOf(false) }
     var routinesOpen by rememberSaveable { mutableStateOf(false) }
     if (routinesOpen) QuickRoutinesPanel(state, model) { routinesOpen = false }
+    var focusInputRequested by remember { mutableStateOf(false) }
     var tvInput by rememberSaveable { mutableStateOf(false) }
-    if (tvInput) ManagementDialog("电视输入", "tv-input-dialog", { tvInput = false }, grouped = true) { TvInputPanel(state, model) }
+    if (tvInput) ManagementDialog("电视输入", "tv-input-dialog", { tvInput = false; focusInputRequested = false }, grouped = true) {
+        TvInputPanel(state, model, requestEditorFocus = focusInputRequested)
+    }
     var quickApps by rememberSaveable { mutableStateOf(false) }
     if (quickApps) LibraryDialog("常用应用", "quick-apps-dialog", { quickApps = false }, subtitle = state.history.find { it.id == state.selected }?.visibleName) { AppShortcutsPanel(state, model) }
     var appDetailsPackage by rememberSaveable { mutableStateOf("") }
@@ -101,6 +106,15 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
     val context = androidx.compose.ui.platform.LocalContext.current
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     val remoteActive = isRemoteType || page == RemotePage.SCREENSHOT
+    val focusedEditor by model.tvInput.focusedEditor.collectAsState()
+    LaunchedEffect(remoteActive, state.connected, state.selected, lifecycle) {
+        if (remoteActive && state.connected) lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            while (kotlinx.coroutines.currentCoroutineContext().isActive) {
+                model.tvInput.monitorFocus()
+                delay(1000)
+            }
+        }
+    }
     DisposableEffect(remoteActive, model) {
         model.hardwareRemoteActive(remoteActive)
         onDispose { model.hardwareRemoteActive(false) }
@@ -180,6 +194,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                         RemotePage.HELP -> HelpScreen()
                         RemotePage.SETTINGS -> AppearanceSettings(themeMode, onThemeChange) {
                             RemoteComfortSettings(state, model)
+                            FloatingRemoteSettings(state.floatingRemoteTransparency, model::setFloatingRemoteTransparency)
                             Panel {
                                 Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("remote-key-haptics")
                                     .toggleable(value = state.keyHapticsEnabled, role = Role.Switch, onValueChange = model::setKeyHapticsEnabled)
@@ -202,6 +217,8 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                 }
             }
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter), color = RemoteColors.Brand)
+            TvInputFocusPrompt(remoteActive && state.connected && focusedEditor != null && !tvInput && !quickApps && !routinesOpen && !shareOpen && !sharedDownload,
+                { focusInputRequested = true; tvInput = true }, Modifier.align(Alignment.BottomCenter).padding(16.dp))
             SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
         }
     }
@@ -287,7 +304,7 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
                         ) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 RemoteIconButton({ model.key("power") }, enabled = state.connected, debugName = "power",
-                                    modifier = Modifier.size(48.dp).background(RemoteColors.Surface, CircleShape)) {
+                                    modifier = Modifier.size(48.dp).then(if (LocalMirrorOverlay.current) Modifier else Modifier.background(RemoteColors.Surface, CircleShape))) {
                                     Icon(painterResource(R.drawable.ic_power), "电源", Modifier.size(24.dp),
                                         tint = if (state.connected) RemoteColors.Warning else RemoteColors.Disabled)
                                 }
@@ -324,7 +341,7 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
                             }
                             Box(Modifier.size(RemoteDimensions.Dpad).testTag("remote-dpad").background(RemoteColors.Surface, CircleShape).border(0.5.dp, RemoteColors.Divider, CircleShape)) {
                                 @Composable fun Direction(icon: Int, label: String, key: String, alignment: Alignment, padding: PaddingValues) {
-                                    RemoteIconButton({ model.key(key) }, enabled = state.connected, modifier = Modifier.align(alignment).padding(padding).size(60.dp), debugName = key) {
+                                    RemoteIconButton({ model.key(key) }, enabled = state.connected, modifier = Modifier.align(alignment).padding(padding).size(60.dp), debugName = key, overlayBacking = false) {
                                         Icon(painterResource(icon), label, Modifier.size(28.dp))
                                     }
                                 }
@@ -333,9 +350,10 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
                                 Direction(R.drawable.ic_left, "向左", "left", Alignment.CenterStart, PaddingValues(start = 8.dp))
                                 Direction(R.drawable.ic_right, "向右", "right", Alignment.CenterEnd, PaddingValues(end = 8.dp))
                                 Box(Modifier.size(RemoteDimensions.Confirm).align(Alignment.Center)
-                                    .background(if (state.connected) RemoteColors.Action else RemoteColors.Disabled, CircleShape)
+                                    .background(if (LocalMirrorOverlay.current) RemoteColors.Fill else if (state.connected) RemoteColors.Action else RemoteColors.Disabled, CircleShape)
+                                    .then(if (LocalMirrorOverlay.current) Modifier.border(0.5.dp, RemoteColors.Divider, CircleShape) else Modifier)
                                     .remoteKeyInput("ok", state.connected) { model.key("ok") }, contentAlignment = Alignment.Center) {
-                                    Text("OK", fontSize = 20.sp, color = RemoteColors.OnAction)
+                                    Text("OK", fontSize = 20.sp, color = if (LocalMirrorOverlay.current && !state.connected) RemoteColors.Disabled else RemoteColors.OnAction)
                                 }
                             }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -346,7 +364,7 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
                         }
                     }
                 }
-                Row(Modifier.fillMaxWidth().padding(start = RemoteDimensions.InnerPadding, end = RemoteDimensions.InnerPadding, bottom = if (imeVisible) 8.dp else RemoteDimensions.VerticalPadding).testTag("remote-text-controls"), verticalAlignment = Alignment.CenterVertically,
+                Row(Modifier.fillMaxWidth().mirrorControlBacking(MaterialTheme.shapes.small).padding(start = RemoteDimensions.InnerPadding, end = RemoteDimensions.InnerPadding, bottom = if (imeVisible) 8.dp else RemoteDimensions.VerticalPadding).testTag("remote-text-controls"), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     RemoteModelAvailability(state.modelConfigured) {
                         OutlinedTextField(
@@ -360,7 +378,11 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
                         )
                         FilledIconButton(onClick = ::submit,
                             enabled = state.connected && state.modelConfigured && !state.submitting && draft.isNotBlank(),
-                            modifier = Modifier.size(48.dp).testTag("remote-send-command")) {
+                            modifier = Modifier.size(48.dp).testTag("remote-send-command"),
+                            colors = if (LocalMirrorOverlay.current) IconButtonDefaults.filledIconButtonColors(
+                                containerColor = RemoteColors.Surface, contentColor = RemoteColors.Text,
+                                disabledContainerColor = RemoteColors.Surface, disabledContentColor = RemoteColors.Disabled,
+                            ) else IconButtonDefaults.filledIconButtonColors()) {
                             Icon(painterResource(R.drawable.ic_send), "发送文字指令", Modifier.size(24.dp))
                         }
                     }
@@ -378,10 +400,13 @@ internal fun RemoteKey(icon: Int, label: String, enabled: Boolean, tint: Color =
             .semantics(mergeDescendants = true) {}.padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Box(Modifier.size(size).background(RemoteColors.Surface, CircleShape), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(size).then(if (LocalMirrorOverlay.current) Modifier.mirrorControlBacking()
+            else Modifier.background(RemoteColors.Surface, CircleShape)), contentAlignment = Alignment.Center) {
             Icon(painterResource(icon), null, Modifier.size(24.dp), tint = if (enabled) tint else RemoteColors.Disabled)
         }
-        Text(label, style = MaterialTheme.typography.bodySmall, color = if (enabled) RemoteColors.Text else RemoteColors.Disabled)
+        Text(label, modifier = Modifier.mirrorControlBacking(MaterialTheme.shapes.small)
+            .then(if (LocalMirrorOverlay.current) Modifier.padding(horizontal = 4.dp) else Modifier),
+            style = MaterialTheme.typography.bodySmall, color = if (enabled) RemoteColors.Text else RemoteColors.Disabled)
     }
 }
 
@@ -409,8 +434,9 @@ private fun RemoteTypePicker(selected: RemotePage, navigate: (RemotePage) -> Uni
 }
 
 @Composable
-private fun RemoteIconButton(onClick: () -> Unit, enabled: Boolean, modifier: Modifier = Modifier, debugName: String = "remote-key", content: @Composable () -> Unit) {
-    Box(modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).remoteKeyInput(debugName, enabled, onClick),
+private fun RemoteIconButton(onClick: () -> Unit, enabled: Boolean, modifier: Modifier = Modifier, debugName: String = "remote-key", overlayBacking: Boolean = true, content: @Composable () -> Unit) {
+    Box(modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+        .then(if (overlayBacking) Modifier.mirrorControlBacking() else Modifier).remoteKeyInput(debugName, enabled, onClick),
         contentAlignment = Alignment.Center) {
         CompositionLocalProvider(LocalContentColor provides if (enabled) RemoteColors.Text else RemoteColors.Disabled) { content() }
     }

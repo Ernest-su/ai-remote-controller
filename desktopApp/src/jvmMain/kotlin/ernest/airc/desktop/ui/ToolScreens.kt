@@ -30,7 +30,6 @@ fun DesktopApplications(state: DesktopState, controller: DesktopController, onDe
             management.message != null || cache.message != null || installation.message != null -> "有应用任务结果可查看"
             else -> null
         },
-        onInspect = onDetails ?: { controller.appManagement.inspect(it, state.connected) },
         onUninstall = { controller.appManagement.uninstall(it, state.connected, controller::listApps) },
         onClearCache = if("apps.clear_cache" in state.tools) { { controller.appCache.prepare(it,state.connected && !management.busy && !installation.busy) } } else null,
         icon = { name -> androidx.compose.runtime.key(iconRevision) { ApplicationIcon(name, state.connected && "apps.icon" in state.tools, controller.appIcons.cached(name), controller.appIcons::load) } },

@@ -294,7 +294,7 @@ class ManagementUiTest {
                     Column(Modifier.widthIn(max = if (large.value) 320.dp else 360.dp)) {
                         Text(if (files.value) "文件管理" else "应用管理", Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge)
                         if (files.value) FileBrowserPanel(FileBrowserState(entries = entries, loaded = true), true, {}, {}, {}, {}, {}, onRoot = {}, onCreateDirectory = {})
-                        else ApplicationsPanel(apps, true, false, null, "", {}, {}, onInspect = {})
+                        else ApplicationsPanel(apps, true, false, null, "", {}, {})
                     }
                 } }
             }

@@ -12,8 +12,12 @@ import java.io.FileNotFoundException;
 public final class TextJournalProvider extends ContentProvider {
     public boolean onCreate() { return true; }
     public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
-        if (!"r".equals(mode) || !"/text".equals(uri.getPath())) throw new FileNotFoundException("read only text journal");
-        return ParcelFileDescriptor.open(new File(getContext().getFilesDir(), "remote-text.txt"), ParcelFileDescriptor.MODE_READ_ONLY);
+        if (!"r".equals(mode)) throw new FileNotFoundException("read only fixture journal");
+        String name;
+        if ("/text".equals(uri.getPath())) name = "remote-text.txt";
+        else if ("/color-input".equals(uri.getPath())) name = "color-input.jsonl";
+        else throw new FileNotFoundException("unknown fixture journal");
+        return ParcelFileDescriptor.open(new File(getContext().getFilesDir(), name), ParcelFileDescriptor.MODE_READ_ONLY);
     }
     @Override public android.os.Bundle call(String method, String arg, android.os.Bundle extras) {
         int uid = android.os.Binder.getCallingUid();

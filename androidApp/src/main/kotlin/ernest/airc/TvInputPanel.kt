@@ -8,6 +8,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
@@ -21,7 +23,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
 @Composable
-internal fun TvInputPanel(state: RemoteUiState, model: RemoteViewModel) {
+internal fun TvInputPanel(state: RemoteUiState, model: RemoteViewModel, requestEditorFocus: Boolean = false) {
     val input by model.tvInput.state.collectAsState()
     val view = LocalView.current
     // This editor lives in its own Dialog window; the Activity's adjustResize does not apply.
@@ -47,14 +49,26 @@ internal fun TvInputPanel(state: RemoteUiState, model: RemoteViewModel) {
         model.tvInput::edit, model.tvInput::mode, { model.tvInput.send(state.connected) },
         { clipboard.getText()?.text?.let(model.tvInput::edit) }, { model.key("delete") }, { model.key("enter") },
         { model.tvInput.enable(state.connected) }, { model.tvInput.refresh(state.connected) },
-        { model.tvInput.restore(state.connected) }, model.tvInput::cancel)
+        { model.tvInput.restore(state.connected) }, model.tvInput::cancel,
+        direction = model::key, requestEditorFocus = requestEditorFocus)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun TvInputContent(input: TvInputState, targetName: String, connected: Boolean,
     edit: (String) -> Unit, mode: (TvInputMode) -> Unit, send: () -> Unit, pastePhone: () -> Unit,
-    delete: () -> Unit, enter: () -> Unit, enable: () -> Unit, refresh: () -> Unit, restore: () -> Unit, cancel: () -> Unit) {
+    delete: () -> Unit, enter: () -> Unit, enable: () -> Unit, refresh: () -> Unit, restore: () -> Unit, cancel: () -> Unit, direction: (String) -> Unit = {}, requestEditorFocus: Boolean = false) {
+    val editorFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    var editorRequested by remember { mutableStateOf(false) }
+    LaunchedEffect(requestEditorFocus, input.busy) {
+        if (requestEditorFocus && !input.busy && !editorRequested) {
+            // Let the initial status refresh disable/re-enable the editor before requesting focus.
+            withFrameNanos { }
+            editorFocus.requestFocus(); keyboard?.show()
+            editorRequested = true
+        }
+    }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         TvInputIcon(R.drawable.ic_device_tv)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -114,7 +128,7 @@ internal fun TvInputContent(input: TvInputState, targetName: String, connected: 
     Panel {
         OutlinedTextField(input.draft, edit, enabled = !input.busy, label = { Text("输入到电视") },
             placeholder = { Text("输入片名、网址或其他文字") },
-            modifier = Modifier.fillMaxWidth().testTag("tv-input-draft"), minLines = 3, maxLines = 5,
+            modifier = Modifier.fillMaxWidth().focusRequester(editorFocus).testTag("tv-input-draft"), minLines = 3, maxLines = 5,
             isError = input.draft.toByteArray().size > 65536,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, autoCorrectEnabled = false))
         if (input.draft.toByteArray().size > 65536) Text("文字过长，请缩短后发送（最多 65536 UTF-8 字节）。",
@@ -150,6 +164,14 @@ internal fun TvInputContent(input: TvInputState, targetName: String, connected: 
         TvInputTextAction("删除一字", R.drawable.ic_delete, connected && !input.busy, delete)
         TvInputTextAction("回车", R.drawable.ic_enter, connected && !input.busy, enter)
     }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(Triple("向左", "left", R.drawable.ic_left), Triple("向上", "up", R.drawable.ic_up),
+            Triple("向下", "down", R.drawable.ic_down), Triple("向右", "right", R.drawable.ic_right)).forEach { (label, key, icon) ->
+            TvInputTextAction(label, icon, connected && !input.busy, { direction(key) })
+        }
+    }
+    Text("焦点联动需先安装并启用 AIRC 输入法；检测到电视输入框后，遥控与预览页会显示输入入口。",
+        style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
     Text("无需模型，需要可用的 ADB 连接。草稿只在本次 App 进程中保留，不保存输入历史。",
         style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
 }

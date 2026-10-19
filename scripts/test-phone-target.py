@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 import subprocess
 import shlex
@@ -12,7 +13,7 @@ from instrumentation_result import require_passed
 
 ROOT = Path(__file__).resolve().parent.parent
 SUITES = {
-    "tv-input-ui": ("ernest.airc.TvInputUiTest", 1),
+    "tv-input-ui": ("ernest.airc.TvInputUiTest,ernest.airc.TvInputFocusUiTest", 2),
     "remote-menu-ui": ("ernest.airc.RemoteQuickMenuUiTest,ernest.airc.RemoteLayoutUiTest", 5),
     "file-page-ui": ("ernest.airc.FilePageLayoutUiTest", 1),
     "library-layout-ui": ("ernest.airc.LibraryLayoutUiTest", 1),
@@ -31,9 +32,10 @@ SUITES = {
     "models": ("ernest.airc.ModelProfilesUiTest", 1),
     "model-sync": ("ernest.airc.ModelProfileSyncTargetTest", 1),
     "gamepad-lifecycle": ("ernest.airc.GamepadLifecycleTargetTest", 5),
-    "mirror-toolbar-ui": ("ernest.airc.MirrorToolbarUiTest", 2),
+    "mirror-toolbar-ui": ("ernest.airc.MirrorToolbarUiTest,ernest.airc.MirrorOverlayUiTest,ernest.airc.MirrorFloatingDragUiTest,ernest.airc.FloatingRemoteBehaviorUiTest,ernest.airc.MirrorQualityUiTest", 9),
     "mirror-surface-ui": ("ernest.airc.MirrorSurfaceUiTest", 5),
     "mirror-ui": ("ernest.airc.RemoteNavigationUiTest#dynamicSurfaceRecreatesWithoutStartingOfflineCapture,ernest.airc.RemoteNavigationUiTest#ascrcpyAppParametersSurviveRotationAndReturnWithoutCapture,ernest.airc.RemoteNavigationUiTest#ascrcpyReplacesLegacyPngPreviewAfterRotation,ernest.airc.RemoteExecutionUiTest#everyPreviewVisitAutomaticallyStartsButLeavingStopsCapture", 4),
+    "mirror-floating-target": ("ernest.airc.LiveFloatingRemoteTargetTest", 1),
     "ascrcpy": ("ernest.airc.AscrcpyPreviewTargetTest", 4),
     "files": ("ernest.airc.FileTransferTargetTest", 1),
     "touchpad": ("ernest.airc.TouchpadTargetTest", 1),
@@ -53,6 +55,7 @@ def main():
     parser.add_argument("--host", help="Target address reachable directly from the phone")
     parser.add_argument("--with-touch-receiver", action="store_true", help="Install owned static touch receiver for focused mirror diagnostics")
     parser.add_argument("--use-installed-phone", action="store_true", help="Verify matching installed phone APK hashes instead of reinstalling")
+    parser.add_argument("--preview-quality", choices=["流畅", "均衡", "清晰"], help="Initial quality for live floating-remote validation")
     parser.add_argument("--suite", choices=[*SUITES, "all"], default="all")
     args = parser.parse_args()
     phone_only=args.suite in ("tv-input-ui", "remote-menu-ui", "file-page-ui", "library-layout-ui", "mobile-convenience-ui", "app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-surface-ui", "mirror-toolbar-ui", "mirror-ui", "gamepad-ui", "models", "profile-isolation", "controller-ui")
@@ -96,10 +99,10 @@ def main():
         if not asset.is_file() or hashlib.sha256(asset.read_bytes()).digest() != hashlib.sha256(embedded).digest():
             parser.error("Runtime asset differs from the app APK; rebuild before testing")
 
-    selected = [value for name,value in SUITES.items() if name not in ("app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-toolbar-ui", "gamepad-lifecycle", "models", "model-sync", "profile-isolation", "controller-ui")] if args.suite == "all" else [SUITES[args.suite]]
+    selected = [value for name,value in SUITES.items() if name not in ("app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-toolbar-ui", "mirror-floating-target", "gamepad-lifecycle", "models", "model-sync", "profile-isolation", "controller-ui")] if args.suite == "all" else [SUITES[args.suite]]
     directory = f"/data/local/tmp/airc-phone-acceptance-{uuid.uuid4()}"
     binary = f"{directory}/airc-runtime"
-    touch_selected = not phone_only and (args.suite in ("all", "touchpad", "ascrcpy", "gamepad-lifecycle") or args.with_touch_receiver)
+    touch_selected = not phone_only and (args.suite in ("all", "touchpad", "ascrcpy", "gamepad-lifecycle", "mirror-floating-target") or args.with_touch_receiver)
     receiver_apk = ROOT / "mediaFixture/build/outputs/apk/debug/mediaFixture-debug.apk"
     receiver_package = "ernest.airc.mediafixture"
     if touch_selected:
@@ -107,6 +110,13 @@ def main():
             parser.error("Build :mediaFixture:assembleDebug first")
         if f"package:{receiver_package}" in adb(args.target, "shell", "pm", "list", "packages", "--user", "all", receiver_package).splitlines():
             parser.error("Refusing to replace an existing target fixture package")
+    target_original_activity = None
+    if args.suite == "mirror-floating-target":
+        activities = adb(args.target, "shell", "dumpsys", "activity", "activities")
+        resumed = re.search(r"(?:mResumedActivity:|topResumedActivity=).*? ([A-Za-z0-9_.$]+/[A-Za-z0-9_.$]+)(?: |})", activities)
+        if not resumed:
+            parser.error("Cannot identify target Activity to restore")
+        target_original_activity = resumed.group(1)
     receiver_installed = False
     created = copied = False
     tests_installed = False
@@ -135,7 +145,7 @@ def main():
                 raise RuntimeError("Independent target service did not become ready")
             if touch_selected:
                 adb(args.target, "install", str(receiver_apk)); receiver_installed = True
-                adb(args.target, "shell", "am", "start", "-W", "-n", f"{receiver_package}/{'.GamepadActivity' if root_target else '.TouchActivity'}")
+                adb(args.target, "shell", "am", "start", "-W", "-n", f"{receiver_package}/{'.GamepadActivity' if root_target else '.ColorActivity' if args.suite == 'mirror-floating-target' else '.TouchActivity'}")
         command = ["shell", "am", "instrument", "-w", "-r", "-e", "class",
                    ",".join(item[0] for item in selected)]
         if service is not None:
@@ -143,8 +153,10 @@ def main():
                 command += ["-e", f"{prefix}TargetHost", args.host,
                             "-e", f"{prefix}TargetPort", str(service["port"])]
             command += ["-e", "ascrcpyTargetHost", args.host, "-e", "ascrcpyTargetPort", args.target.rsplit(":",1)[1] if ":" in args.target else "5555"]
+        if args.preview_quality:
+            command += ["-e", "livePreviewQuality", args.preview_quality]
         command += ["ernest.airc.test/androidx.test.runner.AndroidJUnitRunner"]
-        output = adb(args.phone, *command, timeout=300)
+        output = adb(args.phone, *command, timeout=120 if args.suite == "mirror-floating-target" else 300)
         print(output, flush=True)
         count = sum(item[1] for item in selected)
         require_passed(output, count)
@@ -165,9 +177,18 @@ def main():
                             adb(args.target, "uninstall", receiver_package)
                     finally:
                         if tests_installed:
+                            if args.suite == "mirror-floating-target":
+                                adb(args.phone, "shell", "am", "force-stop", "ernest.airc")
+                                recovery = adb(args.phone, "shell", "am", "instrument", "-w", "-r", "-e", "class",
+                                    "ernest.airc.DeviceHistoryRecoveryTest", "ernest.airc.test/androidx.test.runner.AndroidJUnitRunner", timeout=60)
+                                require_passed(recovery, 1)
                             adb(args.phone, "uninstall", "ernest.airc.test")
                 finally:
-                    adb(args.phone, "shell", "am", "start", "-n", "ernest.airc/.MainActivity")
+                    try:
+                        if target_original_activity:
+                            adb(args.target, "shell", "am", "start", "-W", "-n", target_original_activity)
+                    finally:
+                        adb(args.phone, "shell", "am", "start", "-n", "ernest.airc/.MainActivity")
 
 
 if __name__ == "__main__":

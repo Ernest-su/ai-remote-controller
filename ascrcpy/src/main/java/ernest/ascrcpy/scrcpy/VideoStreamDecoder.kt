@@ -2,6 +2,8 @@ package ernest.ascrcpy.scrcpy
 
 import android.media.MediaCodec
 import android.media.MediaFormat
+import android.media.MediaCodecInfo
+import android.os.Build
 import android.view.Surface
 import ernest.ascrcpy.adb.AdbChannel
 import java.nio.ByteBuffer
@@ -46,6 +48,12 @@ internal class VideoStreamDecoder(
                 queue(packet, ptsAndFlags)
                 outputFailure?.let{throw IllegalStateException("Video output failed",it)}
             }
+        } catch (error: Throwable) {
+            if (error !is kotlinx.coroutines.CancellationException) {
+                android.util.Log.e("AircVideoDecoder", "Video input failed: ${error.javaClass.simpleName}: ${error.message}")
+                onOutputFailure(error)
+            }
+            throw error
         } finally {
             releaseDecoder()
         }
@@ -56,15 +64,25 @@ internal class VideoStreamDecoder(
         if (size == newSize && decoder != null) return
         releaseDecoder()
         size = newSize
-        decoder = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC).apply {
+        val codec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
+        // Own the instance before configuring so a rejected format cannot leak a codec.
+        decoder = codec
+        try {
             val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, newSize.width, newSize.height)
-            format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
-            configure(format, surface, null, 0)
-            start()
+            if (Build.VERSION.SDK_INT >= 30 && codec.codecInfo.getCapabilitiesForType(MediaFormat.MIMETYPE_VIDEO_AVC)
+                    .isFeatureSupported(MediaCodecInfo.CodecCapabilities.FEATURE_LowLatency)) {
+                format.setInteger(MediaFormat.KEY_LOW_LATENCY, 1)
+            }
+            android.util.Log.d("AircVideoDecoder", "Configuring ${codec.name}: ${newSize.width}x${newSize.height}")
+            codec.configure(format, surface, null, 0)
+            codec.start()
+            android.util.Log.d("AircVideoDecoder", "Decoder started")
+        } catch (error: Throwable) {
+            releaseDecoder()
+            throw error
         }
         // Output must keep draining while the input socket is idle on a static
         // screen. Waiting for the next packet can otherwise hide the first frame.
-        val codec=checkNotNull(decoder)
         onVideoSize(newSize)
         draining.set(true);outputFailure=null
         outputThread=Thread({

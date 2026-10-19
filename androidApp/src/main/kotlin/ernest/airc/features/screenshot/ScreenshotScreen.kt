@@ -8,6 +8,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.ui.Modifier
@@ -73,7 +75,7 @@ internal fun ScreenshotScreen(state: RemoteUiState, model: RemoteViewModel, full
         text={ androidx.compose.foundation.text.selection.SelectionContainer {
             Text(state.output, Modifier.heightIn(max=RemoteDimensions.ManagementDialogHeight).then(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState())))
         } }, confirmButton={TextButton({showResults=false}) {Text("关闭")}})
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(if (fullscreen) MirrorOverlayStyle.Canvas else Color.Transparent)) {
         val viewportHeight = maxHeight
     ScreenshotPanel(image, screenshot.loading, state.connected && !state.busy && !dynamicActive && "device.screenshot" in state.tools,
         screenshot.error ?: message,
@@ -97,16 +99,18 @@ internal fun ScreenshotScreen(state: RemoteUiState, model: RemoteViewModel, full
             }
         }, preview = {
             // Keep the same composition and native view ancestors across fullscreen changes.
-            Surface(color=RemoteColors.Surface, shape=MaterialTheme.shapes.small) {
+            Surface(color=if (fullscreen) Color.Transparent else RemoteColors.Surface, shape=MaterialTheme.shapes.small) {
                 Box(Modifier.padding(if(fullscreen) 0.dp else 16.dp)) {
-                    AndroidScreenMirror(state, model, fullscreen, onFullscreen,
-                        modifier=if(fullscreen) Modifier.height(viewportHeight) else Modifier,
-                        onRemote={remoteVisible=!remoteVisible}, remoteVisible=remoteVisible)
+                    MirrorOverlayTheme(fullscreen) {
+                        AndroidScreenMirror(state, model, fullscreen, onFullscreen,
+                            modifier=if(fullscreen) Modifier.height(viewportHeight) else Modifier,
+                            onRemote={remoteVisible=!remoteVisible}, remoteVisible=remoteVisible)
+                    }
                 }
             }
         }, unavailableMessage = if(dynamicActive) "动态预览期间暂不获取单张截图。" else "请连接支持截图工具的服务。", fullscreen=fullscreen)
         if(remoteVisible) remoteState.SaveableStateProvider("floating-remote") {
-            MirrorFloatingRemote(state,model,onClose={remoteVisible=false},onResults={showResults=true})
+            MirrorFloatingRemote(state,model,onClose={remoteVisible=false},onResults={showResults=true}, fullscreen=fullscreen)
         }
     }
 }

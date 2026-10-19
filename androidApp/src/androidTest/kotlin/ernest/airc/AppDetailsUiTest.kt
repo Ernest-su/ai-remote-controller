@@ -17,7 +17,8 @@ import org.junit.runner.RunWith
 /** Local protocol fixture; actual app mutations are covered by the UUID target fixture. */
 @RunWith(AndroidJUnit4::class)
 class AppDetailsUiTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rules: org.junit.rules.TestRule = org.junit.rules.RuleChain.outerRule(DeviceHistoryIsolation()).around(compose)
     @Test fun applicationDetailsRestoreSelectionAndPermissionsRequireConfirmation() {
         val app = TargetAppInfo("fixture.app", 0, 10001, 1, codePath = "/data/app/fixture", lastUpdateTime = "fixture", system = false)
         val snapshot = AppControlSnapshot("fixture.app", 0, true, 0, false, AppControlCapabilities(true, true, true), listOf(
@@ -59,6 +60,13 @@ class AppDetailsUiTest {
             compose.onNodeWithTag("open-menu").performClick()
             compose.onNodeWithTag("feature-apps").performClick()
             compose.waitUntil(10_000) { model.state.value.apps.isNotEmpty() }
+            compose.onNodeWithTag("app-more-fixture.app").performClick()
+            compose.onNodeWithText("查看应用信息").assertDoesNotExist()
+            compose.onNodeWithText("应用详情").performClick()
+            compose.onNodeWithTag("app-details-page").assertIsDisplayed()
+            compose.onNodeWithTag("navigate-back").performClick()
+            compose.onNodeWithTag("apps-page").assertIsDisplayed()
+            compose.onNodeWithTag("app-management-dialog").assertDoesNotExist()
             compose.onNodeWithText("测试应用").performClick()
             compose.onNodeWithTag("app-details-page").assertIsDisplayed()
             compose.waitUntil(10_000) { model.appControl.state.value.details != null }
@@ -82,6 +90,10 @@ class AppDetailsUiTest {
             compose.onNodeWithText("刷新应用详情").performScrollTo().assertIsNotEnabled()
             compose.onNodeWithTag("navigate-back").performClick()
             compose.onNodeWithTag("apps-page").assertIsDisplayed()
+            compose.onNodeWithTag("app-management-dialog").assertDoesNotExist()
+            compose.onNodeWithTag("apps-tools").performClick()
+            compose.onNodeWithText("管理任务").performClick()
+            compose.onNodeWithTag("app-management-dialog").assertIsDisplayed()
         } finally {
             if (initialized) compose.runOnUiThread { model.disconnect() }
             server.shutdown()
