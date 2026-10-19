@@ -1186,6 +1186,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="应用详情操作">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        遥控按键按住
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -1935,6 +1952,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="应用详情操作">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        遥控按键按住
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -1972,8 +2006,8 @@
 <tr>
 <td><code>remote.key</code></td>
 <td><code>remote_key</code></td>
-<td><code>key</code></td>
-<td>常驻输入桥接提交一次按下/抬起</td>
+<td><code>key</code>，按住时加 <code>action</code>, <code>pressId</code></td>
+<td>一次短按，或连接独占的按下/保活/抬起/取消</td>
 </tr>
 <tr>
 <td><code>remote.text</code></td>
@@ -2067,10 +2101,10 @@
 </tr>
 </tbody>
 </table>
-<p><code>key</code> 支持 <code>up</code>、<code>down</code>、<code>left</code>、<code>right</code>、<code>ok</code>、<code>back</code>、<code>home</code>、<code>menu</code>、<code>power</code>、<code>volume_up</code>、<code>volume_down</code>、<code>mute</code>、<code>play_pause</code>、<code>media_previous</code>、<code>media_next</code>、<code>0</code>…<code>9</code>、<code>channel_up</code>、<code>channel_down</code>、<code>delete</code>。</p>
+<p><code>key</code> 支持 <code>up</code>、<code>down</code>、<code>left</code>、<code>right</code>、<code>ok</code>、<code>back</code>、<code>home</code>、<code>menu</code>、<code>power</code>、<code>volume_up</code>、<code>volume_down</code>、<code>mute</code>、<code>play_pause</code>、<code>media_previous</code>、<code>media_next</code>、<code>0</code>…<code>9</code>、<code>channel_up</code>、<code>channel_down</code>、<code>delete</code>、<code>enter</code>。</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="s2">"open-settings"</span><span class="p">,</span><span class="nt">"protocol"</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span><span class="nt">"type"</span><span class="p">:</span><span class="s2">"tool"</span><span class="p">,</span><span class="nt">"tool"</span><span class="p">:</span><span class="s2">"apps.open"</span><span class="p">,</span><span class="nt">"arguments"</span><span class="p">:{</span><span class="nt">"package"</span><span class="p">:</span><span class="s2">"com.android.settings"</span><span class="p">}}</span>
 </code></pre></div>
-<p>工具以服务当前 shell/root 身份执行，Android 权限仍然适用。普通工具使用独立参数，<code>device.shell</code> 的直接专家请求接受 shell 文本，模型调用仅用固定诊断参数。每条命令最长 30 秒，每路输出上限 256 KiB；模型工具循环最多 16 轮，整体请求上限 170 秒。</p>
+<p>工具以服务当前 shell/root 身份执行，Android 权限仍然适用。普通工具使用独立参数，<code>device.shell</code> 的直接专家请求接受 shell 文本，模型调用仅用固定诊断参数。每条命令最长 30 秒，每路输出上限 256 KiB（应用列表框架查询为 1 MiB）；模型工具循环最多 16 轮，整体请求上限 170 秒。</p>
 <p>响应通过请求 <code>id</code> 关联，失败返回 <code>ok: false</code> 与 <code>error</code>。完整格式见<a href="../../protocol/">协议</a>。</p>
 <h2 id="device-info">设备信息<a class="headerlink" href="#device-info" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="s2">"info"</span><span class="p">,</span><span class="nt">"protocol"</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span><span class="nt">"type"</span><span class="p">:</span><span class="s2">"tool"</span><span class="p">,</span><span class="nt">"tool"</span><span class="p">:</span><span class="s2">"device.info"</span><span class="p">,</span><span class="nt">"arguments"</span><span class="p">:{}}</span>
@@ -2078,7 +2112,7 @@
 <p>成功响应的 <code>result</code> 是 JSON 字符串，包含 <code>manufacturer</code>、<code>model</code>、<code>androidRelease</code>、整数 <code>sdk</code>、字符串数组 <code>abis</code>、<code>screen</code>（<code>width</code> / <code>height</code>，像素）和 <code>storage</code>（固定查询 <code>/data</code> 的 <code>path</code>、实际 <code>mountPoint</code>、<code>totalBytes</code>、<code>usedBytes</code>、<code>availableBytes</code>）。屏幕优先使用 <code>wm size</code> 的有效 override；未获得的数据返回 <code>null</code>，不能据此声称设备不支持该能力。只使用固定 <code>getprop</code>、<code>wm size</code> 和 <code>df -k /data</code> 参数，不接受自定义命令或路径，不包含设备序列号。</p>
 <p>探测整体受 30 秒超时约束。该工具已接入直接调用和模型函数；Android 功能菜单的设备信息页支持刷新与展示这些字段。</p>
 <h2 id="apps-list">应用列表<a class="headerlink" href="#apps-list" title="Permanent link">&para;</a></h2>
-<p><code>apps.list</code> 的 <code>result</code> 为 JSON 字符串，例如 <code>{"apps":[{"package":"com.android.settings","label":"设置","system":true}],"source":"package_manager","userId":0,"labelErrors":0}</code>。应用按包名排序、去重；通过目标包管理器读取当前 Android 用户的应用名称与系统/用户类型。名称读取失败时 <code>label</code> 为 <code>null</code>，并计入 <code>labelErrors</code>，不阻塞其他应用。接口整体受 30 秒与 256 KiB 限制，查询期间安装状态变化时应刷新。</p>
+<p><code>apps.list</code> 的 <code>result</code> 为 JSON 字符串，例如 <code>{"apps":[{"package":"com.android.settings","label":"设置","system":true}],"source":"package_manager","userId":0,"labelErrors":0}</code>。应用按包名排序、去重；通过目标包管理器读取当前 Android 用户的应用名称与系统/用户类型。名称读取失败时 <code>label</code> 为 <code>null</code>，并计入 <code>labelErrors</code>，不阻塞其他应用。框架查询受 30 秒与 1 MiB 限制，查询期间安装状态变化时应刷新。</p>
 <p>目标包管理器桥接不可用时，使用 <code>pm list packages</code> 读取包名与系统类型；此时 <code>source</code> 为 <code>pm</code>、<code>labelsAvailable</code> 为 false、<code>label</code> 为 <code>null</code>，不返回 <code>userId</code> 与 <code>labelErrors</code>。</p>
 <p>Android 页面显示名称、包名、图标与类型，支持名称/包名搜索、分类筛选和点击启动；名称不可用时保留包名。此列表包含无启动入口的系统组件，点击启动失败时显示实际工具错误。</p>
 <h2 id="gestures">坐标输入<a class="headerlink" href="#gestures" title="Permanent link">&para;</a></h2>
@@ -2102,6 +2136,8 @@
 <p><code>task.start</code> / <code>task_start</code> 的 <code>direction=download</code> 配合 root/path 创建流式下载，轮询 <code>task.progress</code> / <code>task_progress</code> 等待 ready，读取其 sha256 和 <code>dataPath=/transfers/{id}/data</code>，随后 GET 该路径。上传使用 direction=upload、sizeBytes、sha256，再 PUT 原始二进制到 dataPath。GET/PUT 的 MIME 为 application/octet-stream，禁止缓存；固定 64 KiB 缓冲，单文件最大 1 TiB。上传长度/摘要必须匹配，fsync 后原子提交；默认 RENAME_NOREPLACE，不支持时明确失败。最多两个活动任务，最多保留 16 条记录；终态记录可提前淘汰，空闲记录在新任务时按 15 分钟清理。任务不跨进程重启恢复。</p>
 <p><code>task.progress</code> 返回 id/direction/root/name/sizeBytes/bytesTransferred/phase/sha256/error/unit/dataPath。phase 包含 hashing、ready、awaiting_upload、uploading、downloading、committing、deleting、completed、failed、cancelled。unit 通常是 bytes，删除任务是 items。<code>task.cancel</code> / <code>task_cancel</code> 与 <code>DELETE /transfers/{id}</code> 可取消未提交任务，已提交文件保留；递归删除的已删除项无法恢复。</p>
 <p><code>files.mkdir</code> / <code>files_mkdir</code> 接收 <code>root</code>（downloads/inbox/full）及必填相对 <code>path</code>，创建单个新目录并返回 <code>{root,path,created:true}</code>。父目录必须存在；不创建父目录、不覆盖文件/目录/链接、不跟随符号链接，不接受递归或权限参数。使用 mkdirat 按打开的父目录执行，权限沿用服务身份，新目录请求模式为 0700，实际模式由文件系统策略决定。</p>
+<p><code>files.url_info</code> / <code>files_url_info</code> 接收一个 HTTP(S) <code>url</code>，从被控端读取建议名称与大小，返回 <code>{name, sizeBytes}</code>，大小未知时为 null。优先 HEAD，HEAD 不支持或没有长度时尝试 <code>Range: bytes=0-0</code>，不读取或保存完整响应体；206 使用 Content-Range 总长度。文件名优先 Content-Disposition 的 UTF-8 filename*，再 filename，最后最终重定向网址。名称不得包含路径或控制字符。HTTP(S) 重定向最多十次、禁止内嵌凭据，整个探测最多十秒。探测不创建下载任务，不保证下载时资源或长度不变。</p>
+<p><code>files.download_url</code> / <code>files_download_url</code> 接收必填 HTTP(S) <code>url</code>，可选 <code>root</code>（默认 downloads）、相对目录 <code>directory</code>（默认空）与 <code>name</code>（默认网址末段，无末段时 download.bin）。不允许嵌入用户名/密码，仅跟随 HTTP(S) 重定向，最多十次。复用文件管理的 no-follow 路径访问与上传临时文件；优先原子不覆盖重命名，存储卡不支持时在下载完成后独占创建目标并流式复制，仍不覆盖同名文件。复制保存阶段可能暂时显示未完成目标文件，异常退出可能留下该文件；常规失败会清理。返回 <code>direction=url_download</code> 的后台任务，使用 <code>task.progress</code>/<code>task.cancel</code> 查询或取消；阶段为 connecting、downloading、committing、completed、failed、cancelled。<code>bytesTransferred</code> 为已写字节，<code>sizeBytes=0</code>，实际总长度从 <code>result.totalBytes</code> 读取（未知时 null），<code>result.path</code> 为目标相对路径。完成时 totalBytes 为最终字节数并提供 SHA-256。最多 1 TiB，与其他传输共享活动任务限额；错误或取消清理临时文件，不覆盖现有文件，无断点续传或重启恢复。</p>
 <p><code>files.delete</code> / <code>files_delete</code> 接收 root/path/recursive，仅创建待确认提案，不立即删除。<code>files.prepare_overwrite</code> / <code>files_prepare_overwrite</code> 接收 root/path，返回覆盖提案。提案含 id/kind/root/path/exists/directory/sizeBytes/recursive/approvalRequired，15 分钟过期，最多 32 项。<code>files.pending</code> / <code>files_pending</code> 可查询尚未确认提案。控制端必须核对目标并让用户确认，再发送独立请求 <code>type=approve, arguments={id}</code>；<code>{id,accepted:false}</code> 丢弃提案。模型工具没有 approve。删除确认返回 task 描述；覆盖确认返回单次 token，随后 task.start 上传携带 overwriteToken。覆盖前重新核对目标信息，变化时失败；允许覆盖时使用原子替换。递归删除不跟随链接、不跨挂载点、最多 128 层。</p>
 <p><code>files.download</code> / <code>files_download</code> 保留小文件快照接口，最大 16 MiB，返回短期 FileArtifact（id/path/name/mimeType/sizeBytes/sha256/expiresInSeconds）。GET <code>/artifacts/{id}</code> 下载，60 秒过期，与截图共享四项资源容量；大文件应使用 task.start。界面所有文件下载均采用流式任务。详见<a href="../../guide/files/">目标文件</a>。</p>
 <h2 id="_5">媒体打开工具<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
@@ -2129,9 +2165,10 @@
 <h2 id="media-seek">播放定位<a class="headerlink" href="#media-seek" title="Permanent link">&para;</a></h2>
 <p><code>media.status</code> 优先使用一次性标准 MediaController 桥接，返回 seekAvailable、source=media_controller、userId 和活动 sessions；会话增加 sessionTag，读取真实报告位置、更新时钟、时长、ACTION_SEEK_TO 支持与标题。位置是播放器报告值，不在控制端外推。桥接不可用时回退原 dumpsys 解析，seekAvailable=false 并附有限长度 bridgeError。</p>
 <p><code>media.seek</code> / <code>media_seek</code> 接收 package、非负整数 positionMs 和可选 sessionTag。选择当前 Android 用户活动会话，检查 ACTION_SEEK_TO 和已知正时长边界；多个匹配会话时拒绝猜测。通过标准 TransportControls.seekTo 提交，不用方向/快进键模拟。返回 packageName、requestedMs、submitted=true、playbackVerified=false 和提交时 session 快照。提交不证明执行：控制端随后读取位置核对，播放器拒绝或未及时更新时如实显示未观察到目标位置。接口依据 <a href="https://developer.android.com/reference/android/media/session/MediaSessionManager#getActiveSessions(android.content.ComponentName)">MediaSessionManager</a> 与 <a href="https://developer.android.com/reference/android/media/session/MediaController.TransportControls#seekTo(long)">TransportControls.seekTo</a>。</p>
-<p>常驻服务仍为 Rust 原生二进制。Android 构建时编译并嵌入短时 Java/Dex 桥接，只经系统 app_process 为当前请求调用 framework，不安装服务 APK或后台 Java 服务。初始化到服务私有 platform 目录中的 SHA-256 命名只读资产，核对 owner、模式、长度和内容；子进程每次限时 10 秒、输出 256 KiB。反射只用于获取系统/当前用户上下文与 Android 媒体模块初始化；厂商或权限阻止时返回不可用，不切换或提权。最多 64 会话，标题限 256 字符、tag 超过 128 字符返回 null。Root 身份及其他 Android 版本尚未实机验收。</p>
+<p>常驻服务仍为 Rust 原生二进制。Android 构建时编译并嵌入短时 Java/Dex 桥接，只经系统 app_process 为当前请求调用 framework，不安装服务 APK或后台 Java 服务。初始化到服务私有 platform 目录中的 SHA-256 命名只读资产，核对 owner、模式、长度和内容；子进程默认限时 10 秒、输出 256 KiB；应用列表框架查询限时 30 秒、输出 1 MiB。反射只用于获取系统/当前用户上下文与 Android 媒体模块初始化；厂商或权限阻止时返回不可用，不切换或提权。最多 64 会话，标题限 256 字符、tag 超过 128 字符返回 null。Root 身份及其他 Android 版本尚未实机验收。</p>
 <h2 id="app-labels">真实应用名称<a class="headerlink" href="#app-labels" title="Permanent link">&para;</a></h2>
-<p>apps.list / apps_list 优先通过短时框架桥接读取当前 Android 用户的 PackageManager 安装列表与 getApplicationLabel，返回 package、label 和 system；包名排序。标签按目标资源/配置解析，最多 256 个 UTF-16 单元。返回 source=package_manager、labelsAvailable=true、userId 和 labelErrors，单个标签读取失败时保留 null；这不表示标签完整读取成功。最多 4096 条、整体 256 KiB。桥接不可用或结果无效时回退原 pm 枚举，source=pm、labelsAvailable=false，未知 label 保持 null。它不会启动或修改应用。手机/桌面沿用名称与包名搜索、按准确包名启动。</p>
+<p>apps.list / apps_list 优先通过短时框架桥接读取当前 Android 用户的 PackageManager 安装列表与 getApplicationLabel，返回 package、label 和 system；包名排序。标签按目标资源/配置解析，最多 256 个 UTF-16 单元。返回 source=package_manager、labelsAvailable=true、userId 和 labelErrors，单个标签读取失败时保留 null；这不表示标签完整读取成功。最多 4096 条、整体 1 MiB。桥接不可用或结果无效时回退原 pm 枚举，source=pm、labelsAvailable=false，未知 label 保持 null。它不会启动或修改应用。手机/桌面沿用名称与包名搜索、按准确包名启动。</p>
+<p>应用元数据缓存：<code>apps.list</code> 的框架结果为每条应用提供 <code>cacheKey</code>（64 位小写十六进制 SHA-256），由用户、包名、首次安装/更新时间（毫秒）、版本、UID、系统标志、base/split 路径和资源配置生成。被控端每次重新查询 PackageManager 元数据，匹配时复用私有目录中持久化的名称和 96×96 PNG。<code>apps.icon</code> 描述符同时携带 <code>cacheKey</code>，控制端必须与当前列表标识一致后再下载；标识变化应刷新列表，不缓存该图标。缓存通过进程间锁与原子替换保护，文件限额 64 MiB / 8192 项，PNG 至多 128 KiB 并验证摘要；不持久缓存短时 artifact 地址。<code>apps.info</code> 复用静态信息并增加 <code>firstInstallTime</code> 字段；<code>apps.control_info</code>、待确认操作及实际提交前的身份/权限检查继续实时读取。pm 枚举回退没有 cacheKey，控制端刷新后不能保留这些未知版本的图标。</p>
 <p>框架上下文与媒体桥接共用初始化源码，但应用与媒体操作拆为独立 Java 类。常驻服务仍为 Rust 可执行文件，SDK javac/D8 仅在 Android 构建时生成并嵌入短时适配 Dex，目标按请求运行 app_process。生成资产不提交，标签读取不要求额外服务 APK。</p>
 <h2 id="media-custom-action">标准播放器自定义动作<a class="headerlink" href="#media-custom-action" title="Permanent link">&para;</a></h2>
 <p><code>media.status</code> 增加 <code>customActionAvailable</code>，会话的 <code>customActions</code> 是 <code>{id,name}</code> 列表；每会话最多 32 项，动作 ID 最多 512 UTF-8 字节且不含控制字符，名称最多 128 UTF-16 单元。无效或重复声明会让标准状态路径失败并回退，回退不提供动作能力。</p>
@@ -2212,6 +2249,10 @@
 <p><code>apps.apk_icon</code> / <code>apps_apk_icon</code> 接收 <code>{root,path}</code>（<code>.apk</code> 普通文件，最多4 GiB），从已固定的文件描述符经 Android 包资源解析获取96×96 PNG，单图最多128 KiB；返回 BinaryArtifact 加 <code>root</code>、<code>filePath</code>，<code>path</code> 仍为 <code>/artifacts/{id}</code>。客户端核对原根、文件路径、尺寸与长度后读取。此接口不安装 APK、不从同包名的已安装应用借用图标；split 缺少独立图标、无访问权限或资源无法解析时可能失败，界面保留占位。</p>
 <h2 id="_10">应用详情操作<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
 <p><code>apps.control_info</code> 与 <code>apps.prepare_control</code> 为控制端应用详情提供只读快照和用户待确认操作；模型可读取状态或准备提案，独立确认接口不向模型暴露，不能自动执行。接口、能力字段、确认和结果语义见<a href="../../protocol/#app-controls">协议</a>，使用步骤见<a href="../../guide/apps/">应用管理</a>。</p>
+<h3 id="_11">遥控按键按住<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h3>
+<p><code>remote.key</code> 只提供 <code>key</code> 时提交一次完整短按。按住请求必须且只包含 <code>key</code>、<code>action</code>、<code>pressId</code> 三个字段，<code>pressId</code> 是每次手势新建的 UUID；<code>action</code> 为 <code>down</code>、<code>keep</code>、<code>up</code> 或 <code>cancel</code>。<code>down</code> 注册按住，控制端每250ms发送 <code>keep</code>，正常松开使用 <code>up</code>，取消使用 <code>cancel</code>。同一按键同时只能由一个连接的一次手势持有；其他连接或旧 UUID 不得释放新手势，失效后的 <code>keep</code> 不会重新发送 DOWN。</p>
+<p>目标桥接使用 <code>SOURCE_KEYBOARD</code>，首次 DOWN 的重复次数为0；按系统长按阈值产生首次重复 DOWN（重复次数1、<code>FLAG_LONG_PRESS</code>），之后按系统重复间隔继续递增重复次数，均保留初始 <code>downTime</code>。UP 的重复次数为0，取消 UP 带 <code>FLAG_CANCELED</code>。不会通过多次 DOWN/UP 模拟连续点击。目标应用和系统策略决定最终行为。</p>
+<p>断线释放所属连接的按键。桥接线程独立于 RPC 计时，1500ms无保活或按住120秒即取消释放；服务退出时关闭桥接并释放剩余按键。出错后仅尝试抬起，不自动重放 DOWN。边沿响应包含 <code>operation</code>、<code>pressId</code>、<code>keyCode</code>、<code>submitted</code>、<code>released</code> 和 <code>source</code>；<code>down</code>/<code>keep</code> 的 <code>released</code> 为false，<code>up</code>/<code>cancel</code> 为true，提交成功不代表目标应用已经消费事件。</p>
 
 
 

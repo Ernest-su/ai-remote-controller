@@ -1602,7 +1602,7 @@ python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </sp
 </tr>
 <tr>
 <td><code>gamepad-ui</code></td>
-<td>标题启停/重连图标、重连可停止且游戏按键禁用、固定无滚动视口、多指操作与取消释放、横屏方向及离页恢复；只验证控制端界面</td>
+<td>NES/双摇杆类型选择、方向与跳跃多指组合、类型旋转保留、标题启停/重连图标、重连可停止且游戏按键禁用、固定无滚动视口、多指操作与取消释放、横屏方向及离页恢复；只验证控制端界面</td>
 </tr>
 <tr>
 <td><code>controller-ui</code></td>
@@ -1614,7 +1614,7 @@ python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </sp
 </tr>
 <tr>
 <td><code>mirror-toolbar-ui</code></td>
-<td>动态预览标题图标、全屏原生视图复用、悬浮遥控横竖屏比例及草稿保留；不连接目标</td>
+<td>动态预览标题图标、画质档位保存、紧凑按键至少 48dp、全屏原生视图复用、布局切换及横竖屏草稿保留；不连接目标</td>
 </tr>
 <tr>
 <td><code>file-preview-ui</code></td>
@@ -1675,6 +1675,29 @@ uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </sp
 <p>被控端应用操作使用 UUID 包名、临时签名 APK 与独立 runtime 状态目录；脚本创建相机运行时权限、普通网络权限和私有标记数据，验证拒绝/重复确认、权限授予撤销、状态改变后确认拒绝、强停、启停用及数据清除。只在显式选择的自有模拟器或专用目标执行，不操作已有应用的数据，结束卸载自建 APK、停止自建服务并移除自己的转发和目录。先构建配套 ABI：</p>
 <div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </span>websockets<span class="w"> </span>python<span class="w"> </span>runtime/app_control_target_test.py<span class="w"> </span>--serial<span class="w"> </span>&lt;自有模拟器序列号&gt;<span class="w"> </span>--binary<span class="w"> </span>androidApp/src/main/assets/runtime/airc-runtime-x86_64
 </code></pre></div>
+<p>标准遥控长按使用 <code>RemoteKeyControllerTest</code> 与 Rust <code>remote_input::tests</code> 验证串行边沿、手势归属、快速短按、无自动重放、断线与超时释放。<code>remote-haptics-input-ui</code> 同时检查真实界面的按下先于松开、菜单保活、取消和后台释放，服务为控制端回环 fixture。独立 Android 接收端可验证实际 KeyEvent：</p>
+<div class="highlight"><pre><span></span><code>./gradlew<span class="w"> </span>:inputFixture:assembleDebug<span class="w"> </span>:androidApp:assembleDebug<span class="w"> </span>--no-daemon
+uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </span>websockets<span class="w"> </span>python<span class="w"> </span>runtime/remote_key_hold_target_test.py<span class="w"> </span>--serial<span class="w"> </span>&lt;自有目标序列号&gt;<span class="w"> </span>--binary<span class="w"> </span>androidApp/src/main/assets/runtime/airc-runtime-&lt;匹配ABI&gt;<span class="w"> </span>--receiver-apk<span class="w"> </span>inputFixture/build/outputs/apk/debug/inputFixture-debug.apk
+</code></pre></div>
+<p>专项只安装原先不存在的接收 fixture，并创建 UUID runtime 目录与临时 ADB 转发；校验方向、菜单、确认、返回、数字及删除的 downTime、重复次数、长按标记、取消与断线释放。短暂暂停经路径验证的自建 runtime，核对 Java 桥接的独立超时释放，随后恢复并清理。接收 fixture 通过只读、要求 shell DUMP 权限的 provider 暴露自身日志，不依赖目标支持 run-as。测试不操作电源/音量，也不证明厂商系统键或第三方应用的最终长按动作。</p>
+<p>应用元数据缓存的隔离目标回归：</p>
+<div class="highlight"><pre><span></span><code>./gradlew<span class="w"> </span>:desktopApp:jvmTest<span class="w"> </span>--tests<span class="w"> </span>ernest.airc.desktop.AppMetadataCacheTargetTest<span class="w"> </span>--tests<span class="w"> </span>ernest.airc.desktop.AppLabelsTargetTest<span class="w"> </span>-PaircTargetSerial<span class="o">=</span>&lt;自有模拟器序列号&gt;<span class="w"> </span>--no-daemon
+</code></pre></div>
+<p>专项创建 UUID 服务目录，拒绝覆盖已有媒体 fixture；验证名称与图标的重复读取、跨服务重启复用、同版本重装/更新失效、损坏缓存重建、卸载清理及实时权限/启用状态。资源配置检查临时切换目标亮暗模式并恢复原设置，结束卸载自建 fixture、停止自建服务并清理转发和目录。控制端版本标识、未变化图标复用和晚到响应边界由 <code>InstalledAppsTest</code>、<code>AppIconControllerTest</code> 验证。</p>
+<p>手机快捷功能回归：先构建 App 与测试 APK，执行 <code>python3 scripts/test-phone-target.py --phone &lt;模拟器序列号&gt; --suite mobile-convenience-ui</code>。覆盖独立电视输入的离线禁用与旋转草稿、系统分享不自动执行、内容 URI 元数据与拒绝文件 URI、收藏切换与恢复、音量键页面范围、组合分步编辑与排序、等待秒数编辑、旋转恢复、列表直接执行、暂停/继续不重放、最后一次详情及旋转恢复、未保存修改及删除确认。<code>--suite library-layout-ui</code> 检查 320dp / 1.5 倍字号下的收藏筛选与星标、步骤类型图标和菜单、按键选择和等待输入，并保存亮暗主题截图；桌面 <code>ApplicationLibraryUiTest</code> 覆盖收藏优先、筛选、上限与离线管理，<code>LibraryEditingTest</code> 覆盖排序及秒数解析边界。<code>QuickRoutineControllerTest</code> 覆盖组合顺序、暂停与剩余等待、按键释放校验、按电视保存执行记录、失败/取消中断与重连隔离；<code>ClipboardPasteMessageTest</code> 覆盖 UTF-8 包格式与长度边界。</p>
+<p>中文粘贴专项使用 <code>ScrcpyTextInputTargetTest</code>，需显式传入 <code>textTargetHost</code> / <code>textTargetPort</code>，在自有目标预先安装原本不存在的 mediaFixture，并在测试后卸载。专项打开 TextActivity 的 paste 模式，核对中文、表情和 Shell 字符按字面写入，以及临时 server 文件被清理；不证明厂商播放器或密码输入框允许粘贴。</p>
+<p>文字接收 fixture 通过仅允许 shell DUMP 权限读取的 <code>content://ernest.airc.mediafixture.text/text</code> 返回合成测试文字，不依赖目标 <code>run-as</code> 能力，不暴露其他应用文件。</p>
+<p>主界面 UI fixture 在启动 Activity 前用 DeviceHistoryIsolation 持久备份设备历史和上次连接项，测试期间清空可自动重连目标，Activity 销毁后恢复；不把原设备当作离线 fixture。中断留下 active 备份时拒绝覆盖，应先调用该类的 restore 恢复原历史。此隔离不修改模型密钥或目标服务。</p>
+<p>文件页布局回归使用 <code>python3 scripts/test-phone-target.py --phone &lt;模拟器序列号&gt; --suite file-page-ui</code>，检查无重复标题、320dp / 1.5 倍字号的底栏溢出菜单及亮暗截图、按操作打开弹窗、自动识别信息的显示与文件名编辑。<code>FileWorkflowUiTest</code> 验证上传表单与下载/删除状态隔离；<code>UrlDownloadControllerTest</code> 验证自动探测不启动下载、手动名称保护、快速换址及迟到响应隔离；<code>UrlMetadataProtocolTest</code> 使用主机 runtime 和本地 HTTP fixture 验证重定向、响应头识别及识别后下载，<code>UrlDownloadTargetTest</code> 在隔离 Android 目录验证相同协议。</p>
+<p>标准遥控器顶栏菜单回归使用 <code>python3 scripts/test-phone-target.py --phone &lt;模拟器序列号&gt; --suite remote-menu-ui</code>：验证三项带图标竖排菜单、离线可浏览、点击后关闭菜单、旋转不自动打开菜单、设备和类型入口可用，并复用窄屏、大字体及真实软键盘布局回归。<code>mobile-convenience-ui</code> 从该菜单进入收藏、电视输入与快捷操作。</p>
+<p>电视输入双通道验证：<code>TvInputControllerTest</code> 覆盖按电视保存方式、确认后清草稿、拒绝重复提交、失败不回退、取消和换目标隔离，以及中文/Shell 字符编码边界。构建 App/测试 APK 后，<code>python3 scripts/test-phone-target.py --phone &lt;自有模拟器&gt; --suite tv-input-ui</code> 检查 320dp / 1.5 倍字号的亮暗单选、安装与发送禁用、恢复入口、错误与处理中反馈并保存截图；<code>mobile-convenience-ui</code> 覆盖真实入口、旋转、草稿保留和软键盘展开/全局状态更新后的标题与关闭按钮可见性。</p>
+<p>执行 <code>python3 scripts/test-tv-input-method.py --serial &lt;自有模拟器&gt;</code> 可安装 fixture、运行真实输入法专项并恢复原 Activity、清理自建包。专项 <code>TvInputMethodTargetTest</code> 仅在显式传入 <code>ownedImeTarget=true</code> 的自有 API 31+ 模拟器运行。先确认 <code>ernest.airc.ime</code> 和 <code>ernest.airc.mediafixture</code> 均未安装，再安装自建 mediaFixture。专项使用模拟器 shell 权限运行生产输入法安装、摘要检查、启用、中文/表情/字面 Shell 字符提交、剪贴板不变、普通应用越权拒绝、无输入框拒绝和原输入法恢复，结束卸载自建输入法；外层调用者须卸载自建 mediaFixture 并恢复原 Activity。该专项不证明厂商电视或第三方自绘输入框兼容。</p>
+<p>全屏透明叠层回归使用 <code>AppearanceTest</code> 核对半透明衬底在纯白/纯黑视频上的正常文字、图标与危险前景对比度，并核对切换全屏后主题恢复及内容实例保留。<code>mirror-toolbar-ui</code> 同时运行 <code>MirrorOverlayUiTest</code>：以纯白、纯黑、棋盘格模拟视频，在亮暗主题下检查外框空隙透明、48dp 触控、图标入口、透明空隙阻断目标触控、完整遥控草稿保留并保存截图；原 <code>MirrorToolbarUiTest</code> 继续核对原生 Surface 身份、方向缩放和普通布局。<code>MirrorQualityUiTest</code> 通过内存 ADB 传入真实视频尺寸头并配置平台解码器，检查连续切换档位后的解码尺寸、分辨率/码率/帧率参数与旧会话清理；该 fixture 不提供视频帧，不证明真实目标编码和画面渲染。</p>
+<p>悬浮遥控头部与拖动继续使用 <code>mirror-toolbar-ui</code> 专项：<code>MirrorFloatingDragUiTest</code> 检查图标顺序和触控尺寸、无文字切换行、手柄快速/慢速连续滑动与长按后移动（不重复位移）、空白/按键/切换/关闭/输入区长按拖动及连续多次位移、边界限制、快速滑动不拖动、静止按住保持按键语义、拖动取消按键及多指介入不再发送 DOWN。桌面 <code>RemoteKeyInputUiTest</code> 检查父级手势取消当前按键、已消费 DOWN 不生成新按键；<code>remote-haptics-input-ui</code> 回归原有真实按下/抬起、快速点按与震动清理。以上均使用本地 fixture，不证明厂商电视的最终按键消费。</p>
+<p>电视输入焦点联动：<code>TvInputControllerTest</code> 使用只读 backend fixture 验证就绪/失焦、查询失败后隐藏与恢复、监测取消释放连接，以及换电视拒绝迟到状态，不触发安装或发送。<code>tv-input-ui</code> 包含 <code>TvInputFocusUiTest</code>，验证显式点击才打开面板和手机焦点、保留草稿及方向操作。<code>TvInputMethodTargetTest</code> 同时读取真实输入连接的轻量焦点接口；由 <code>scripts/test-tv-input-method.py --serial &lt;自有模拟器&gt;</code> 执行，不证明厂商输入框兼容。</p>
+<p>悬浮吸附与淡化：<code>MirrorRemoteBehaviorTest</code> 核对四边吸附、自由位置、越界与窄视口；<code>mirror-toolbar-ui</code> 包含 <code>FloatingRemoteBehaviorUiTest</code>，检查离线透明度设置及重新加载、连续拖动后吸附、5秒闲置淡化与按住恢复后的持续可见。测试使用本地画面 fixture，不连接电视。</p>
+<p>真实电视预览与浮层联测使用 <code>python3 scripts/test-phone-target.py --phone &lt;控制端ADB&gt; --target &lt;电视ADB&gt; --host &lt;电视IP&gt; --suite mirror-floating-target</code>。先构建 App、AndroidTest 与 mediaFixture；专项创建配套隔离 runtime，在临时 ColorActivity 中核对实际解码像素变化、原生 Surface 保留、连续拖动与吸附、设置透明度、闲置淡化与唤醒、浮层不透传触控、电视实收方向键 DOWN/UP、完整/紧凑切换及后台恢复。退出后核对自建 scrcpy 文件/进程释放，恢复控制端历史和透明度、电视原前台 Activity，并卸载自建 fixture。控制端若是模拟器，应明确报告，不能称为实体手机实测。</p>
+<p>首次在新控制端进入全屏时，先关闭 Android 的全屏手势教学提示，避免系统遮罩干扰叠层像素检查。<code>mirror-floating-target</code> 支持 <code>--preview-quality 流畅|均衡|清晰</code> 选择初始档位；若测试进程被中断，驱动器通过 <code>DeviceHistoryRecoveryTest</code> 恢复设备历史与已记录的透明度，避免把临时目标留给自动重连。</p>
 
 
 

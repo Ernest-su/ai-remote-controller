@@ -1526,6 +1526,8 @@ Rust验证适配进程UID，接口/权限存在不宣称操作可执行，当前
 <h2 id="_4">应用图标的取消与并发<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <p><code>AppIconController</code> 最多保留两项图标加载。排队阶段可以取消；获得名额后重新核对目标连接和列表版本，刷新前的排队任务不能再发送。已发送的 WebSocket 图标请求没有撤回协议，因此即使列表项离屏，也要等响应、断线或既有请求超时后才释放名额，避免快速滚动积累远端任务。</p>
 <p>仅描述请求的等待段不响应列表项取消；收到描述后立即检查取消状态，已离屏的项不再下载图片或写入缓存。后续 HTTP 下载仍可取消，阻塞读取会关闭连接并释放名额。刷新与设备切换清除缓存及旧版本结果，不重置仍在使用的并发名额。</p>
+<p>手机电视输入由 TvInputController 承载仅内存草稿，ScrcpyTextInput 使用独立的无音视频 ADB 控制会话，通过 scrcpy 4.0 的剪贴板粘贴与回执传输 UTF-8；不修改 runtime 的 ASCII remote.text 接口，不自动读取电视剪贴板。连接代次变化或取消会停止请求并清理本次临时 server。IncomingShare 只接收 content URI 或文字并保存在进程中，SharePanel 复用下载目录选择、传输和媒体控制，不从外部 Intent 自动执行任务。</p>
+<p>AppShortcuts 与 QuickRoutine 按设备身份保存在控制手机，忘记设备时移除。QuickRoutineController 只执行类型限定的应用启动、普通按键与有界等待，捕获原连接并在每步核对；取消、错误与目标变化后不重放。管理 ADB 状态来自已有连接流，动态预览状态来自独立控制器，不将管理连接健康当作预览或 runtime 健康。</p>
 
 
 
