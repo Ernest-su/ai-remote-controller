@@ -32,11 +32,15 @@ def main():
         if not versions:
             sys.exit("No NDK installed; set ANDROID_NDK_HOME or install an NDK with android sdk.")
         ndk = str(versions[-1])
-    host = "linux-x86_64" if sys.platform.startswith("linux") else "darwin-x86_64"
+    hosts = {"linux": "linux-x86_64", "darwin": "darwin-x86_64", "win32": "windows-x86_64"}
+    if sys.platform not in hosts:
+        sys.exit(f"Unsupported build host: {sys.platform}")
+    host = hosts[sys.platform]
     toolchain = pathlib.Path(ndk) / "toolchains/llvm/prebuilt" / host / "bin"
     output = ROOT / "androidApp/src/main/assets/runtime"
     output.mkdir(parents=True, exist_ok=True)
     cargo_env = os.environ.copy()
+    cargo_env["AIRC_PYTHON"] = sys.executable
     # A bind-mounted workspace may contain host build scripts linked against a newer glibc.
     # Keep container builds separate while preserving an explicit Cargo target directory.
     if not cargo_env.get("CARGO_TARGET_DIR") and (pathlib.Path("/.dockerenv").exists() or pathlib.Path("/run/.containerenv").exists()):
@@ -46,13 +50,15 @@ def main():
     assets = []
     for abi in args.abi or TARGETS:
         target, compiler = TARGETS[abi]
+        if sys.platform == "win32":
+            compiler += ".cmd"
         if not (toolchain / compiler).is_file():
             sys.exit(f"Missing NDK compiler: {toolchain / compiler}")
         subprocess.run(["rustup", "target", "add", target], check=True)
         env = cargo_env.copy()
         env["CARGO_TARGET_" + target.upper().replace("-", "_") + "_LINKER"] = str(toolchain / compiler)
         env["CC_" + target.replace("-", "_")] = str(toolchain / compiler)
-        env["AR_" + target.replace("-", "_")] = str(toolchain / "llvm-ar")
+        env["AR_" + target.replace("-", "_")] = str(toolchain / ("llvm-ar.exe" if sys.platform == "win32" else "llvm-ar"))
         env["CARGO_TARGET_" + target.upper().replace("-", "_") + "_RUSTFLAGS"] = "-C link-arg=-Wl,-z,max-page-size=16384"
         subprocess.run(["cargo", "build", "--locked", "--release", "--manifest-path", str(ROOT / "runtime/Cargo.toml"), "--target", target], env=env, check=True)
         name = f"airc-runtime-{abi}"
