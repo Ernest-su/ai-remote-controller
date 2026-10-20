@@ -18,6 +18,8 @@ export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
 
 开发机需要 JDK 17、Android SDK 36、NDK `28.2.13676358`、Rust/Cargo/rustup 和 Python 3.11+；Gradle daemon 按仓库配置使用 JetBrains JDK 25，首次自动获取。构建会将三 ABI runtime 打包到 APK，无需单独安装目标程序。详细环境见[从源码构建](development/build.md)。
 
+Windows 原生构建及 Python 解释器设置见[构建文档](development/build.md)。
+
 debug APK 输出为 `androidApp/build/outputs/apk/debug/androidApp-debug.apk`，安装到控制手机。debug 与生产 APK 使用不同证书，不能互相直接覆盖安装；如需切换，应在卸载前确认能够重新配置模型与设备信息。
 
 生产签名、六项 GitHub Secrets 和草稿 Release 的使用方法见[签名与发布](development/releasing.md)。只有公开的 Release 才能进入 App 在线更新入口。

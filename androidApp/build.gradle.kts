@@ -37,10 +37,15 @@ android {
 }
 kotlin { jvmToolchain(17) }
 
+// Override with -PaircPython=/path/to/python when Python is not on PATH.
+val runtimePython = providers.gradleProperty("aircPython").getOrElse(
+    if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) "python" else "python3"
+)
+
 // A distributable APK must carry the actual target binaries, never an empty stub.
 val bundleRuntime by tasks.registering(Exec::class) {
     workingDir(rootProject.projectDir)
-    commandLine("python3", "scripts/build-runtime.py")
+    commandLine(runtimePython, "scripts/build-runtime.py")
     environment("ANDROID_HOME", androidComponents.sdkComponents.sdkDirectory.get().asFile.absolutePath)
     inputs.files(rootProject.fileTree("runtime/src"), rootProject.fileTree("runtime/platform/android"),
         rootProject.file("runtime/build.rs"), rootProject.file("runtime/Cargo.toml"),
@@ -71,7 +76,7 @@ providers.gradleProperty("aircReleaseFixture").orNull?.let { manifestPath ->
 
 val scrcpyAssets = layout.buildDirectory.dir("generated/scrcpyAssets")
 val prepareScrcpyServer by tasks.registering(Exec::class) {
-    commandLine("python3", rootProject.file("scripts/prepare-scrcpy-server.py"), scrcpyAssets.get().asFile)
+    commandLine(runtimePython, rootProject.file("scripts/prepare-scrcpy-server.py"), scrcpyAssets.get().asFile)
     inputs.file(rootProject.file("scripts/prepare-scrcpy-server.py"))
     outputs.file(scrcpyAssets.map { it.file("scrcpy-server-v4.0") })
 }

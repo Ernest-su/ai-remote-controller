@@ -6,7 +6,7 @@
 - Android NDK，已验证 `28.2.13676358`。
 - SDK build-tools 36.0.0（D8）与 javac 用于构建嵌入的短时媒体桥接；工具链内容仍在宿主机安装，编译只读 SDK。
 - Rust 1.88 或更高版本、Cargo/rustup、Python 3.11+；首次构建需要网络。APK 只读解析使用固定 zip 9.0.2，其 Rust 要求见[官方文档](https://docs.rs/zip/9.0.2/zip/#msrv)。
-- 已验证 Linux x86_64。构建脚本包含 macOS 工具链路径选择，其他主机尚未完整验收。
+- 构建脚本按 Linux、macOS、Windows 选择 NDK 工具链；Windows 使用原生 Python、Rust MSVC 工具链与 Visual Studio C++ Build Tools。完整验收范围以实际构建结果为准。
 
 从仓库根目录执行：
 
@@ -15,6 +15,15 @@ export ANDROID_HOME=/path/to/android-sdk
 export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
 ./gradlew :androidApp:assembleDebug :shared:jvmTest --no-daemon
 ```
+
+Windows 的 Android Studio 可直接执行同一 Gradle 任务。命令行可从仓库根目录运行：
+
+```powershell
+$env:ANDROID_HOME = "C:\Android\Sdk"
+java -classpath gradle/wrapper/gradle-wrapper.jar org.gradle.wrapper.GradleWrapperMain :androidApp:assembleDebug --no-daemon
+```
+
+SDK 路径换为本机安装目录。Windows 默认调用 `python`，Linux/macOS 默认调用 `python3`；如需指定解释器，给 Gradle 传入 `-PaircPython=C:/Python/python.exe`。先用该解释器执行 `--version`，确认不是 Windows 应用商店的空别名。runtime 子构建会沿用此解释器；Windows NDK 必须包含 `windows-x86_64` 工具链。
 
 `local.properties` 可设置 Android SDK 路径，但不要提交个人配置。Gradle 的 preBuild 会执行 `scripts/build-runtime.py`，构建 ARM64、ARMv7、x86_64 程序及清单，打包进 APK。构建同时生成 `tvInputMethod` 配套电视输入法，将同构建类型的已签名 APK 嵌入 `assets/airc-input-method.apk`；debug 使用开发证书，release 与控制端共用生产签名配置。电视安装由“电视输入 → 输入法提交 → 安装并启用”明确触发，按 APK 摘要校验与更新。
 

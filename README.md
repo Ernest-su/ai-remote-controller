@@ -20,6 +20,8 @@ export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
 ./gradlew :androidApp:assembleDebug --no-daemon
 ```
 
+Windows 原生构建及 Python 解释器设置见[构建文档](docs/development/build.md)。
+
 APK 输出：`androidApp/build/outputs/apk/debug/androidApp-debug.apk`。安装到控制手机，在目标设备启用 ADB，点击右上角连接状态，进入“设备”页连接并部署。详细前提和步骤见[快速开始](docs/getting-started.md)。
 
 单独调试设备端：执行 `./android-build-run.sh` 自动构建目标 ABI、ADB 推送并后台启动 runtime，参数见[构建文档](docs/development/build.md)。
