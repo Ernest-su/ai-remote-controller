@@ -101,7 +101,9 @@ fn strings(chunk: &[u8]) -> Result<Vec<String>> {
                     bail!("missing string terminator");
                 }
                 let units: Vec<_> = raw
-                    .chunks_exact(2)
+                    .as_chunks::<2>()
+                    .0
+                    .iter()
                     .map(|v| u16::from_le_bytes([v[0], v[1]]))
                     .collect();
                 String::from_utf16(&units)?
