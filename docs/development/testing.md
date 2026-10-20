@@ -204,3 +204,13 @@ uv run --with websockets python runtime/remote_key_hold_target_test.py --serial 
 真实电视预览与浮层联测使用 `python3 scripts/test-phone-target.py --phone <控制端ADB> --target <电视ADB> --host <电视IP> --suite mirror-floating-target`。先构建 App、AndroidTest 与 mediaFixture；专项创建配套隔离 runtime，在临时 ColorActivity 中核对实际解码像素变化、原生 Surface 保留、连续拖动与吸附、设置透明度、闲置淡化与唤醒、浮层不透传触控、电视实收方向键 DOWN/UP、完整/紧凑切换及后台恢复。退出后核对自建 scrcpy 文件/进程释放，恢复控制端历史和透明度、电视原前台 Activity，并卸载自建 fixture。控制端若是模拟器，应明确报告，不能称为实体手机实测。
 
 首次在新控制端进入全屏时，先关闭 Android 的全屏手势教学提示，避免系统遮罩干扰叠层像素检查。`mirror-floating-target` 支持 `--preview-quality 流畅|均衡|清晰` 选择初始档位；若测试进程被中断，驱动器通过 `DeviceHistoryRecoveryTest` 恢复设备历史与已记录的透明度，避免把临时目标留给自动重连。
+
+符号链接专项：`FileBrowserControllerTest` 检查链接目录的逻辑路径、返回与只读创建拦截；`FileLinkUiTest`（桌面与 Android，Android 归入 `file-page-ui`）验证链接目标/错误、预览与下载入口、链接删除确认和只读禁用，适配亮暗、320dp 与1.5倍字号。Rust `tools::files` 检查范围内相对/绝对/多级链接、越界、失效、循环、无权限、特殊文件、procfs链接和并发替换后的读取隔离；文件动作及传输测试检查只删除链接、下载可读而写入父目录仍拒绝链接。
+
+Android 文件系统专项只操作明确选择的自有模拟器，在 UUID 目录启动匹配 ABI 的独立服务，验证真实 HTTP 范围预览、固定来源、流式下载摘要、写入/扫描拒绝及链接删除，结束清理自建服务、文件与转发：
+
+```sh
+uv run --with websockets python runtime/file_links_target_test.py --serial <自有模拟器序列号> --binary androidApp/src/main/assets/runtime/airc-runtime-x86_64
+```
+
+按目标 ABI 替换二进制；此专项不安装 App、不修改已有文件或系统设置，也不代替厂商共享存储兼容性测试。

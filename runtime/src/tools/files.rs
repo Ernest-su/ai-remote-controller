@@ -9,6 +9,10 @@ use std::{
     path::Path,
 };
 
+#[path = "file_links.rs"]
+mod links;
+pub(crate) use links::open_read;
+
 static INBOX: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 pub(crate) fn initialize(directory: &Path) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
@@ -103,7 +107,29 @@ fn execute_at(root: &Path, tool: &str, args: &Value) -> Result<String> {
         .map(|value| value.as_str().context("path must be a string"))
         .transpose()?
         .unwrap_or("");
-    let file = open(root, relative)?;
+    components(relative)?;
+    if tool == "files.stat" {
+        let (parent_path, name) = relative.rsplit_once('/').unwrap_or(("", relative));
+        let parent = open_read(root, parent_path)?;
+        let entry = std::fs::symlink_metadata(format!(
+            "/proc/self/fd/{}/{}",
+            parent.file.as_raw_fd(),
+            name
+        ))?;
+        let mut value = if entry.is_symlink() {
+            links::describe(root, relative, name, true)
+        } else {
+            let resolved = open_read(root, relative)?;
+            let meta = resolved.file.metadata()?;
+            json!({"kind":if meta.is_dir(){"directory"}else{"file"},"sizeBytes":if meta.is_file(){Some(meta.len())}else{None},"symlink":false})
+        };
+        value["root"] = json!(root_name);
+        value["path"] = json!(relative);
+        return Ok(value.to_string());
+    }
+    let resolved = open_read(root, relative)?;
+    let read_only = resolved.followed;
+    let file = resolved.file;
     let metadata = file.metadata()?;
     if tool == "files.preview" {
         if !metadata.is_file() {
@@ -130,9 +156,6 @@ fn execute_at(root: &Path, tool: &str, args: &Value) -> Result<String> {
         return Ok(
             crate::artifacts::insert_file(bytes, relative.rsplit('/').next().unwrap()).to_string(),
         );
-    }
-    if tool == "files.stat" {
-        return Ok(json!({"root":root_name,"path":relative,"kind":if metadata.is_dir() {"directory"} else {"file"},"sizeBytes":if metadata.is_file(){Some(metadata.len())}else{None}}).to_string());
     }
     if !metadata.is_dir() {
         bail!("files.list requires a directory");
@@ -178,10 +201,17 @@ fn execute_at(root: &Path, tool: &str, args: &Value) -> Result<String> {
         .into_iter()
         .filter(|(name, _)| name.as_str() > cursor)
         .collect();
-    let page: Vec<_> = remaining.iter().take(limit as usize).map(|(name,meta)| json!({"name":name,"kind":if meta.is_symlink(){"symlink"}else if meta.is_dir(){"directory"}else if meta.is_file(){"file"}else{"other"},"sizeBytes":if meta.is_file(){Some(meta.len())}else{None}})).collect();
+    let page: Vec<_> = remaining.iter().take(limit as usize).map(|(name,meta)| {
+        if meta.is_symlink() {
+            let path = if relative.is_empty() { name.clone() } else { format!("{relative}/{name}") };
+            links::describe(root, &path, name, true)
+        } else {
+            json!({"name":name,"kind":if meta.is_dir(){"directory"}else if meta.is_file(){"file"}else{"other"},"sizeBytes":if meta.is_file(){Some(meta.len())}else{None},"symlink":false})
+        }
+    }).collect();
     let next =
         (remaining.len() > limit as usize).then(|| page.last().unwrap()["name"].as_str().unwrap());
-    Ok(json!({"root":root_name,"path":relative,"entries":page,"nextCursor":next}).to_string())
+    Ok(json!({"root":root_name,"path":relative,"entries":page,"nextCursor":next,"readOnly":read_only}).to_string())
 }
 
 pub(super) async fn execute(tool: &str, args: &Value) -> Result<String> {
@@ -257,7 +287,7 @@ mod tests {
             format!("/media/{}", result["id"].as_str().unwrap())
         );
         crate::media_resources::revoke_preview(result["id"].as_str().unwrap()).unwrap();
-        for path in ["link.mp4", "../escape", ""] {
+        for path in ["../escape", ""] {
             assert!(execute_at(&root, "files.preview", &json!({"path":path})).is_err());
         }
         assert!(execute_at(

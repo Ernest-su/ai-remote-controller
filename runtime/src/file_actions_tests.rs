@@ -84,3 +84,58 @@ async fn confirmation_overwrite_delete_and_path_boundaries() {
     assert!(directory.join("file").exists());
     std::fs::remove_dir_all(directory).unwrap();
 }
+
+#[test]
+fn deleting_a_link_preserves_target_and_mutations_reject_link_parents() {
+    let directory = std::env::temp_dir().join(format!("airc-link-delete-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(directory.join("target")).unwrap();
+    std::fs::write(directory.join("target/keep"), b"keep").unwrap();
+    std::os::unix::fs::symlink("target", directory.join("alias")).unwrap();
+    let path = directory
+        .join("alias")
+        .to_str()
+        .unwrap()
+        .trim_start_matches('/')
+        .to_owned();
+    assert!(prepare(
+        "files.delete",
+        &json!({"root":"full","path":format!("{path}/keep")})
+    )
+    .is_err());
+    assert!(prepare(
+        "files.prepare_overwrite",
+        &json!({"root":"full","path":path})
+    )
+    .is_err());
+    let proposal: Value = serde_json::from_str(
+        &prepare(
+            "files.delete",
+            &json!({"root":"full","path":path,"recursive":false}),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(proposal["symlink"], true);
+    assert_eq!(proposal["directory"], false);
+    let prepared = proposals()
+        .lock()
+        .unwrap()
+        .remove(proposal["id"].as_str().unwrap())
+        .unwrap();
+    remove(
+        &prepared.parent,
+        &prepared.name,
+        false,
+        &AtomicBool::new(false),
+        &AtomicU64::new(0),
+        0,
+        prepared.expected.as_ref(),
+    )
+    .unwrap();
+    assert!(std::fs::symlink_metadata(directory.join("alias")).is_err());
+    assert_eq!(
+        std::fs::read(directory.join("target/keep")).unwrap(),
+        b"keep"
+    );
+    std::fs::remove_dir_all(directory).unwrap();
+}

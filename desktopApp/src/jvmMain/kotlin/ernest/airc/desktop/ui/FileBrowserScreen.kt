@@ -63,7 +63,7 @@ fun DesktopFileBrowser(state: DesktopState, controller: DesktopController) {
         },
         onApk=if(available && !apk.busy && "apps.apk_info" in state.tools) ({entry -> controller.apkInspection.inspect(files.root,path(entry.name),available)}) else null,
         onMedia=if(available && "media.players" in state.tools && "media.open" in state.tools) ({entry -> controller.fileMedia.inspect(files.root,path(entry.name),available,"media.publish" in state.tools && files.root!="downloads")}) else null,
-        onDelete=if(available && !transfer.running && "files.delete" in state.tools) ({entry -> controller.transfers.delete(files.root,path(entry.name),entry.kind=="directory",available) { controller.files.refresh(available) } }) else null,
+        onDelete=if(available && !files.readOnly && !transfer.running && "files.delete" in state.tools) ({entry -> controller.transfers.delete(files.root,path(entry.name),entry.kind=="directory" && !entry.isSymbolicLink,available && !files.readOnly) { controller.files.refresh(available) } }) else null,
         onDownload=if(canTransfer&&!transfer.running) ({ entry ->
             message=null
             cache.mkdirs()
@@ -91,8 +91,8 @@ fun DesktopFileBrowser(state: DesktopState, controller: DesktopController) {
                 }
             }
             if (section == "storage") {
-            if("storage.analyze" in state.tools) StorageAnalysisPanel(storage, available && "task.progress" in state.tools && "task.cancel" in state.tools,
-                { controller.storageAnalysis.analyze(files.root,files.path,available) }, controller.storageAnalysis::cancel)
+            if("storage.analyze" in state.tools) StorageAnalysisPanel(storage, available && !files.readOnly && "task.progress" in state.tools && "task.cancel" in state.tools,
+                { controller.storageAnalysis.analyze(files.root,files.path,available && !files.readOnly) }, controller.storageAnalysis::cancel)
             if ("storage.analyze" !in state.tools) Text("当前服务不支持存储分析。", color=RemoteColors.Secondary)
             }
             if (section == "apk") {
@@ -115,7 +115,7 @@ fun DesktopFileBrowser(state: DesktopState, controller: DesktopController) {
             if (media.players == null && !media.busy) Text("从媒体文件的更多菜单选择在被控设备播放，选择播放器后再执行。", color=RemoteColors.Secondary)
             }
             if (section in listOf("upload", "download", "delete")) {
-            FileTransferPanel(transfer,files.root,files.path,canTransfer,
+            FileTransferPanel(transfer,files.root,files.path,canTransfer && (section != "upload" || !files.readOnly),
                 onSelect={
                     val dialog=FileDialog(null as Frame?,"选择推送文件",FileDialog.LOAD)
                     try { dialog.isVisible=true;dialog.file?.let { name ->
@@ -123,7 +123,7 @@ fun DesktopFileBrowser(state: DesktopState, controller: DesktopController) {
                         if(file.isFile) controller.transfers.select(UploadSource(file.name,file.length(),file::inputStream))
                     } } finally { dialog.dispose() }
                 },
-                onUpload={ name -> message=null;controller.transfers.upload(files.root,path(name),canTransfer) },
+                onUpload={ name -> message=null;controller.transfers.upload(files.root,path(name),canTransfer && !files.readOnly) },
                 onCancel=controller.transfers::cancel,
                 onSave={
                     val name=controller.transfers.prepareExport()
@@ -151,7 +151,7 @@ fun DesktopFileBrowser(state: DesktopState, controller: DesktopController) {
                         catch(_:Exception) { message="保存失败，可重试。" }
                         finally { dialog.dispose();exported?.let { if(completed)it.file.delete()else controller.transfers.restoreExport(it) } }
                     }
-                }, onOverwrite={name -> controller.transfers.upload(files.root,path(name),canTransfer,true)},onConfirm=controller.transfers::confirm,operation=section)
+                }, onOverwrite={name -> controller.transfers.upload(files.root,path(name),canTransfer && !files.readOnly,true)},onConfirm=controller.transfers::confirm,operation=section)
             message?.let { androidx.compose.material3.Text(it,color=RemoteColors.Secondary) }
             }
         })

@@ -83,7 +83,7 @@ Android 页面显示名称、包名、图标与类型，支持名称/包名搜�
 
 ## 文件管理与流式传输
 
-`files.list` / `files_list` 与 `files.stat` / `files_stat` 接收 `root`（`downloads` 默认、`inbox` 服务私有收件箱、`full` 文件系统 `/`）及相对 `path`。拒绝绝对路径、`..` 和符号链接穿越；权限沿用服务身份。列表额外接收 `limit`（1–100，默认 50）与 `cursor`；返回 root/path/entries/nextCursor，按文件名排序，最多扫描 4096 项。stat 返回 kind 与普通文件 sizeBytes。
+`files.list` / `files_list` 与 `files.stat` / `files_stat` 接收 `root`（`downloads` 默认、`inbox` 服务私有收件箱、`full` 文件系统 `/`）及相对 `path`。调用参数仍拒绝绝对路径和 `..`；只读解析允许普通符号链接，但目标必须留在所选根内，权限沿用服务身份。列表额外接收 `limit`（1–100，默认 50）与 `cursor`；返回 root/path/entries/nextCursor/readOnly，按文件名排序，最多扫描 4096 项。路径经过链接时 readOnly=true。条目的 kind 为解析后的 file/directory，另以 symlink=true、linkTarget 标注链接，targetName 提供解析后的文件名以识别无扩展名链接的预览类型；解析失败时 kind=symlink，linkError 区分 link_missing、link_outside_root、link_loop、link_permission、link_special、link_not_directory、link_invalid、link_changed、link_unavailable。stat 返回相同的类型、链接字段与普通文件 sizeBytes。解析使用固定目录/链接描述符，限制40次展开，拒绝特殊文件及 procfs 链接；不能用预先规范化路径后再按字符串打开替代。
 
 `task.start` / `task_start` 的 `direction=download` 配合 root/path 创建流式下载，轮询 `task.progress` / `task_progress` 等待 ready，读取其 sha256 和 `dataPath=/transfers/{id}/data`，随后 GET 该路径。上传使用 direction=upload、sizeBytes、sha256，再 PUT 原始二进制到 dataPath。GET/PUT 的 MIME 为 application/octet-stream，禁止缓存；固定 64 KiB 缓冲，单文件最大 1 TiB。上传长度/摘要必须匹配，fsync 后原子提交；默认 RENAME_NOREPLACE，不支持时明确失败。最多两个活动任务，最多保留 16 条记录；终态记录可提前淘汰，空闲记录在新任务时按 15 分钟清理。任务不跨进程重启恢复。
 
@@ -251,7 +251,7 @@ remote.key 的 power 参数仅供直接手动控制；模型别名 remote_key �
 
 ### 文件预览与 APK 图标
 
-`files.preview` / `files_preview` 接收 `{root,path}`，只打开选定根中的普通文件，不跟随符号链接，返回 `{id,root,path,sizeBytes,dataPath}`；`dataPath` 为 `/media/{id}`，支持 HTTP GET/HEAD 与单范围 Range。范围响应携带精确 Content-Range 与长度，文件发生变化时返回409。最多八个预览资源、闲置五分钟失效，容量与目标播放资源分别计算。`files.preview_close` / `files_preview_close` 接收 `{id}` 释放预览，不能借此关闭目标播放资源。流不内联文件内容，不计算全文件摘要；需要完整校验的导出继续使用下载任务。
+`files.preview` / `files_preview` 接收 `{root,path}`，只读打开选定根中的普通文件，允许受限跟随范围内的普通符号链接，返回 `{id,root,path,sizeBytes,dataPath}`；`dataPath` 为 `/media/{id}`，支持 HTTP GET/HEAD 与单范围 Range。范围响应携带精确 Content-Range 与长度，文件发生变化时返回409。最多八个预览资源、闲置五分钟失效，容量与目标播放资源分别计算。`files.preview_close` / `files_preview_close` 接收 `{id}` 释放预览，不能借此关闭目标播放资源。流不内联文件内容，不计算全文件摘要；需要完整校验的导出继续使用下载任务。
 
 `apps.apk_icon` / `apps_apk_icon` 接收 `{root,path}`（`.apk` 普通文件，最多4 GiB），从已固定的文件描述符经 Android 包资源解析获取96×96 PNG，单图最多128 KiB；返回 BinaryArtifact 加 `root`、`filePath`，`path` 仍为 `/artifacts/{id}`。客户端核对原根、文件路径、尺寸与长度后读取。此接口不安装 APK、不从同包名的已安装应用借用图标；split 缺少独立图标、无访问权限或资源无法解析时可能失败，界面保留占位。
 

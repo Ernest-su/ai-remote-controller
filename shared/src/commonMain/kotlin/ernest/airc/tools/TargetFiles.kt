@@ -4,11 +4,15 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 @Serializable
-data class TargetFileEntry(val name: String, val kind: String, val sizeBytes: Long? = null)
+data class TargetFileEntry(val name: String, val kind: String, val sizeBytes: Long? = null,
+    val symlink: Boolean = false, val linkTarget: String? = null, val linkError: String? = null, val targetName: String? = null) {
+    val isSymbolicLink: Boolean get() = symlink || kind == "symlink"
+}
 @Serializable
-data class TargetFilesPage(val root: String, val path: String, val entries: List<TargetFileEntry>, val nextCursor: String? = null)
+data class TargetFilesPage(val root: String, val path: String, val entries: List<TargetFileEntry>, val nextCursor: String? = null, val readOnly: Boolean = false)
 @Serializable
-data class TargetFileStat(val root: String, val path: String, val kind: String, val sizeBytes: Long? = null)
+data class TargetFileStat(val root: String, val path: String, val kind: String, val sizeBytes: Long? = null,
+    val symlink: Boolean = false, val linkTarget: String? = null, val linkError: String? = null, val targetName: String? = null)
 
 data class FileBrowserState(
     val path: String = "",
@@ -20,6 +24,7 @@ data class FileBrowserState(
     val selected: TargetFileStat? = null,
     val root: String = "downloads",
     val contentRevision: Long = 0,
+    val readOnly: Boolean = false,
 )
 
 fun validTargetFileName(name: String): Boolean = name.isNotEmpty() && name != "." && name != ".." &&
@@ -40,4 +45,16 @@ data class FileTransferState(val operation: String = "upload", val sourceName: S
 fun fileRootTitle(root: String): String = when(root) { "inbox" -> "服务收件箱"; "full" -> "全盘 /"; else -> "Downloads" }
 
 @Serializable
-data class FileActionProposal(val id: String, val kind: String, val root: String, val path: String, val recursive: Boolean = false, val exists: Boolean, val sizeBytes: Long? = null, val directory: Boolean = false, val approvalRequired: Boolean = true)
+data class FileActionProposal(val id: String, val kind: String, val root: String, val path: String, val recursive: Boolean = false, val exists: Boolean, val sizeBytes: Long? = null, val directory: Boolean = false, val approvalRequired: Boolean = true, val symlink: Boolean = false)
+
+fun fileLinkError(code: String?): String = when (code) {
+    "link_missing" -> "链接目标不存在"
+    "link_outside_root" -> "链接目标超出当前浏览范围"
+    "link_loop" -> "链接循环或层数过多"
+    "link_permission" -> "没有权限访问链接目标"
+    "link_special" -> "不支持访问特殊链接或特殊文件"
+    "link_not_directory" -> "链接路径中包含非目录项"
+    "link_invalid" -> "链接目标路径无效"
+    "link_changed" -> "链接目标已变化，请刷新"
+    else -> "链接目标暂时不可访问"
+}

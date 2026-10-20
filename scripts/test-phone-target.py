@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SUITES = {
     "tv-input-ui": ("ernest.airc.TvInputUiTest,ernest.airc.TvInputFocusUiTest", 2),
     "remote-menu-ui": ("ernest.airc.RemoteQuickMenuUiTest,ernest.airc.RemoteLayoutUiTest", 5),
-    "file-page-ui": ("ernest.airc.FilePageLayoutUiTest", 1),
+    "file-page-ui": ("ernest.airc.FilePageLayoutUiTest,ernest.airc.FileLinkUiTest", 2),
     "library-layout-ui": ("ernest.airc.LibraryLayoutUiTest", 1),
     "mobile-convenience-ui": ("ernest.airc.MobileConvenienceUiTest", 4),
     "remote-haptics-input-ui": ("ernest.airc.RemoteHapticsInputUiTest", 7),

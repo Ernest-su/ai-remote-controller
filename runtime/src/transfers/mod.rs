@@ -70,7 +70,7 @@ fn create_at_impl(
             if object.contains_key("sizeBytes") || object.contains_key("sha256") {
                 bail!("download size and digest are determined by target");
             }
-            let file = crate::tools::files::open(root, relative)?;
+            let file = crate::tools::files::open_read(root, relative)?.file;
             let meta = file.metadata()?;
             if !meta.is_file() || meta.len() > MAX_FILE {
                 bail!("invalid file or exceeds 1 TiB protocol quota");

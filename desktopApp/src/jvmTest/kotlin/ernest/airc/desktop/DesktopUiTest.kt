@@ -250,18 +250,18 @@ class DesktopUiTest {
         assertTrue(cancelled)
     }
 
-    @Test fun fileBrowserOffersDirectoryAndMetadataActionsWithoutFollowingLinks() {
+    @Test fun fileBrowserOffersDirectoryMetadataAndBlockedLinkReasons() {
         var entered = ""
         var inspected = ""
         val folder = TargetFileEntry("folder", "directory")
         val file = TargetFileEntry("test.txt", "file", 3)
-        compose.setContent { RemoteTheme { FileBrowserPanel(FileBrowserState(entries = listOf(folder, file, TargetFileEntry("escape", "symlink")), loaded = true), true, {}, {}, {}, { entered = it.name }, { inspected = it.name }) } }
+        compose.setContent { RemoteTheme { FileBrowserPanel(FileBrowserState(entries = listOf(folder, file, TargetFileEntry("escape", "symlink", symlink = true, linkTarget = "/outside", linkError = "link_outside_root")), loaded = true), true, {}, {}, {}, { entered = it.name }, { inspected = it.name }) } }
         compose.onNodeWithText("folder").performScrollTo().performClick()
         assertEquals("folder", entered)
         compose.onNodeWithText("test.txt").performScrollTo().performClick()
         assertEquals("test.txt", inspected)
         compose.onNodeWithTag("files-properties-dialog-close").performClick()
-        compose.onNodeWithText("符号链接 · 不可访问").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("符号链接 · 链接目标超出当前浏览范围").performScrollTo().assertIsDisplayed()
     }
 
     @Test fun diagnosticPanelDistinguishesSkippedStagesAndReportsDuration() {

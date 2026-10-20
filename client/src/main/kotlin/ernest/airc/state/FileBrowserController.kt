@@ -7,7 +7,7 @@ import kotlinx.serialization.json.*
 class FileBrowserController(private val scope: CoroutineScope, private val runtime: RuntimeConnection? = null, private val request: suspend (String, JsonObject) -> String) {
     constructor(scope:CoroutineScope,runtime:RuntimeConnection):this(scope,runtime,{tool,args->runtime.request("tool",tool,args)})
     fun createDirectory(name:String,available:Boolean) {
-        if(!available || state.value.loading || !validTargetFileName(name))return
+        if(!available || state.value.loading || state.value.readOnly || !validTargetFileName(name))return
         val token=generation;val root=state.value.root;val parent=state.value.path
         val path=listOf(parent,name).filter{it.isNotEmpty()}.joinToString("/")
         mutable.update{it.copy(loading=true,error=null)}
@@ -82,7 +82,10 @@ class FileBrowserController(private val scope: CoroutineScope, private val runti
                 check(page.root == root && page.path == path && page.entries.size <= 50) { "文件列表响应与请求不匹配" }
                 check(page.entries.all { entry ->
                     validTargetFileName(entry.name) && entry.kind in listOf("file", "directory", "symlink", "other") &&
-                        (entry.sizeBytes?.let { it >= 0 } ?: true)
+                        (entry.sizeBytes?.let { it >= 0 } ?: true) &&
+                        (entry.linkError == null || entry.isSymbolicLink && entry.kind == "symlink") &&
+                        (entry.targetName?.let { entry.isSymbolicLink && validTargetFileName(it) } ?: true) &&
+                        (entry.linkTarget?.let { target -> entry.isSymbolicLink && target.length <= 4096 && target.none { it.isISOControl() } } ?: true)
                 } && page.entries.map { it.name }.distinct().size == page.entries.size) { "文件列表条目无效" }
                 check(page.entries.zipWithNext().all { (a,b) -> compareNames(a.name,b.name)<0 } &&
                     (cursor==null || page.entries.all { compareNames(it.name,cursor)>0 })) { "目录分页顺序无效，请刷新目录" }
@@ -91,7 +94,7 @@ class FileBrowserController(private val scope: CoroutineScope, private val runti
                 if (token == generation) mutable.update {
                     val entries = if (append) (it.entries + page.entries) else page.entries
                     check(entries.size <= 4096) { "目录缓存超过 4096 项，请选择更小目录" }
-                    FileBrowserState(path, entries, page.nextCursor, loaded = true, root = root, contentRevision = it.contentRevision + if(append) 0 else 1)
+                    FileBrowserState(path, entries, page.nextCursor, loaded = true, root = root, contentRevision = it.contentRevision + if(append) 0 else 1, readOnly = page.readOnly)
                 }
             } catch (e: CancellationException) {
                 if (token == generation) mutable.update { it.copy(loading = false) }
@@ -101,7 +104,7 @@ class FileBrowserController(private val scope: CoroutineScope, private val runti
         }
     }
     fun inspect(entry: TargetFileEntry, available: Boolean) {
-        if (!available || state.value.loading || entry.kind !in listOf("file", "directory") || !validTargetFileName(entry.name)) return
+        if (!available || state.value.loading || entry.kind !in listOf("file", "directory", "symlink") || !validTargetFileName(entry.name)) return
         val path = listOf(state.value.path, entry.name).filter { it.isNotEmpty() }.joinToString("/")
         val token = generation
         val root = state.value.root
@@ -109,7 +112,7 @@ class FileBrowserController(private val scope: CoroutineScope, private val runti
         launchOperation {
             try {
                 val result = json.decodeFromString<TargetFileStat>(query("files.stat", buildJsonObject { put("root",root); put("path", path) }))
-                check(result.root == root && result.path == path && result.kind == entry.kind &&
+                check(result.root == root && result.path == path && result.kind in listOf("file", "directory", "symlink") && (entry.isSymbolicLink || result.kind == entry.kind) &&
                     (result.sizeBytes?.let { it >= 0 } ?: true)) { "文件属性响应与请求不匹配" }
                 if (token == generation) mutable.update { it.copy(loading = false, selected = result) }
             } catch (e: CancellationException) {

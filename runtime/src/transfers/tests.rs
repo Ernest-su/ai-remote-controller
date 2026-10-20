@@ -183,3 +183,32 @@ async fn app_control_progress_uses_items_and_stays_committing_until_completion()
     assert_eq!(completed["phase"], "completed");
     assert_eq!(completed["bytesTransferred"], 1);
 }
+
+#[test]
+fn links_are_readable_download_sources_but_not_upload_destinations() {
+    let root = std::env::temp_dir().join(format!("airc-link-transfer-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(root.join("target")).unwrap();
+    std::fs::write(root.join("target/source"), b"linked bytes").unwrap();
+    std::os::unix::fs::symlink("target", root.join("alias")).unwrap();
+    let task = create_at(
+        &json!({"direction":"download","path":"alias/source"}),
+        &root,
+    )
+    .unwrap();
+    let mut bytes = Vec::new();
+    task.file
+        .lock()
+        .unwrap()
+        .as_mut()
+        .unwrap()
+        .read_to_end(&mut bytes)
+        .unwrap();
+    assert_eq!(bytes, b"linked bytes");
+    assert!(create_at(
+        &json!({"direction":"upload","path":"alias/new","sizeBytes":0,"sha256":"0".repeat(64)}),
+        &root
+    )
+    .is_err());
+    assert!(!root.join("target/new").exists());
+    std::fs::remove_dir_all(root).unwrap();
+}

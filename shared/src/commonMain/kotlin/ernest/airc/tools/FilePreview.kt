@@ -6,7 +6,8 @@ enum class FilePreviewKind { IMAGE, VIDEO, AUDIO, TEXT }
 
 fun filePreviewKind(entry: TargetFileEntry): FilePreviewKind? {
     if (entry.kind != "file" || !validTargetFileName(entry.name)) return null
-    return when (entry.name.substringAfterLast('.', "").lowercase()) {
+    val name = if (entry.isSymbolicLink) entry.targetName ?: entry.name else entry.name
+    return when (name.substringAfterLast('.', "").lowercase()) {
         "jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif", "avif" -> FilePreviewKind.IMAGE
         "mp4", "mkv", "webm", "avi", "mov", "m4v", "ts", "3gp" -> FilePreviewKind.VIDEO
         "mp3", "m4a", "aac", "wav", "ogg", "flac", "opus" -> FilePreviewKind.AUDIO

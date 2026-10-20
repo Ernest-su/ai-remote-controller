@@ -223,7 +223,7 @@ class FileBrowserControllerTest {
             browser.parent(true); assertEquals("", browser.state.value.path)
             val before = calls.size
             browser.enter(TargetFileEntry("..", "directory"), true)
-            browser.inspect(TargetFileEntry("link", "symlink"), true)
+            browser.inspect(TargetFileEntry("..", "symlink"), true)
             assertEquals(before, calls.size)
             browser.clear(); assertFalse(browser.state.value.loaded)
         } finally { scope.cancel() }
@@ -251,4 +251,28 @@ class FileBrowserControllerTest {
             yield(); assertFalse(browser.state.value.loaded); assertFalse(browser.state.value.loading)
         } finally { scope.cancel() }
     }
+    @Test fun linkDirectoriesKeepLogicalBreadcrumbsAndBlockCreationUntilReturning() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val calls = mutableListOf<String>()
+        val browser = FileBrowserController(scope) { tool, args ->
+            calls += tool
+            val path = args["path"]!!.jsonPrimitive.content
+            if (tool == "files.stat") """{"root":"downloads","path":"alias.txt","kind":"symlink","symlink":true,"linkTarget":"missing","linkError":"link_missing"}"""
+            else """{"root":"downloads","path":"$path","readOnly":${path.isNotEmpty()},"entries":[]}"""
+        }
+        try {
+            browser.enter(TargetFileEntry("folder", "directory", symlink = true, linkTarget = "real"), true)
+            assertEquals("folder", browser.state.value.path)
+            assertTrue(browser.state.value.readOnly)
+            val before = calls.size
+            browser.createDirectory("blocked", true)
+            assertEquals(before, calls.size)
+            browser.parent(true)
+            assertEquals("", browser.state.value.path)
+            assertFalse(browser.state.value.readOnly)
+            browser.inspect(TargetFileEntry("alias.txt", "symlink", symlink = true, linkError = "link_missing"), true)
+            assertEquals("link_missing", browser.state.value.selected?.linkError)
+        } finally { browser.clear(); scope.cancel() }
+    }
+
 }

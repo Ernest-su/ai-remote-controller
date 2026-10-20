@@ -54,7 +54,7 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
     val drafts = rememberSaveableStateHolder()
     val enabled = available && !state.loading
     val entries = remember(state.entries, query, sort,category,showHidden,onSelectDirectory) {
-        state.entries.filter { (onSelectDirectory == null || it.kind == "directory") && it.name.contains(query.trim(), ignoreCase = true) &&
+        state.entries.filter { (onSelectDirectory == null || it.kind == "directory" && !it.isSymbolicLink) && it.name.contains(query.trim(), ignoreCase = true) &&
             (showHidden || !it.name.startsWith(".")) && (category==FileCategory.ALL || fileCategory(it)==category) }
             .sortedWith(compareBy<TargetFileEntry> { it.kind != "directory" }
                 .thenBy { if (sort == "size") -(it.sizeBytes ?: -1) else 0L }
@@ -72,7 +72,7 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
             Text(name, style = MaterialTheme.typography.bodyLarge)
             if(filePreviewKind(entry) in listOf(FilePreviewKind.VIDEO,FilePreviewKind.AUDIO)) {
                 Text("在主控设备播放", style=MaterialTheme.typography.titleMedium)
-                onMedia?.let { target -> ActionButton("改为在被控设备播放", enabled) {previewName=null;tools("media") {target(entry)}} }
+                onMedia?.takeUnless { entry.isSymbolicLink || state.readOnly }?.let { target -> ActionButton("改为在被控设备播放", enabled) {previewName=null;tools("media") {target(entry)}} }
             }
             if (available) previewContent(entry) else ManagementMessage("设备未连接或正在执行操作，恢复后可重新打开预览。")
         }
@@ -97,9 +97,15 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
             InfoRow("名称", name)
             InfoRow("位置", "${fileRootTitle(state.root)}/${listOf(state.path, name).filter { it.isNotEmpty() }.joinToString("/")}")
             val selected = state.selected?.takeIf { it.root == state.root && it.path == listOf(state.path, name).filter { it.isNotEmpty() }.joinToString("/") }
+            state.entries.firstOrNull { it.name == name && it.isSymbolicLink }?.takeIf { selected == null }?.let { entry ->
+                entry.linkTarget?.let { InfoRow("链接目标", it) }
+                entry.linkError?.let { ManagementMessage(fileLinkError(it), error = true) }
+            }
             if (state.loading) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("正在读取属性…") }
             selected?.let { file ->
-                InfoRow("类型", if (file.kind == "directory") "目录" else "文件")
+                InfoRow("类型", if (file.symlink || file.kind == "symlink") "符号链接" else if (file.kind == "directory") "目录" else "文件")
+                file.linkTarget?.let { InfoRow("链接目标", it) }
+                file.linkError?.let { ManagementMessage(fileLinkError(it), error = true) }
                 file.sizeBytes?.let { InfoRow("大小", "${managementFileSize(it)}（$it 字节）") }
             }
             state.error?.let { ManagementMessage(it, error = true) }
@@ -142,6 +148,7 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                     trailingIcon = { if (query.isNotEmpty()) ManagementIconButton(ManagementIcons.Close, "清除文件搜索", tag = "files-clear-search") { query = "" } },
                     modifier = Modifier.fillMaxWidth().testTag("files-search"))
                 if (!available) ManagementMessage(unavailableMessage)
+                if (state.readOnly) ManagementMessage("当前目录通过符号链接访问，仅支持浏览、预览和下载；写入、删除与递归扫描不可用。")
                 if (state.loading) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("正在读取…", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary) }
                 state.error?.let { ManagementMessage(it, error = true, actionLabel = if (enabled) "重新加载" else null, action = onRefresh) }
                 operationMessage?.let { ManagementMessage(it, actionLabel = "查看文件任务") { showTools = true } }
@@ -180,12 +187,12 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                 row.forEach { entry ->
                     Box(Modifier.weight(1f).then(if(grid) Modifier.fillMaxHeight() else Modifier)) {
                         FileManagementRow(entry,enabled,
-                            { if(selectedName!=null) selectedName=if(selectedName==entry.name) null else entry.name else if(entry.kind=="directory") onEnter(entry) else if(entry.name.endsWith(".apk",true) && onApk != null) tools("apk") {onApk(entry)} else if(previewContent != null && filePreviewKind(entry) != null) previewName=entry.name else inspect(entry) },
+                            { if(selectedName!=null) selectedName=if(selectedName==entry.name) null else entry.name else if(entry.kind=="directory") onEnter(entry) else if(entry.name.endsWith(".apk",true) && onApk != null && !entry.isSymbolicLink && !state.readOnly) tools("apk") {onApk(entry)} else if(previewContent != null && filePreviewKind(entry) != null) previewName=entry.name else inspect(entry) },
                             { inspect(entry) },onDownload?.let { { tools("download") { it(entry) } } },
-                            onMedia?.let { { tools("media") { it(entry) } } },onApk?.let { { tools("apk") { it(entry) } } },
-                            onDelete?.let { { tools("delete") { it(entry) } } },
+                            onMedia?.takeUnless { entry.isSymbolicLink || state.readOnly }?.let { { tools("media") { it(entry) } } },onApk?.takeUnless { entry.isSymbolicLink || state.readOnly }?.let { { tools("apk") { it(entry) } } },
+                            onDelete?.takeUnless { state.readOnly }?.let { { tools("delete") { it(entry) } } },
                             grid=grid,selected=selectedName==entry.name,onSelect={selectedName=entry.name},
-                            thumbnail=thumbnail, onPreview=if(previewContent != null && filePreviewKind(entry) != null) ({previewName=entry.name}) else null)
+                            thumbnail=thumbnail?.takeUnless { (entry.isSymbolicLink || state.readOnly) && entry.name.endsWith(".apk", true) }, onPreview=if(previewContent != null && filePreviewKind(entry) != null) ({previewName=entry.name}) else null)
                     }
                 }
                 if(grid && row.size==1) Spacer(Modifier.weight(1f))
@@ -200,7 +207,7 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                 HorizontalDivider(color=RemoteColors.Divider,thickness=0.5.dp)
                 if(onSelectDirectory != null) {
                     FileActionBar(listOf(FileBarAction("刷新目录", ManagementIcons.Refresh, "files-refresh", enabled, action = onRefresh)))
-                    ActionButton("选择此目录", enabled && state.loaded && state.error == null, onSelectDirectory)
+                    ActionButton("选择此目录", enabled && state.loaded && state.error == null && !state.readOnly, onSelectDirectory)
                 } else if(selected!=null) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
                         Text(selected.name,Modifier.weight(1f).padding(8.dp),maxLines=1,overflow=TextOverflow.Ellipsis,style=MaterialTheme.typography.bodyMedium)
@@ -210,18 +217,18 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                         if (previewContent != null && filePreviewKind(selected) != null) add(FileBarAction("在主控设备预览 / 播放", ManagementIcons.Play, "files-preview", enabled) { previewName = selected.name })
                         add(FileBarAction("文件属性", ManagementIcons.File, "files-properties", enabled) { inspect(selected) })
                         if (selected.kind == "file") onDownload?.let { action -> add(FileBarAction("下载文件", LibraryIcons.Down, "files-download", enabled) { tools("download") { action(selected) } }) }
-                        if (isTargetMedia(selected.name)) onMedia?.let { action -> add(FileBarAction("在被控设备播放", ManagementIcons.Play, "files-play-target", enabled) { tools("media") { action(selected) } }) }
-                        if (selected.name.endsWith(".apk", true)) onApk?.let { action -> add(FileBarAction("APK 信息", ManagementIcons.Apps, "files-apk", enabled) { tools("apk") { action(selected) } }) }
-                        onDelete?.let { action -> add(FileBarAction("删除", ManagementIcons.Trash, "files-delete", enabled, danger = true) { tools("delete") { action(selected) } }) }
+                        if (!selected.isSymbolicLink && !state.readOnly && isTargetMedia(selected.name)) onMedia?.let { action -> add(FileBarAction("在被控设备播放", ManagementIcons.Play, "files-play-target", enabled) { tools("media") { action(selected) } }) }
+                        if (!selected.isSymbolicLink && !state.readOnly && selected.name.endsWith(".apk", true)) onApk?.let { action -> add(FileBarAction("APK 信息", ManagementIcons.Apps, "files-apk", enabled) { tools("apk") { action(selected) } }) }
+                        onDelete?.takeUnless { state.readOnly }?.let { action -> add(FileBarAction(if (selected.isSymbolicLink) "删除链接" else "删除", ManagementIcons.Trash, "files-delete", enabled, danger = true) { tools("delete") { action(selected) } }) }
                     })
                 } else FileActionBar(buildList {
-                    add(FileBarAction("上传文件", ManagementIcons.Upload, "files-upload") { tools("upload") })
+                    add(FileBarAction("上传文件", ManagementIcons.Upload, "files-upload", !state.readOnly) { tools("upload") })
                     add(FileBarAction("网址下载", LibraryIcons.Down, "files-url") { tools("url") })
-                    onCreateDirectory?.let { add(FileBarAction("新建目录", ManagementIcons.AddFolder, "files-create-directory", directoryAvailable && !state.loading) { showDirectory = true }) }
+                    onCreateDirectory?.let { add(FileBarAction("新建目录", ManagementIcons.AddFolder, "files-create-directory", directoryAvailable && !state.loading && !state.readOnly) { showDirectory = true }) }
                     add(FileBarAction("刷新目录", ManagementIcons.Refresh, "files-refresh", enabled, action = onRefresh))
                     add(FileBarAction(if (grid) "切换列表视图" else "切换网格视图", if (grid) ManagementIcons.List else ManagementIcons.Apps, "files-view") { grid = !grid })
                     add(FileBarAction("文件操作与任务", ManagementIcons.Transfer, "files-tools") { showTools = true })
-                    add(FileBarAction("存储分析", ManagementIcons.Storage, "files-storage") { tools("storage") })
+                    add(FileBarAction("存储分析", ManagementIcons.Storage, "files-storage", !state.readOnly) { tools("storage") })
                 })
             }
         }
@@ -237,7 +244,7 @@ private fun FileManagementRow(
     thumbnail: (@Composable (TargetFileEntry, Modifier) -> Unit)? = null, onPreview: (() -> Unit)? = null,
 ) {
     var menu by remember(entry.name) { mutableStateOf(false) }
-    val supported = entry.kind in listOf("directory", "file") && validTargetFileName(entry.name)
+    val supported = entry.kind in listOf("directory", "file", "symlink") && validTargetFileName(entry.name)
     val interaction = Modifier.combinedClickable(enabled = enabled && supported, role = Role.Button,
         onClickLabel = if (entry.kind == "directory") "进入目录" else if(onPreview != null) "预览文件" else "查看属性",
         onLongClickLabel = "选择文件", onLongClick = onSelect, onClick = onOpen)
@@ -259,12 +266,16 @@ private fun FileManagementRow(
     }
     @Composable fun FileLabels() {
         Text(entry.name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text(when (entry.kind) {
+        Text(if (entry.isSymbolicLink) {
+            if (entry.linkError != null || entry.kind == "symlink") "符号链接 · ${fileLinkError(entry.linkError)}"
+            else "符号链接 · ${if (entry.kind == "directory") "文件夹" else "文件"}"
+        } else when (entry.kind) {
             "directory" -> "文件夹"
             "file" -> listOf(entry.name.substringAfterLast('.', "").uppercase().take(8),entry.sizeBytes?.let(::managementFileSize).orEmpty()).filter {it.isNotEmpty()}.joinToString(" · ").ifEmpty {"文件"}
             "symlink" -> "符号链接 · 不可访问"
             else -> "特殊文件 · 不可访问"
         }, style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
+        entry.linkTarget?.let { Text("指向：$it", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary, maxLines = 2, overflow = TextOverflow.Ellipsis) }
     }
     @Composable fun MoreMenu() {
         if (supported) Box {
@@ -278,7 +289,7 @@ private fun FileManagementRow(
                     if (isTargetMedia(entry.name)) onMedia?.let { DropdownMenuItem(text = { Text("在被控设备播放") }, enabled = enabled, onClick = { menu = false; it() }) }
                     if (entry.name.endsWith(".apk", true)) onApk?.let { DropdownMenuItem(text = { Text("APK 信息") }, enabled = enabled, onClick = { menu = false; it() }) }
                 }
-                onDelete?.let { DropdownMenuItem(text = { Text("删除", color = RemoteColors.Warning) }, enabled = enabled, onClick = { menu = false; it() }) }
+                onDelete?.let { DropdownMenuItem(text = { Text(if (entry.isSymbolicLink) "删除链接" else "删除", color = RemoteColors.Warning) }, enabled = enabled, onClick = { menu = false; it() }) }
             }
         }
     }

@@ -49,7 +49,7 @@ pub(crate) fn same(a: &Metadata, b: &Metadata) -> bool {
 }
 impl Proposal {
     fn preview(&self) -> Value {
-        json!({"id":self.id,"kind":self.kind,"root":self.root,"path":self.path,"recursive":self.recursive,"exists":self.expected.is_some(),"sizeBytes":self.expected.as_ref().filter(|m|m.is_file()).map(Metadata::len),"directory":self.expected.as_ref().is_some_and(Metadata::is_dir),"approvalRequired":true})
+        json!({"id":self.id,"kind":self.kind,"root":self.root,"path":self.path,"recursive":self.recursive,"exists":self.expected.is_some(),"sizeBytes":self.expected.as_ref().filter(|m|m.is_file()).map(Metadata::len),"directory":self.expected.as_ref().is_some_and(Metadata::is_dir),"symlink":self.expected.as_ref().is_some_and(|m|m.is_symlink()),"approvalRequired":true})
     }
 }
 pub fn prepare(tool: &str, args: &Value) -> Result<String> {
@@ -78,6 +78,9 @@ pub fn prepare(tool: &str, args: &Value) -> Result<String> {
     }
     if kind == "overwrite" && expected.as_ref().is_some_and(Metadata::is_dir) {
         bail!("cannot overwrite directory with file");
+    }
+    if kind == "overwrite" && expected.as_ref().is_some_and(|m| m.is_symlink()) {
+        bail!("cannot overwrite a symbolic link");
     }
     let recursive = args
         .get("recursive")

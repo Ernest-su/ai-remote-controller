@@ -100,7 +100,7 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
         },
         onApk=if(available && !apk.busy && "apps.apk_info" in state.tools) ({entry -> model.apkInspection.inspect(files.root,path(entry.name),available)}) else null,
         onMedia=if(available && "media.players" in state.tools && "media.open" in state.tools) ({entry -> model.fileMedia.inspect(files.root,path(entry.name),available,"media.publish" in state.tools && files.root!="downloads")}) else null,
-        onDelete=if(available && !transfer.running && "files.delete" in state.tools) ({entry -> model.transfers.delete(files.root,path(entry.name),entry.kind=="directory",available) { model.files.refresh(available) } }) else null,
+        onDelete=if(available && !files.readOnly && !transfer.running && "files.delete" in state.tools) ({entry -> model.transfers.delete(files.root,path(entry.name),entry.kind=="directory" && !entry.isSymbolicLink,available && !files.readOnly) { model.files.refresh(available) } }) else null,
         onDownload=if(canTransfer&&!transfer.running) ({ entry ->
             message=null
             model.transfers.download(files.root,path(entry.name),context.externalCacheDir ?: context.cacheDir,canTransfer)
@@ -112,8 +112,8 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
                 DownloadPanel(state, model)
             }
             if (section == "storage") {
-            if("storage.analyze" in state.tools) StorageAnalysisPanel(storage, available && "task.progress" in state.tools && "task.cancel" in state.tools,
-                { model.storageAnalysis.analyze(files.root,files.path,available) }, model.storageAnalysis::cancel)
+            if("storage.analyze" in state.tools) StorageAnalysisPanel(storage, available && !files.readOnly && "task.progress" in state.tools && "task.cancel" in state.tools,
+                { model.storageAnalysis.analyze(files.root,files.path,available && !files.readOnly) }, model.storageAnalysis::cancel)
             if ("storage.analyze" !in state.tools) Text("当前服务不支持存储分析。", color=RemoteColors.Secondary)
             }
             if (section == "apk") {
@@ -136,9 +136,9 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
             if (media.players == null && !media.busy) Text("从媒体文件的更多菜单选择在被控设备播放，选择播放器后再执行。", color=RemoteColors.Secondary)
             }
             if (section in listOf("upload", "download", "delete")) {
-            FileTransferPanel(transfer,files.root,files.path,canTransfer,{select.launch(arrayOf("*/*"))},
-                {name -> message=null;model.transfers.upload(files.root,path(name),canTransfer)},model.transfers::cancel,
-                {model.transfers.prepareExport()?.let { save.launch(it) }},onOverwrite={name -> model.transfers.upload(files.root,path(name),canTransfer,true)},onConfirm=model.transfers::confirm,operation=section)
+            FileTransferPanel(transfer,files.root,files.path,canTransfer && (section != "upload" || !files.readOnly),{select.launch(arrayOf("*/*"))},
+                {name -> message=null;model.transfers.upload(files.root,path(name),canTransfer && !files.readOnly)},model.transfers::cancel,
+                {model.transfers.prepareExport()?.let { save.launch(it) }},onOverwrite={name -> model.transfers.upload(files.root,path(name),canTransfer && !files.readOnly,true)},onConfirm=model.transfers::confirm,operation=section)
             message?.let { androidx.compose.material3.Text(it,color=RemoteColors.Secondary) }
             }
         })

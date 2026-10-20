@@ -16,6 +16,7 @@ class FilePreviewClientTest {
         assertEquals("plain",decodeFilePreviewText(byteArrayOf(0xef.toByte(),0xbb.toByte(),0xbf.toByte())+"plain".toByteArray()).text)
         assertFails {decodeFilePreviewText(byteArrayOf(0,1,2,3))}
         assertNull(filePreviewKind(TargetFileEntry("escape.txt","symlink")))
+        assertEquals(FilePreviewKind.TEXT, filePreviewKind(TargetFileEntry("alias", "file", symlink = true, targetName = "real.txt")))
         assertNull(filePreviewKind(TargetFileEntry("../escape.txt","file")))
         assertEquals(FilePreviewKind.TEXT,filePreviewKind(TargetFileEntry("FILE.YAML","file")))
     }
