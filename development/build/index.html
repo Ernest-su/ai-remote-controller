@@ -1434,13 +1434,18 @@
 <li>Android NDK，已验证 <code>28.2.13676358</code>。</li>
 <li>SDK build-tools 36.0.0（D8）与 javac 用于构建嵌入的短时媒体桥接；工具链内容仍在宿主机安装，编译只读 SDK。</li>
 <li>Rust 1.88 或更高版本、Cargo/rustup、Python 3.11+；首次构建需要网络。APK 只读解析使用固定 zip 9.0.2，其 Rust 要求见<a href="https://docs.rs/zip/9.0.2/zip/#msrv">官方文档</a>。</li>
-<li>已验证 Linux x86_64。构建脚本包含 macOS 工具链路径选择，其他主机尚未完整验收。</li>
+<li>构建脚本按 Linux、macOS、Windows 选择 NDK 工具链；Windows 使用原生 Python、Rust MSVC 工具链与 Visual Studio C++ Build Tools。完整验收范围以实际构建结果为准。</li>
 </ul>
 <p>从仓库根目录执行：</p>
 <div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">ANDROID_HOME</span><span class="o">=</span>/path/to/android-sdk
 <span class="nb">export</span><span class="w"> </span><span class="nv">ANDROID_NDK_HOME</span><span class="o">=</span><span class="s2">"</span><span class="nv">$ANDROID_HOME</span><span class="s2">/ndk/28.2.13676358"</span>
 ./gradlew<span class="w"> </span>:androidApp:assembleDebug<span class="w"> </span>:shared:jvmTest<span class="w"> </span>--no-daemon
 </code></pre></div>
+<p>Windows 的 Android Studio 可直接执行同一 Gradle 任务。命令行可从仓库根目录运行：</p>
+<div class="highlight"><pre><span></span><code><span class="nv">$env:ANDROID_HOME</span> <span class="p">=</span> <span class="s2">"C:\Android\Sdk"</span>
+<span class="n">java</span> <span class="n">-classpath</span> <span class="n">gradle</span><span class="p">/</span><span class="n">wrapper</span><span class="p">/</span><span class="n">gradle-wrapper</span><span class="p">.</span><span class="n">jar</span> <span class="n">org</span><span class="p">.</span><span class="n">gradle</span><span class="p">.</span><span class="n">wrapper</span><span class="p">.</span><span class="n">GradleWrapperMain</span> <span class="p">:</span><span class="n">androidApp</span><span class="p">:</span><span class="n">assembleDebug</span> <span class="p">-</span><span class="n">-no-daemon</span>
+</code></pre></div>
+<p>SDK 路径换为本机安装目录。Windows 默认调用 <code>python</code>，Linux/macOS 默认调用 <code>python3</code>；如需指定解释器，给 Gradle 传入 <code>-PaircPython=C:/Python/python.exe</code>。先用该解释器执行 <code>--version</code>，确认不是 Windows 应用商店的空别名。runtime 子构建会沿用此解释器；Windows NDK 必须包含 <code>windows-x86_64</code> 工具链。</p>
 <p><code>local.properties</code> 可设置 Android SDK 路径，但不要提交个人配置。Gradle 的 preBuild 会执行 <code>scripts/build-runtime.py</code>，构建 ARM64、ARMv7、x86_64 程序及清单，打包进 APK。构建同时生成 <code>tvInputMethod</code> 配套电视输入法，将同构建类型的已签名 APK 嵌入 <code>assets/airc-input-method.apk</code>；debug 使用开发证书，release 与控制端共用生产签名配置。电视安装由“电视输入 → 输入法提交 → 安装并启用”明确触发，按 APK 摘要校验与更新。</p>
 <table>
 <thead>
