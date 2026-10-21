@@ -3,7 +3,7 @@ package ernest.airc
 import kotlinx.serialization.Serializable
 @Serializable
 data class AppInstallProposal(val id: String, val kind: String, val apk: TargetApkInfo, val currentApp: TargetAppInfo? = null, val userId: Int, val update: Boolean, val approvalRequired: Boolean, val codeMayAffectAllUsers: Boolean, val apks: List<TargetApkInfo> = emptyList())
-data class AppInstallationState(val selectedApks: List<TargetApkInfo> = emptyList(), val busy: Boolean = false, val proposal: AppInstallProposal? = null, val phase: String = "idle", val bytes: Long = 0, val total: Long? = null, val message: String? = null, val error: String? = null)
+data class AppInstallationState(val selectedApks: List<TargetApkInfo> = emptyList(), val busy: Boolean = false, val proposal: AppInstallProposal? = null, val phase: String = "idle", val bytes: Long = 0, val total: Long? = null, val message: String? = null, val error: String? = null, val noticeId: String? = null)
 
 
 /** Checks declared identities only; Android PackageManager verifies signatures and split dependencies. */

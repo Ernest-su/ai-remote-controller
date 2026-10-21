@@ -20,7 +20,7 @@ class FileMediaController(private val scope: CoroutineScope, private val capture
     private fun run(available: Boolean, operation: suspend (suspend (String,JsonObject)->String)->Unit) {
         if(!available || state.value.busy)return
         val token=generation
-        mutable.update {it.copy(busy=true,error=null,message=null)}
+        mutable.update {it.copy(noticeId=java.util.UUID.randomUUID().toString(),busy=true,error=null,message=null)}
         job=scope.launch {
             try {operation(captureRequest?.invoke() ?: request)}
             catch(e:CancellationException){throw e}

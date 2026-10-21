@@ -1,3 +1,4 @@
+use super::commit::{copy_to_exclusive, ensure_space};
 use super::*;
 use serde_json::json;
 use tokio::io::AsyncWriteExt;
@@ -14,7 +15,7 @@ fn start_at(args: &Value, root: &std::path::Path) -> Result<String> {
     let object = args.as_object().context("arguments must be object")?;
     if object
         .keys()
-        .any(|k| !["url", "root", "directory", "name"].contains(&k.as_str()))
+        .any(|k| !["url", "root", "directory", "name", "overwriteToken"].contains(&k.as_str()))
     {
         bail!("unknown download argument");
     }
@@ -55,14 +56,19 @@ fn start_at(args: &Value, root: &std::path::Path) -> Result<String> {
         .map(|v| v.as_str().context("root must be string"))
         .transpose()?
         .unwrap_or("downloads");
+    if args.get("overwriteToken").is_none() {
+        if let Some(conflict) = name_conflict(root, root_name, &path)? {
+            return Ok(json!({"conflict":conflict}).to_string());
+        }
+    }
+    let mut upload_args = json!({"root":root_name,"direction":"upload","path":path,"sizeBytes":0,"sha256":"0".repeat(64)});
+    if let Some(token) = args.get("overwriteToken") {
+        upload_args["overwriteToken"] = token.clone();
+    }
     let mut registry = tasks().lock().unwrap();
     reserve(&mut registry)?;
     // Reuse the anchored temporary file and atomic no-replace commit used by uploads.
-    let mut task = create_at_impl(
-        &json!({"root":root_name,"direction":"upload","path":path,"sizeBytes":0,"sha256":"0".repeat(64)}),
-        root,
-        true,
-    )?;
+    let mut task = create_at_impl(&upload_args, root, true)?;
     let value = Arc::get_mut(&mut task).unwrap();
     value.direction = "url_download".into();
     value.busy.store(true, Ordering::Release);
@@ -71,14 +77,54 @@ fn start_at(args: &Value, root: &std::path::Path) -> Result<String> {
     let progress = task.progress().to_string();
     registry.insert(task.id.clone(), task.clone());
     drop(registry);
+    let download_root = root.to_path_buf();
     tokio::spawn(async move {
         if let Err(error) = run(&task, url).await {
+            if error
+                .downcast_ref::<std::io::Error>()
+                .is_some_and(|e| e.kind() == std::io::ErrorKind::AlreadyExists)
+            {
+                if let Ok(Some(conflict)) = name_conflict(&download_root, &task.root, &path) {
+                    if let Some(result) = task.result.lock().unwrap().as_mut() {
+                        result["conflict"] = conflict;
+                    }
+                }
+            }
             task.failed(error.to_string());
         }
         task.file.lock().unwrap().take();
         task.busy.store(false, Ordering::Release);
     });
     Ok(progress)
+}
+
+fn name_conflict(root: &std::path::Path, root_name: &str, path: &str) -> Result<Option<Value>> {
+    let (parent, name) = crate::tools::files::parent(root, path)?;
+    let Some(existing) = crate::file_actions::metadata(&parent, &name)? else {
+        return Ok(None);
+    };
+    let name = name.to_str()?;
+    let (stem, extension) = name
+        .rsplit_once('.')
+        .filter(|(s, e)| !s.is_empty() && e.len() < 240)
+        .map(|(s, e)| (s, format!(".{e}")))
+        .unwrap_or((name, String::new()));
+    for index in 1..=9999 {
+        let suffix = format!(" ({index}){extension}");
+        let mut prefix = stem.to_owned();
+        while prefix.len() + suffix.len() > 255 {
+            prefix.pop();
+        }
+        let suggested = format!("{prefix}{suffix}");
+        let candidate = std::ffi::CString::new(suggested.as_str())?;
+        if crate::file_actions::metadata(&parent, &candidate)?.is_none() {
+            return Ok(Some(
+                json!({"root":root_name,"path":path,"name":name,"suggestedName":suggested,
+                "canOverwrite":existing.is_file() && !existing.is_symlink()}),
+            ));
+        }
+    }
+    bail!("too many files with the same name; choose another filename");
 }
 
 pub(super) fn validate_url(url: &reqwest::Url) -> Result<()> {
@@ -180,6 +226,12 @@ async fn run(task: &Arc<Transfer>, url: reqwest::Url) -> Result<()> {
         {
             let mut slot = task.destination.lock().unwrap();
             let target = slot.as_mut().context("download target unavailable")?;
+            if target.overwrite {
+                let current = crate::file_actions::metadata(&target.parent, &target.destination)?;
+                if !crate::file_actions::same_optional(target.expected.as_ref(), current.as_ref()) {
+                    bail!("target changed after overwrite approval; request a new approval");
+                }
+            }
             if unsafe {
                 libc::syscall(
                     libc::SYS_renameat2,
@@ -187,7 +239,11 @@ async fn run(task: &Arc<Transfer>, url: reqwest::Url) -> Result<()> {
                     target.temporary.as_ptr(),
                     target.parent.as_raw_fd(),
                     target.destination.as_ptr(),
-                    libc::RENAME_NOREPLACE,
+                    if target.overwrite {
+                        0
+                    } else {
+                        libc::RENAME_NOREPLACE
+                    },
                 )
             } != 0
             {
@@ -201,128 +257,6 @@ async fn run(task: &Arc<Transfer>, url: reqwest::Url) -> Result<()> {
         result["totalBytes"] = json!(count);
     }
     task.phase("completed");
-    Ok(())
-}
-
-// Android shared-storage FUSE can reject renameat2(RENAME_NOREPLACE). Finish fetching
-// into the private temporary file, then copy to an exclusively created destination.
-// The destination descriptor never overwrites an existing entry, even under races.
-async fn copy_to_exclusive(target: UploadTarget, size: u64, expected_digest: &str) -> Result<()> {
-    use std::os::unix::fs::MetadataExt;
-    use tokio::io::AsyncReadExt;
-    let input_fd = unsafe {
-        libc::openat(
-            target.parent.as_raw_fd(),
-            target.temporary.as_ptr(),
-            libc::O_RDONLY
-                | libc::O_LARGEFILE
-                | libc::O_NOFOLLOW
-                | libc::O_NONBLOCK
-                | libc::O_CLOEXEC,
-        )
-    };
-    if input_fd < 0 {
-        return Err(std::io::Error::last_os_error().into());
-    }
-    let input = unsafe { File::from_raw_fd(input_fd) };
-    if !input.metadata()?.is_file() {
-        bail!("download temporary file is no longer a regular file");
-    }
-    ensure_space(input.as_raw_fd(), size)?;
-    let parent = target.parent.try_clone()?;
-    let fd = unsafe {
-        libc::openat(
-            target.parent.as_raw_fd(),
-            target.destination.as_ptr(),
-            libc::O_WRONLY
-                | libc::O_LARGEFILE
-                | libc::O_CREAT
-                | libc::O_EXCL
-                | libc::O_NOFOLLOW
-                | libc::O_CLOEXEC,
-            0o600,
-        )
-    };
-    if fd < 0 {
-        return Err(std::io::Error::last_os_error().into());
-    }
-    let output = unsafe { File::from_raw_fd(fd) };
-    let metadata = output.metadata()?;
-    let mut guard = ExclusiveCopy {
-        parent,
-        name: target.destination.clone(),
-        device: metadata.dev(),
-        inode: metadata.ino(),
-        keep: false,
-    };
-    let mut input = tokio::fs::File::from_std(input);
-    let mut output = tokio::fs::File::from_std(output);
-    let mut buffer = vec![0; CHUNK];
-    let mut count = 0;
-    let mut digest = Sha256::new();
-    loop {
-        let read = input.read(&mut buffer).await?;
-        if read == 0 {
-            break;
-        }
-        count += read as u64;
-        if count > size {
-            bail!("download temporary file changed before saving");
-        }
-        output.write_all(&buffer[..read]).await?;
-        digest.update(&buffer[..read]);
-    }
-    if count != size || format!("{:x}", digest.finalize()) != expected_digest {
-        bail!("download temporary file changed before saving");
-    }
-    output.flush().await?;
-    output.sync_all().await?;
-    if !guard.owned() {
-        bail!("download destination changed while saving");
-    }
-    guard.keep = true;
-    // UploadTarget drops here and removes only the temporary file.
-    Ok(())
-}
-
-struct ExclusiveCopy {
-    parent: File,
-    name: std::ffi::CString,
-    device: u64,
-    inode: u64,
-    keep: bool,
-}
-impl ExclusiveCopy {
-    fn owned(&self) -> bool {
-        use std::os::unix::fs::MetadataExt;
-        crate::file_actions::metadata(&self.parent, &self.name)
-            .ok()
-            .flatten()
-            .is_some_and(|m| m.dev() == self.device && m.ino() == self.inode && m.is_file())
-    }
-}
-impl Drop for ExclusiveCopy {
-    fn drop(&mut self) {
-        if !self.keep && self.owned() {
-            unsafe {
-                libc::unlinkat(self.parent.as_raw_fd(), self.name.as_ptr(), 0);
-            }
-        }
-    }
-}
-
-fn ensure_space(fd: std::os::fd::RawFd, required: u64) -> Result<()> {
-    let mut stat = std::mem::MaybeUninit::<libc::statvfs>::uninit();
-    if unsafe { libc::fstatvfs(fd, stat.as_mut_ptr()) } != 0 {
-        return Err(std::io::Error::last_os_error().into());
-    }
-    let stat = unsafe { stat.assume_init() };
-    // statvfs fields differ between 32-bit Android and the host.
-    #[allow(clippy::unnecessary_cast)]
-    let available = (stat.f_bavail as u64).saturating_mul(stat.f_frsize as u64);
-    if available < required.saturating_add(16 * 1024 * 1024) {
-        bail!("insufficient target storage space; 16 MiB reserve required");
-    }
     Ok(())
 }
 
@@ -436,11 +370,60 @@ mod tests {
         let url = server(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ndata", false).await;
         let value: Value =
             serde_json::from_str(&start_at(&json!({"url":url}), &root).unwrap()).unwrap();
-        let task = finish(value["id"].as_str().unwrap()).await;
-        assert_eq!(*task.phase.lock().unwrap(), "failed");
+        assert_eq!(value["conflict"]["suggestedName"], "file (1).bin");
+        assert_eq!(value["conflict"]["canOverwrite"], true);
         assert_eq!(std::fs::read(root.join("file.bin")).unwrap(), b"original");
         assert_eq!(std::fs::read_dir(&root).unwrap().count(), 3);
+        let url = server(
+            b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\ndata",
+            false,
+        )
+        .await;
+        let value: Value =
+            serde_json::from_str(&start_at(&json!({"url":url,"name":"race.bin"}), &root).unwrap())
+                .unwrap();
+        std::fs::write(root.join("race.bin"), b"racing original").unwrap();
+        let task = finish(value["id"].as_str().unwrap()).await;
+        assert_eq!(*task.phase.lock().unwrap(), "failed");
+        assert_eq!(
+            task.result.lock().unwrap().as_ref().unwrap()["conflict"]["suggestedName"],
+            "race (1).bin"
+        );
+        assert_eq!(
+            std::fs::read(root.join("race.bin")).unwrap(),
+            b"racing original"
+        );
         tasks().lock().unwrap().remove(&task.id);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn collisions_suggest_unused_names_and_preserve_links_and_directories() {
+        let root = std::env::temp_dir().join(format!("airc-url-conflict-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&root).unwrap();
+        std::fs::write(root.join("电影.mp4"), b"original").unwrap();
+        std::fs::write(root.join("电影 (1).mp4"), b"copy").unwrap();
+        let conflict = name_conflict(&root, "inbox", "电影.mp4").unwrap().unwrap();
+        assert_eq!(conflict["suggestedName"], "电影 (2).mp4");
+        assert_eq!(conflict["canOverwrite"], true);
+        std::os::unix::fs::symlink(root.join("电影.mp4"), root.join("link.mp4")).unwrap();
+        assert_eq!(
+            name_conflict(&root, "inbox", "link.mp4").unwrap().unwrap()["canOverwrite"],
+            false
+        );
+        std::fs::create_dir(root.join("folder")).unwrap();
+        assert_eq!(
+            name_conflict(&root, "inbox", "folder").unwrap().unwrap()["canOverwrite"],
+            false
+        );
+        let long = format!("{}.mp4", "电".repeat(83));
+        std::fs::write(root.join(&long), b"long").unwrap();
+        let suggested = name_conflict(&root, "inbox", &long).unwrap().unwrap()["suggestedName"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(suggested.len() <= 255 && suggested.ends_with(" (1).mp4"));
+        assert!(start_at(&json!({"url":"http://localhost/movie","name":"电影.mp4","overwriteToken":"unapproved"}), &root).is_err());
         std::fs::remove_dir_all(root).unwrap();
     }
 

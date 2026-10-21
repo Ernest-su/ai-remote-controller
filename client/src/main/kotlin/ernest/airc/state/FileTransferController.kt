@@ -62,7 +62,7 @@ class FileTransferController(private val scope: CoroutineScope, private val runt
         if (state.value.running) return
         val token = ++generation
         downloaded?.second?.delete();downloaded=null
-        mutable.update { it.copy(operation=operation,running=true,phase="preparing",bytes=0,total=null,path=path,root=root,error=null,readyToSave=false,proposal=null,unit="bytes") }
+        mutable.update { it.copy(noticeId=java.util.UUID.randomUUID().toString(),operation=operation,running=true,phase="preparing",bytes=0,total=null,path=path,root=root,error=null,readyToSave=false,proposal=null,unit="bytes") }
         job=scope.launch {
             try { action(token) }
             catch (e: CancellationException) { update(token) { it.copy(phase="cancelled") };throw e }

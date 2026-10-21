@@ -50,6 +50,7 @@ nav:
       - 连接设备: guide/connections.md
       - 桌面测试工具: guide/desktop.md
       - 遥控与文字: guide/remote.md
+      - 定时操作: guide/schedules.md
       - 设备预览: guide/screenshots.md
       - 文件管理: guide/files.md
       - 媒体投送: guide/media.md

@@ -93,9 +93,9 @@ class DesktopUiTest {
         var analyzed = false
         val report = StorageReport("inbox", "folder", StorageTotals(1, 7, 4096), mapOf("images" to StorageTotals(1, 7, 4096)), listOf(StorageLargeFile("folder/a.jpg", "images", 7, 4096)), 1, 1, 0, 0, 0, 0, 0, 0, emptyList(), 0, true, false, false)
         compose.setContent { RemoteTheme { Column { StorageAnalysisPanel(StorageAnalysisState(root = "inbox", path = "folder", report = report), false, { analyzed = true }, {}) } } }
-        compose.onNodeWithText("分析此目录").assertIsNotEnabled()
-        compose.onNodeWithText("报告不完整：达到扫描上限、存在访问错误或目录发生变化。").assertExists()
-        compose.onNodeWithText("folder/a.jpg").assertExists()
+        compose.onNodeWithText("重新分析").assertIsNotEnabled()
+        compose.onNodeWithText("有些文件未能查看，以下只显示已找到的内容。").assertExists()
+        compose.onNodeWithText("a.jpg").assertExists()
         compose.onNodeWithText("删除").assertDoesNotExist()
         assertFalse(analyzed)
     }
@@ -103,9 +103,9 @@ class DesktopUiTest {
     @Test fun storageScanShowsItemCountAndCancellation() {
         var cancelled = false
         compose.setContent { RemoteTheme { Column { StorageAnalysisPanel(StorageAnalysisState(busy = true, root = "inbox", path = "folder", phase = "scanning", visited = 42, limit = 100), true, {}, { cancelled = true }) } } }
-        compose.onNodeWithText("已扫描 42 项，最多 100 项").assertExists()
-        compose.onNodeWithText("分析此目录").assertIsNotEnabled()
-        compose.onNodeWithText("取消存储分析").performClick(); assertTrue(cancelled)
+        compose.onNodeWithText("正在查看文件，已检查 42 项…").assertExists()
+        compose.onNodeWithText("开始分析").assertIsNotEnabled()
+        compose.onNodeWithText("停止分析").performClick(); assertTrue(cancelled)
     }
 
     @Test fun apkReplacementConfirmationShowsVersionAndCrossUserImpactAndAllowsRejection() {

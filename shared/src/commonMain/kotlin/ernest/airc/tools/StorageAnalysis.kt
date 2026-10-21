@@ -15,8 +15,8 @@ data class StorageReport(
     val skippedFilesystems: Long, val errorCount: Long, val errors: List<StorageScanError>, val changedDirectories: Long,
     val truncated: Boolean, val complete: Boolean, val snapshot: Boolean,
 )
-data class StorageAnalysisState(val busy: Boolean = false, val root: String? = null, val path: String = "", val phase: String = "idle", val visited: Long = 0, val limit: Long = 100000, val report: StorageReport? = null, val error: String? = null)
+data class StorageAnalysisState(val busy: Boolean = false, val root: String? = null, val path: String = "", val phase: String = "idle", val visited: Long = 0, val limit: Long = 100000, val report: StorageReport? = null, val error: String? = null, val noticeId: String? = null, val outdated: Boolean = false)
 fun storageCategoryTitle(category: String) = when(category) {
-    "apk" -> "APK"; "images" -> "图片"; "video" -> "视频"; "audio" -> "音频"; "archives" -> "压缩文件"
-    "documents" -> "文档"; "logs" -> "日志后缀"; "temporary" -> "临时后缀"; else -> "其他"
+    "apk" -> "安装包"; "images" -> "图片"; "video" -> "视频"; "audio" -> "音频"; "archives" -> "压缩文件"
+    "documents" -> "文档"; "logs" -> "日志文件"; "temporary" -> "临时文件"; else -> "其他"
 }

@@ -5,14 +5,16 @@ import kotlinx.serialization.Serializable
 val routineKeys = listOf("up", "down", "left", "right", "ok", "back", "home", "menu", "play_pause", "media_previous", "media_next", "volume_down", "volume_up", "mute")
 
 @Serializable
-data class RoutineStep(val type: String, val value: String) {
-    fun valid(): Boolean = when (type) {
+data class RoutineStep(val type: String, val value: String, val timeoutSeconds: Int = 30) {
+    fun valid(): Boolean = timeoutSeconds in 1..60 && when (type) {
         "key" -> value in routineKeys
-        "app" -> value.length <= 255 && value.matches(Regex("[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z0-9_]+)+"))
+        "app", "wait_app" -> value.length <= 255 && value.matches(Regex("[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z0-9_]+)+"))
+        "wait_text" -> value.isNotBlank() && value.length <= 200 && value.none { it.isISOControl() }
+        "wait_playing" -> value.isEmpty()
         "wait" -> value.toLongOrNull() in 100L..10000L
         else -> false
     }
-    fun description(): String = when (type) { "app" -> "打开 $value"; "wait" -> "等待 $value 毫秒"; else -> "按键 ${routineKeyLabel(value)}" }
+    fun description(): String = when (type) { "app" -> "打开 $value"; "wait_app" -> "等待应用进入前台：$value"; "wait_text" -> "等待界面出现：$value"; "wait_playing" -> "等待播放开始"; "wait" -> "等待 $value 毫秒"; else -> "按键 ${routineKeyLabel(value)}" }
 }
 
 @Serializable

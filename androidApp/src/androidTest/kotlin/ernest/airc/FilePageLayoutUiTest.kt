@@ -33,7 +33,7 @@ class FilePageLayoutUiTest {
                         if (page == "files") FileBrowserPanel(FileBrowserState(entries = listOf(TargetFileEntry("电视应用.apk", "file", 123456)), loaded = true), true,
                             {}, {}, {}, {}, {}, onCreateDirectory = {}, transfer = { section -> Text("当前操作:$section") })
                         else Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-                            UrlDownloadPanel(download, true, true, { download = download.copy(url = it) }, { download = download.copy(name = it) }, {}, {}, {}, {})
+                            UrlDownloadPanel(download, true, true, { download = download.copy(url = it) }, { download = download.copy(name = it) }, {}, {}, {}, directoryPicker = {})
                         }
                     }
                 }

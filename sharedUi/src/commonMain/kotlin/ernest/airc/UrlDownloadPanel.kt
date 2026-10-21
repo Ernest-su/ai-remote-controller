@@ -14,15 +14,17 @@ import androidx.compose.ui.text.input.KeyboardType
 fun UrlDownloadPanel(
     state: UrlDownloadState, available: Boolean, validUrl: Boolean,
     onUrl: (String) -> Unit, onName: (String) -> Unit, onStart: () -> Unit, onCancel: () -> Unit,
-    onDefaultDirectory: () -> Unit, directoryPicker: @Composable (() -> Unit) -> Unit,
+    onDefaultDirectory: () -> Unit, conflictActions: UrlDownloadConflictActions? = null, tasksOnly: Boolean = false, directoryPicker: @Composable (() -> Unit) -> Unit,
 ) {
+    UrlDownloadConflictDialogs(state, available, conflictActions)
     var picking by rememberSaveable { mutableStateOf(false) }
-    if(picking) {
+    if(picking && !tasksOnly) {
         Text("选择被控设备保存目录", style = MaterialTheme.typography.titleMedium)
         OutlinedButton({ picking = false }, shape = MaterialTheme.shapes.small, modifier = Modifier.heightIn(min = 48.dp)) { Text("返回下载表单") }
         Box(Modifier.fillMaxWidth().height(RemoteDimensions.ManagementDialogHeight)) { directoryPicker { picking = false } }
         return
     }
+    if (!tasksOnly) {
     Text("由被控设备访问网址并保存文件。", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
     OutlinedTextField(state.url, onUrl, enabled = !state.busy, label = { Text("下载地址") },
         modifier = Modifier.fillMaxWidth().testTag("url-download-address"), maxLines = 3,
@@ -40,12 +42,15 @@ fun UrlDownloadPanel(
     OutlinedButton({ picking = true }, shape = MaterialTheme.shapes.small, enabled = available && !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("选择保存目录") }
     if(state.root != "downloads" || state.directory.isNotEmpty())
         TextButton(onDefaultDirectory, enabled = !state.busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("恢复默认下载目录") }
-    Text("同名文件不会覆盖，请更换名称后重试。", color = RemoteColors.Secondary)
+    Text("遇到同名文件时，可选择新名称或确认覆盖原文件。", color = RemoteColors.Secondary)
     if(!available) Text("连接支持网址下载的配套服务后可开始。", color = RemoteColors.Secondary)
     ActionButton(if(state.phase == "failed") "重试下载" else "开始下载",
         available && !state.busy && validUrl && (state.name.isBlank() || validTargetFileName(state.name.trim())), onStart)
+    }
     if(state.phase != "idle") {
         Text(when(state.phase) {
+            "conflict" -> "请选择同名文件的处理方式"
+            "awaiting_approval" -> "等待确认覆盖"
             "connecting" -> "正在连接下载地址"
             "downloading" -> "正在下载"
             "committing" -> "正在保存文件"

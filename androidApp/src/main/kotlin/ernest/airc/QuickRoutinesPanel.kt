@@ -25,6 +25,8 @@ internal fun QuickRoutinesPanel(state: RemoteUiState, model: RemoteViewModel, on
     var stepIndex by rememberSaveable { mutableIntStateOf(-1) }
     var kind by rememberSaveable { mutableStateOf("app") }
     var value by rememberSaveable { mutableStateOf("") }
+    var timeout by rememberSaveable { mutableStateOf("30") }
+    var originalTimeout by rememberSaveable { mutableStateOf("30") }
     var originalKind by rememberSaveable { mutableStateOf("app") }
     var originalValue by rememberSaveable { mutableStateOf("") }
     var discardTo by remember { mutableStateOf<String?>(null) }
@@ -47,12 +49,12 @@ internal fun QuickRoutinesPanel(state: RemoteUiState, model: RemoteViewModel, on
     }
     fun editStep(index: Int = -1) {
         stepIndex = index; kind = steps.getOrNull(index)?.type ?: "app"; value = steps.getOrNull(index)?.let { if (it.type == "wait") routineSeconds(it.value.toLong()) else it.value }.orEmpty()
-        originalKind = kind; originalValue = value; route = "step"
+        timeout = steps.getOrNull(index)?.timeoutSeconds?.toString() ?: "30"; originalTimeout = timeout; originalKind = kind; originalValue = value; route = "step"
     }
     fun back() {
         when (screen) {
             "apps" -> route = "step"
-            "step" -> if (kind != originalKind || value != originalValue) discardTo = "edit" else route = "edit"
+            "step" -> if (kind != originalKind || value != originalValue || timeout != originalTimeout) discardTo = "edit" else route = "edit"
             "edit" -> if (name != originalName || steps != originalSteps) discardTo = "list" else route = "list"
             "details" -> route = "list"
             else -> onClose()
@@ -60,7 +62,7 @@ internal fun QuickRoutinesPanel(state: RemoteUiState, model: RemoteViewModel, on
     }
     val draft = QuickRoutine(editing ?: "draft", name.trim(), steps)
     val canSave = device != null && !run.busy && draft.valid() && (state.routines.size < 20 || editing != null)
-    val step = when (kind) { "wait" -> RoutineStep("wait", parseRoutineSeconds(value)?.toString().orEmpty()); else -> RoutineStep(kind, value) }
+    val step = when (kind) { "wait" -> RoutineStep("wait", parseRoutineSeconds(value)?.toString().orEmpty()); else -> RoutineStep(kind, value, timeout.toIntOrNull() ?: 0) }
     val updatedSteps = if (stepIndex in steps.indices) steps.toMutableList().apply { this[stepIndex] = step } else steps + step
     val canSaveStep = !run.busy && step.valid() && QuickRoutine("draft", "draft", updatedSteps).valid()
     val iconRevision by model.appIcons.revision.collectAsState()
@@ -87,7 +89,7 @@ internal fun QuickRoutinesPanel(state: RemoteUiState, model: RemoteViewModel, on
                 { index -> steps = steps.toMutableList().apply { add(index + 1, steps[index]) } },
                 { index -> steps = steps.filterIndexed { i, _ -> i != index } }, appIcon)
             "step" -> RoutineStepEditorContent(kind, { kind = it; value = "" }, value, { value = it }, state.apps, !run.busy,
-                { route = "apps" }, canSaveStep, appIcon)
+                { route = "apps" }, canSaveStep, appIcon, timeout, { timeout = it })
             "apps" -> ApplicationLibraryPanel(state.apps, state.shortcuts.favorites, state.connected, state.appsLoading, state.appsError,
                 model::listApps, { value = it.packageName; route = "step" }, appIcon, selected = value, selectLabel = "选择应用", selectionAvailable = true)
             "details" -> lastRuns[detailsId]?.let { RoutineExecutionDetails(it, state.apps, run.routineId == detailsId && run.busy, model.quickRoutines::cancel, appIcon) }
@@ -97,7 +99,7 @@ internal fun QuickRoutinesPanel(state: RemoteUiState, model: RemoteViewModel, on
                     if (run.busy && run.routineId == routine.id) {
                         if (run.pauseRequested) model.quickRoutines.resume() else model.quickRoutines.pause()
                     } else model.quickRoutines.start(routine, state.connected, device, state.history.find { it.id == device }?.visibleName)
-                }, { detailsId = it.id; route = "details" }, device != null)
+                }, { detailsId = it.id; route = "details" }, device != null, { model.pinLauncher("routine", it.id, it.name) })
         }
     }
     if (discardTo != null) AlertDialog(onDismissRequest = { discardTo = null }, title = { Text("放弃未保存的修改？") },

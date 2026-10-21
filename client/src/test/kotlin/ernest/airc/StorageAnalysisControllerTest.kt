@@ -61,4 +61,23 @@ class StorageAnalysisControllerTest {
             assertEquals("cancelled", controller.state.value.phase)
         } finally { cancellation.complete(Unit); scope.cancel() }
     }
+    @Test fun deletionUpdatesOnlyItsReportAndMarksTotalsAsOld(): Unit = runBlocking {
+        val scope=CoroutineScope(SupervisorJob()+Dispatchers.Unconfined)
+        val calls=mutableListOf<String>()
+        val controller=StorageAnalysisController(scope) {tool,_->calls+=tool;task()}
+        try {
+            controller.analyze("inbox","folder",true)
+            controller.fileDeleted("downloads","folder/a.jpg")
+            assertEquals(report,controller.state.value.report);assertFalse(controller.state.value.outdated)
+            controller.fileDeleted("inbox","folder/a.jpg")
+            assertTrue(controller.state.value.report!!.largestFiles.isEmpty())
+            assertEquals(report.totals,controller.state.value.report!!.totals)
+            assertTrue(controller.state.value.outdated)
+            assertEquals(listOf("storage.analyze"),calls)
+            controller.analyze("inbox","folder",true)
+            assertFalse(controller.state.value.outdated)
+            assertEquals(report,controller.state.value.report)
+        } finally {scope.cancel()}
+    }
+
 }

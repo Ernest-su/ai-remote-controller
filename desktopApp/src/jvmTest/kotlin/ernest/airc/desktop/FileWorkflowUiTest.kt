@@ -42,7 +42,7 @@ class FileWorkflowUiTest {
     @Test fun detectedDownloadNameAndSizeStayEditable() {
         var name = ""
         compose.setContent { RemoteTheme { Column(Modifier.verticalScroll(rememberScrollState())) {
-            UrlDownloadPanel(UrlDownloadState(url = "https://example.test/raw", name = "电视.apk", infoReady = true, fileSize = 123456), true, true, {}, { name = it }, {}, {}, {}, {})
+            UrlDownloadPanel(UrlDownloadState(url = "https://example.test/raw", name = "电视.apk", infoReady = true, fileSize = 123456), true, true, {}, { name = it }, {}, {}, {}, directoryPicker = {})
         } } }
         compose.onNodeWithTag("url-download-name").assertTextContains("电视.apk").performTextReplacement("我的文件.apk")
         assertEquals("我的文件.apk", name)
@@ -57,6 +57,18 @@ class FileWorkflowUiTest {
         compose.onNodeWithText("目标文件名").assertDoesNotExist()
         compose.onNodeWithText("保存已下载文件").performClick()
         assertTrue(saved)
+    }
+
+    @Test fun aacOffersTargetPlaybackFromFileMenu() {
+        var opened=""
+        val names=listOf("recording.aac","RECORDING.AAC")
+        compose.setContent {RemoteTheme {FileBrowserPanel(FileBrowserState(entries=names.map {TargetFileEntry(it,"file")},loaded=true),true,{},{},{},{},{},onMedia={opened=it.name})}}
+        for(name in names) {
+            compose.onNodeWithTag("file-more-$name").performScrollTo().performClick()
+            compose.onNodeWithText("在被控设备播放").assertIsEnabled().performClick()
+            assertEquals(name,opened)
+            compose.onNodeWithTag("files-tools-dialog-close").performClick()
+        }
     }
 
 }

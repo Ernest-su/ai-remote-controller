@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         model = ViewModelProvider(this)[RemoteViewModel::class.java]
-        if (savedInstanceState == null) model.receiveShare(intent)
+        if (savedInstanceState == null) { model.receiveShare(intent); model.receiveLauncherAction(intent) }
         setContent {
             val preferences = remember { getSharedPreferences("appearance", MODE_PRIVATE) }
             var mode by remember { mutableStateOf(ThemeMode.fromStored(preferences.getString("theme", null))) }
@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
                 RemoteApp(model, mode) { selected ->
                     mode = selected
                     preferences.edit().putString("theme", selected.name).apply()
+                    AircRemoteWidget.updateAll(applicationContext)
                 }
             }
         }
@@ -65,6 +66,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         model.receiveShare(intent)
+        model.receiveLauncherAction(intent)
     }
     override fun onStart() { super.onStart(); model.startDiscovery() }
     override fun onStop() {

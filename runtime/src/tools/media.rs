@@ -87,6 +87,18 @@ pub(super) async fn execute(args: &Value) -> Result<String> {
     }
 }
 
+pub(super) async fn pause_current() -> Result<String> {
+    let result = crate::platform_bridge::invoke("pause_current", &[current_user().await?]).await?;
+    let value: Value = serde_json::from_str(&result)?;
+    if value["operation"] != "pause"
+        || value["submitted"] != true
+        || value["packageName"].as_str().is_none_or(str::is_empty)
+    {
+        bail!("invalid media pause acknowledgement");
+    }
+    Ok(result)
+}
+
 async fn current_user() -> Result<String> {
     let user = run_command("am", &["get-current-user".into()])
         .await?

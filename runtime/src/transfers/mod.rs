@@ -11,6 +11,8 @@ use std::{
     },
     time::{Duration, Instant},
 };
+pub(crate) mod chunks;
+mod commit;
 mod http;
 mod url_download;
 mod url_metadata;
@@ -30,7 +32,7 @@ fn create(args: &Value) -> Result<Arc<Transfer>> {
 }
 
 fn create_at(args: &Value, root: &std::path::Path) -> Result<Arc<Transfer>> {
-    create_at_impl(args, root, false)
+    create_at_impl(args, root, true)
 }
 
 fn create_at_impl(
@@ -134,7 +136,7 @@ fn create_at_impl(
                 libc::openat(
                     parent.as_raw_fd(),
                     temporary.as_ptr(),
-                    libc::O_WRONLY
+                    libc::O_RDWR
                         | libc::O_LARGEFILE
                         | libc::O_CREAT
                         | libc::O_EXCL
@@ -174,7 +176,16 @@ fn create_at_impl(
                 unsafe {
                     libc::unlinkat(parent.as_raw_fd(), temporary.as_ptr(), 0);
                 }
-                bail!("directory does not support safe atomic no-replace commit; choose service inbox: {error}");
+                bail!("unable to prepare no-replace commit: {error}");
+            }
+            if copy_commit {
+                if let Err(error) = commit::ensure_space(parent.as_raw_fd(), size.saturating_mul(2))
+                {
+                    unsafe {
+                        libc::unlinkat(parent.as_raw_fd(), temporary.as_ptr(), 0);
+                    }
+                    return Err(error);
+                }
             }
             let restored = if overwrite || copy_commit {
                 0

@@ -71,7 +71,9 @@ pub(super) struct Busy(Arc<Transfer>);
 impl Drop for Busy {
     fn drop(&mut self) {
         let phase = self.0.phase.lock().unwrap().clone();
-        if phase == "uploading" {
+        if phase == "uploading" || (phase == "committing" && self.0.direction == "upload") {
+            self.0.cancelled.store(true, Ordering::Relaxed);
+            self.0.file.lock().unwrap().take();
             self.0.failed("upload interrupted before commit".into());
         }
         if phase == "downloading" {

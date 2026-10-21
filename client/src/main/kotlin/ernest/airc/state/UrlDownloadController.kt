@@ -9,8 +9,8 @@ fun validDownloadUrl(value: String): Boolean = value.length <= 8192 && value.tri
     it.username.isEmpty() && it.password.isEmpty()
 } ?: false
 
-class UrlDownloadController(private val scope: CoroutineScope, private val runtime: RuntimeConnection? = null, private val request: suspend (String, JsonObject) -> String) {
-    constructor(scope: CoroutineScope, runtime: RuntimeConnection) : this(scope, runtime, { tool, args -> runtime.request("tool", tool, args) })
+class UrlDownloadController(private val scope: CoroutineScope, private val runtime: RuntimeConnection? = null, private val approve: (suspend (JsonObject) -> String)? = null, private val request: suspend (String, JsonObject) -> String) {
+    constructor(scope: CoroutineScope, runtime: RuntimeConnection) : this(scope, runtime, request = { tool, args -> runtime.request("tool", tool, args) })
     private val mutable = MutableStateFlow(UrlDownloadState())
     val state = mutable.asStateFlow()
     private val json = Json { ignoreUnknownKeys = true }
@@ -19,14 +19,21 @@ class UrlDownloadController(private val scope: CoroutineScope, private val runti
     private var infoJob: Job? = null
     private var infoGeneration = 0L
     private var manualName = false
+    private var overwriteApproval: CompletableDeferred<Boolean>? = null
+    fun confirmOverwrite(accepted: Boolean) { overwriteApproval?.complete(accepted) }
+    fun dismissConflict() { if (!state.value.busy) mutable.update { it.copy(conflict = null, phase = "idle") } }
+    fun renameConflict(name: String, available: Boolean) {
+        if (!available || state.value.busy || state.value.conflict == null || !validTargetFileName(name.trim())) return
+        editName(name.trim()); start(available)
+    }
     fun editUrl(value: String) {
         if (state.value.busy || value == state.value.url) return
         infoGeneration++; infoJob?.cancel()
         val inferred = value.trim().toHttpUrlOrNull()?.pathSegments?.lastOrNull()?.takeIf(::validTargetFileName).orEmpty()
         mutable.update { it.copy(url = value, name = if (manualName) it.name else inferred,
-            infoReady = false, infoLoading = false, fileSize = null, infoError = null, phase = "idle", bytes = 0, total = null, destination = null, error = null) }
+            infoReady = false, infoLoading = false, fileSize = null, infoError = null, phase = "idle", bytes = 0, total = null, destination = null, error = null, conflict = null) }
     }
-    fun editName(value: String) { if(!state.value.busy) { manualName = true; mutable.update { it.copy(name = value) } } }
+    fun editName(value: String) { if(!state.value.busy) { manualName = true; mutable.update { it.copy(name = value, conflict = null) } } }
     fun inspect(available: Boolean) {
         infoJob?.cancel()
         val token = ++infoGeneration
@@ -52,26 +59,63 @@ class UrlDownloadController(private val scope: CoroutineScope, private val runti
     }
     fun directory(root: String, path: String) {
         if(!state.value.busy && root in listOf("downloads", "inbox", "full") && (path.isEmpty() || path.split('/').all(::validTargetFileName)))
-            mutable.update { it.copy(root = root, directory = path) }
+            mutable.update { it.copy(root = root, directory = path, conflict = null) }
     }
     fun clear() { generation++; job?.cancel(); infoGeneration++; infoJob?.cancel(); manualName = false; mutable.value = UrlDownloadState() }
     fun cancel() { job?.cancel() }
-    fun start(available: Boolean) {
+    fun start(available: Boolean, overwrite: Boolean = false) {
         val draft = state.value
+        if (overwrite && draft.conflict?.canOverwrite != true) return
         if(!available || draft.busy || !validDownloadUrl(draft.url) || (draft.name.isNotBlank() && !validTargetFileName(draft.name.trim()))) return
         infoGeneration++; infoJob?.cancel()
         val token = generation
-        mutable.value = draft.copy(busy = true, infoLoading = false, phase = "connecting", bytes = 0, total = null, destination = null, error = null)
+        mutable.value = draft.copy(noticeId = java.util.UUID.randomUUID().toString(), busy = true, infoLoading = false, phase = "connecting", bytes = 0, total = null, destination = null, error = null, conflict = null, overwriteProposal = null)
         job = scope.launch {
-            var id: String? = null; var terminal = false; var userCancelled = false; var target: RuntimeTransferTarget? = null
+            var id: String? = null; var terminal = false; var userCancelled = false; var downloadRequested = false; var target: RuntimeTransferTarget? = null
             fun checkTarget() { check(token == generation) { "目标连接已改变" }; if(runtime != null) runtime.checkTransferTarget(checkNotNull(target)) }
             suspend fun query(tool: String, args: JsonObject): String = if(runtime != null) runtime.requestAt(checkNotNull(target), tool, args) else request(tool, args)
             try {
                 target = runtime?.transferTarget(); checkTarget()
-                var task = json.decodeFromString<TransferProgress>(query("files.download_url", buildJsonObject {
+                var overwriteToken: String? = null
+                if (overwrite) {
+                    val path = listOf(draft.directory, draft.name.trim()).filter { it.isNotEmpty() }.joinToString("/")
+                    val proposal = json.decodeFromString<FileActionProposal>(query("files.prepare_overwrite", buildJsonObject { put("root", draft.root); put("path", path) }))
+                    check(proposal.kind == "overwrite" && proposal.root == draft.root && proposal.path == path && proposal.approvalRequired && !proposal.directory && !proposal.symlink) { "覆盖确认信息不匹配" }
+                    checkTarget()
+                    val pending = CompletableDeferred<Boolean>(); overwriteApproval = pending
+                    var approved = false
+                    suspend fun approval(accepted: Boolean): String {
+                        checkTarget()
+                        val args = buildJsonObject { put("id", proposal.id); if (!accepted) put("accepted", false) }
+                        return if (runtime != null) runtime.approveFileAt(checkNotNull(target), args) else checkNotNull(approve) { "覆盖确认接口不可用" }(args)
+                    }
+                    try {
+                        mutable.update { it.copy(phase = "awaiting_approval", overwriteProposal = proposal) }
+                        if (!pending.await()) { approval(false); approved = true; terminal = true; mutable.update { it.copy(phase = "cancelled") }; return@launch }
+                        overwriteToken = json.parseToJsonElement(approval(true)).jsonObject.getValue("id").jsonPrimitive.content
+                        approved = true
+                    } finally {
+                        if (!approved) withContext(NonCancellable) { withTimeoutOrNull(5000) { runCatching { approval(false) } } }
+                        if (overwriteApproval === pending) overwriteApproval = null
+                        if (token == generation) mutable.update { it.copy(overwriteProposal = null) }
+                    }
+                }
+                fun acceptConflict(value: JsonElement): Boolean {
+                    val conflict = json.decodeFromJsonElement<DownloadNameConflict>(value)
+                    check(conflict.root == draft.root && validTargetFileName(conflict.name) && validTargetFileName(conflict.suggestedName) && conflict.name != conflict.suggestedName &&
+                        conflict.path == listOf(draft.directory, conflict.name).filter { it.isNotEmpty() }.joinToString("/") && (draft.name.isBlank() || draft.name.trim() == conflict.name)) { "同名文件信息不匹配" }
+                    checkTarget()
+                    mutable.update { it.copy(name = conflict.name, phase = "conflict", conflict = conflict, error = null) }
+                    return true
+                }
+                downloadRequested = true
+                val output = json.parseToJsonElement(query("files.download_url", buildJsonObject {
                     put("url", draft.url.trim()); put("root", draft.root); put("directory", draft.directory)
                     if(draft.name.isNotBlank()) put("name", draft.name.trim())
-                }))
+                    overwriteToken?.let { put("overwriteToken", it) }
+                })).jsonObject
+                output["conflict"]?.let { acceptConflict(it); terminal = true; return@launch }
+                var task = json.decodeFromJsonElement<TransferProgress>(output)
                 id = task.id
                 var previous = 0L
                 while(true) {
@@ -89,6 +133,7 @@ class UrlDownloadController(private val scope: CoroutineScope, private val runti
                     delay(300)
                     task = json.decodeFromString(query("task.progress", buildJsonObject { put("id", id) }))
                 }
+                if (task.phase == "failed") task.result?.jsonObject?.get("conflict")?.let { acceptConflict(it); return@launch }
                 check(task.phase != "failed") { task.error ?: "下载失败" }
                 if(task.phase == "completed") check(state.value.total == state.value.bytes) { "下载完成长度不匹配" }
             } catch(e: CancellationException) { userCancelled = true; if(token == generation) mutable.update { it.copy(phase = "cancelling") }; throw e }
@@ -117,8 +162,9 @@ class UrlDownloadController(private val scope: CoroutineScope, private val runti
                     }
                 }
                 if(token == generation) mutable.update {
-                    if(userCancelled && id == null) it.copy(busy = false, phase = "failed", error = "下载请求尚未返回，未能确认取消，请检查目标目录。")
-                    else it.copy(busy = false)
+                    if(userCancelled && id == null && downloadRequested) it.copy(busy = false, phase = "failed", error = "下载请求尚未返回，未能确认取消，请检查目标目录。")
+                    else if(userCancelled && id == null) it.copy(busy = false, phase = "cancelled", error = null, overwriteProposal = null)
+                    else it.copy(busy = false, overwriteProposal = null)
                 }
             }
         }

@@ -22,10 +22,13 @@ class DesktopController(
     private val mutable = MutableStateFlow(DesktopState())
     val state = mutable.asStateFlow()
     val profiles = ModelProfileController(store, catalog, scope)
+    val schedules = ScheduleController(scope, runtime)
     val screenshots = ScreenshotController(scope, runtime::screenshot)
+    val uploadDraft = UploadDraftController()
     val transfers = FileTransferController(scope, runtime)
     val urlDownloads = UrlDownloadController(scope, runtime)
     val downloadDirectories = FileBrowserController(scope, runtime)
+    val batchTransfers = BatchTransferController(scope, runtime, defaultStateDirectory().resolve("batch-cache").toFile())
     val files = FileBrowserController(scope,runtime)
     val mediaControl = MediaControlController(scope, runtime)
     val virtualGamepad = VirtualGamepadController(scope, runtime)
@@ -51,7 +54,7 @@ class DesktopController(
     init {
         scope.launch {
             runtime.session.collectLatest { session ->
-                if (session == null) { appIcons.clear(); screenshots.clear(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll(); mutable.update { it.copy(connected = false, apps = emptyList(), appsLoading = false, appsError = null, deviceInfo = null, tools = emptyList(), media = "未连接设备") } }
+                if (session == null) { schedules.clear(); appIcons.clear(); screenshots.clear(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll(); mutable.update { it.copy(connected = false, apps = emptyList(), appsLoading = false, appsError = null, deviceInfo = null, tools = emptyList(), media = "未连接设备") } }
                 else while (true) {
                     if (runtime.session.value != session) return@collectLatest
                     val send = runCatching { runtime.toolWriter() }.getOrNull() ?: return@collectLatest
@@ -100,7 +103,7 @@ class DesktopController(
     }
     private suspend fun attach(host: String, port: Int, serial: String?, runtimePort: Int = port) {
         generation++; feedbackGeneration++
-        appIcons.clear(); screenshots.clear(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll()
+        schedules.clear(); appIcons.clear(); screenshots.clear(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll()
         runtime.disconnect()
         mutable.update { it.copy(connected = false, apps = emptyList(), appsLoading = false, appsError = null, deviceInfo = null, status = "正在连接服务…", touchBusy = false) }
         val release = bundledRelease()
@@ -198,9 +201,13 @@ class DesktopController(
         return true
     }
     private var textSubmissionGeneration = 0L
-    fun text(text: String): Boolean {
+    fun stopText() {
+        val send = runCatching { runtime.commandWriter() }.getOrNull() ?: return
+        scope.launch { runCatching { send("cancel_text", kotlinx.serialization.json.buildJsonObject {}) }.onFailure { message(it.message ?: "停止失败") } }
+    }
+    fun text(text: String, observeScreen: Boolean = false): Boolean {
         if (text.isBlank() || !state.value.connected || !state.value.modelConfigured || state.value.submitting) return false
-        val send = runCatching { runtime.textWriter() }.getOrNull() ?: return false
+        val send = runCatching { runtime.textWriter(observeScreen) }.getOrNull() ?: return false
         val submission = ++textSubmissionGeneration
         val session = generation; val token = ++feedbackGeneration
         mutable.update { it.copy(submitting = true) }; feedback(FeedbackPhase.THINKING, "", token)
@@ -239,7 +246,7 @@ class DesktopController(
     }
     fun disconnect() = operation { generation++; feedbackGeneration++; runtime.disconnect(); releaseForward(); mutable.update { it.copy(status = "已断开", touchBusy = false) } }
     override fun close() {
-        transfers.close(); filePreviews.close()
+        batchTransfers.close(); transfers.close(); filePreviews.close()
         runtime.close()
         profiles.close()
         val previous = forward; forward = null

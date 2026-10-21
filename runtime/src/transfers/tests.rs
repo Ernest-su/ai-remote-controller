@@ -212,3 +212,78 @@ fn links_are_readable_download_sources_but_not_upload_destinations() {
     assert!(!root.join("target/new").exists());
     std::fs::remove_dir_all(root).unwrap();
 }
+
+pub(super) fn copy_upload(root: &std::path::Path, name: &str, data: &[u8]) -> Arc<Transfer> {
+    let task=create_at(&json!({"direction":"upload","path":name,"sizeBytes":data.len(),"sha256":format!("{:x}",Sha256::digest(data))}),root).unwrap();
+    task.destination
+        .lock()
+        .unwrap()
+        .as_mut()
+        .unwrap()
+        .copy_commit = true;
+    task
+}
+
+#[tokio::test]
+async fn single_upload_copy_fallback_handles_empty_files_races_and_bad_digests() {
+    let root = std::env::temp_dir().join(format!("airc-upload-copy-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir(&root).unwrap();
+    for (name, data) in [("saved", b"payload".as_slice()), ("empty", b"".as_slice())] {
+        let task = copy_upload(&root, name, data);
+        assert_eq!(
+            http::upload_for(task.clone(), Body::from(data.to_vec()))
+                .await
+                .status(),
+            StatusCode::OK
+        );
+        assert_eq!(std::fs::read(root.join(name)).unwrap(), data);
+        assert_eq!(*task.phase.lock().unwrap(), "completed");
+        tasks().lock().unwrap().remove(&task.id);
+    }
+    let race = copy_upload(&root, "race", b"new");
+    std::fs::write(root.join("race"), b"original").unwrap();
+    assert_eq!(
+        http::upload_for(race.clone(), Body::from("new"))
+            .await
+            .status(),
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(std::fs::read(root.join("race")).unwrap(), b"original");
+    let corrupt = copy_upload(&root, "corrupt", b"good");
+    assert_eq!(
+        http::upload_for(corrupt.clone(), Body::from("bad!"))
+            .await
+            .status(),
+        StatusCode::BAD_REQUEST
+    );
+    assert!(!root.join("corrupt").exists());
+    assert_eq!(std::fs::read_dir(&root).unwrap().count(), 3);
+    for task in [race, corrupt] {
+        tasks().lock().unwrap().remove(&task.id);
+    }
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
+async fn interrupted_copy_removes_partial_destination_and_temporary_file() {
+    let root = std::env::temp_dir().join(format!("airc-copy-abort-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir(&root).unwrap();
+    let data = vec![42u8; 32 * 1024 * 1024];
+    let task = copy_upload(&root, "partial", &data);
+    let worker = tokio::spawn(http::upload_for(task.clone(), Body::from(data)));
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !root.join("partial").exists() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    worker.abort();
+    let _ = worker.await;
+    assert_eq!(*task.phase.lock().unwrap(), "cancelled");
+    assert!(!task.busy.load(Ordering::Acquire));
+    assert!(!root.join("partial").exists());
+    assert_eq!(std::fs::read_dir(&root).unwrap().count(), 0);
+    tasks().lock().unwrap().remove(&task.id);
+    std::fs::remove_dir_all(root).unwrap();
+}

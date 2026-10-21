@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 internal fun RoutineLibraryContent(routines: List<QuickRoutine>, apps: List<InstalledApp>, connected: Boolean, run: RoutineRunState, lastRuns: Map<String, RoutineExecution>,
     onCreate: () -> Unit, onEdit: (QuickRoutine) -> Unit, onCopy: (QuickRoutine) -> Unit, onDelete: (QuickRoutine) -> Unit,
-    onRun: (QuickRoutine) -> Unit, onDetails: (QuickRoutine) -> Unit, deviceSelected: Boolean) {
+    onRun: (QuickRoutine) -> Unit, onDetails: (QuickRoutine) -> Unit, deviceSelected: Boolean, onPin: (QuickRoutine) -> Unit = {}) {
     LazyColumn(Modifier.fillMaxSize().testTag("routine-library"), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item("heading") {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -65,6 +65,7 @@ internal fun RoutineLibraryContent(routines: List<QuickRoutine>, apps: List<Inst
                         IconButton({ menu = true }, modifier = Modifier.size(48.dp)) { Icon(painterResource(R.drawable.ic_more), "更多 ${routine.name}") }
                         DropdownMenu(menu, { menu = false }) {
                             DropdownMenuItem(text = { Text("最后一次执行详情") }, enabled = record != null, onClick = { menu = false; onDetails(routine) })
+                            DropdownMenuItem(text = { Text("添加到桌面") }, onClick = { menu = false; onPin(routine) })
                             DropdownMenuItem(text = { Text("编辑组合") }, enabled = !run.busy, onClick = { menu = false; onEdit(routine) })
                             DropdownMenuItem(text = { Text("创建副本") }, enabled = !run.busy && routines.size < 20, onClick = { menu = false; onCopy(routine) })
                             DropdownMenuItem(text = { Text("删除组合", color = RemoteColors.Warning) }, enabled = !run.busy, onClick = { menu = false; onDelete(routine) })

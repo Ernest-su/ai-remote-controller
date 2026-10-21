@@ -66,6 +66,7 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite profil
 
 | 专项 | 主要验证内容 |
 | --- | --- |
+| `launcher-shortcut-ui` | 桌面入口默认名称、修改与校验、图标选择、亮暗大字体、草稿恢复、取消与系统快捷方式元数据；不操作外部目标 |
 | `product-pages` | 320dp / 1.5 倍字体亮暗主题下逐页浏览、设备页返回来源、等高网格及离线截图；不操作外部目标 |
 | `remote-haptics-input-ui` | 标准遥控器下键快速短按、真实按下/松开与滑出取消；请求仅发往控制端本地模拟服务，不操作外部目标。真实振动器的停止与厂商日志需在指定手机补查 |
 | `remote-haptics-ui` | 遥控震动开关的切换、旋转与重新加载持久化；实际震感需有振动器的设备核对 |
@@ -75,6 +76,13 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite profil
 | `controller-ui` | 页面导航、提交与执行反馈、键盘间距、离线、大字体、旋转与输入工具 |
 | `management-ui` | 文件/应用列表、搜索筛选、按需面板、离线与草稿恢复 |
 | `mirror-toolbar-ui` | 动态预览标题图标、画质档位保存、紧凑按键至少 48dp、全屏原生视图复用、布局切换及横竖屏草稿保留；不连接目标 |
+| `url-conflict-ui` | 网址下载同名提示、新名称编辑与校验、覆盖前独立确认、目录与离线禁用，320dp/1.5倍字体亮暗主题 |
+| `upload-local-picker-ui` | 上传打开实际系统文件选择器、取消保留草稿、待保存任务不禁用本地选择、下载保存反馈不串入上传 |
+| `storage-task-tabs-ui` | 普通用户存储概览、折叠扫描详情、列表删除确认及离线禁用；任务分类计数、0项禁用、旋转恢复与任务变化 |
+| `file-task-navigation-ui` | 文件任务统一入口、空态、任务汇总不出现创建表单、旋转恢复与窄屏亮暗截图；上传共用一个选择器入口 |
+| `batch-download-mode-ui` | 下载前 ZIP/逐个选择、取消不提交与旋转恢复、独立文件保存状态；通过模拟器系统 DocumentsProvider 验证逐个保存及同名改名不覆盖 |
+| `file-multiselect-ui` | 列表/网格多选下载、可见项选择、32项限制、筛选与恢复、目录切换和刷新、返回退出、离线/批量任务互斥，亮暗大字体 |
+| `file-page-ui` | 文件布局与链接、任务提示同一行布局、关闭后导航/恢复/进度更新保持隐藏，新任务重新显示；使用隔离界面 fixture |
 | `file-preview-ui` | 主控端图片受限解码、文本范围读取及关闭释放、音频播放/后台暂停；仅使用本机回环媒体 fixture |
 | `app-packages-ui` | 图标显示、多包安装清单与显式提交 |
 | `models` | API 配置、模型选择、真实 Keystore 持久化与手动同步边界 |
@@ -214,3 +222,19 @@ uv run --with websockets python runtime/file_links_target_test.py --serial <自�
 ```
 
 按目标 ABI 替换二进制；此专项不安装 App、不修改已有文件或系统设置，也不代替厂商共享存储兼容性测试。
+
+定时与批量功能的聚焦主机回归使用`ScheduleControllerTest`、`BatchTransferProtocolTest`、`RoutineConditionsTest`和`RemoteLayoutTest`，分别验证重连确认失效与音量参数传输、真实主机协议的多文件摘要/ZIP、条件等待与输入边界。Rust schedules测试使用可注入动作验证独立调度、单次不重放、每天顺延、音量参数边界与持久化恢复；chunks测试使用独立任务实例验证分块回退、偏移拒绝、摘要提交与范围读取，不占用其他测试共享注册表的任务名额。
+
+构建App和测试APK后，执行`python3 scripts/test-phone-target.py --phone <自有模拟器> --suite scheduled-features-ui`，验证窄屏大字体亮暗主题的定时运行说明、时间与动作下拉选择、单次未来时间推算、时间选择器确认/取消和恢复、离线草稿与提交禁用、媒体音量输入校验与旋转恢复、静音/解除静音提交、批量文件选择。`product-pages`同时覆盖定时入口和设备页返回。固定桌面快捷方式、小组件、厂商休眠限制、实际关机及真实视觉提供商兼容需按交付范围另行验证，主机和面板fixture不能替代这些行为。
+
+被控端定时执行专项可在自有模拟器运行：
+
+```sh
+uv run --with websockets python runtime/scheduled_actions_target_test.py --serial <自有目标序列号> --binary androidApp/src/main/assets/runtime/airc-runtime-<匹配ABI>
+```
+
+专项构建并安装UUID包名的临时MediaSession/启动器接收应用，创建UUID服务目录，保存60/70/80秒后的暂停、打开应用与强停任务后断开WebSocket。同时保存90秒后的媒体音量40%，以及100/110秒静音和120/130秒解除静音任务。分别核对暂停回调、前台包、stopped标志、系统媒体音量与静音状态及被控端执行记录；重复静音和解除静音不会切换为相反状态。结束清理自己的APK、服务和ADB转发，并恢复原音量、静音状态和Activity。不会执行关机，也不证明厂商休眠或关机接口行为。
+
+Downloads 上传平台验证使用独立 Android 模拟器：`python3 runtime/upload_copy_target_test.py --serial <模拟器序列号> --binary androidApp/src/main/assets/runtime/airc-runtime-x86_64`（需要 Python websockets）。覆盖单文件、空文件、分块续传、摘要错误、同名冲突及临时文件清理；只创建 UUID 专属目录和服务，结束删除自有文件及 ADB 转发。可选 `--baseline-binary <旧版匹配ABI二进制>` 对照旧版的原子不覆盖报错。
+
+AAC 被控端播放验证使用独立模拟器：先构建 `:mediaFixture:assembleDebug`，再运行 `uv run --with av --with websockets python runtime/aac_media_target_test.py --serial <模拟器序列号> --binary androidApp/src/main/assets/runtime/airc-runtime-x86_64 --fixture-apk mediaFixture/build/outputs/apk/debug/mediaFixture-debug.apk`。临时生成静音 AAC，验证大小写扩展名、audio/aac、播放副本与实际 MediaPlayer 播放状态；不代表真实设备或其他 AAC 编码配置的兼容性。脚本拒绝替换已有 fixture App，结束移除自有应用、文件、服务和转发。

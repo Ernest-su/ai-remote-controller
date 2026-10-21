@@ -1,0 +1,8 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="12dp" android:background="?android:attr/colorBackground">
+    <TextView android:id="@+id/widget_title" android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical" android:text="AI 遥控" android:textSize="17sp" />
+    <TextView android:id="@+id/widget_empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="在 App 中将常用应用或快捷操作添加到桌面" android:textSize="14sp" />
+    <Button android:id="@+id/widget_action_1" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" />
+    <Button android:id="@+id/widget_action_2" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" />
+    <Button android:id="@+id/widget_action_3" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" />
+    <Button android:id="@+id/widget_action_4" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" />
+</LinearLayout>

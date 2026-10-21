@@ -41,11 +41,11 @@ class FilePickerTargetTest {
             await{model.state.value.connected&&!model.state.value.busy}
             compose.onNodeWithTag("open-menu").performClick()
             compose.onNodeWithTag("feature-files").performScrollTo().performClick()
-            compose.runOnUiThread{model.transfers.select(UploadSource(name,bytes.size.toLong()){bytes.inputStream()})}
-            compose.onNodeWithTag("files-tools").performClick()
+            compose.runOnUiThread{model.uploadDraft.select(listOf(UploadSource(name,bytes.size.toLong()){bytes.inputStream()}))}
+            compose.onNodeWithTag("files-upload").performClick()
             compose.onNodeWithText("选择本地文件").performScrollTo().performClick()
             cancelPicker()
-            assertEquals(name,model.transfers.state.value.sourceName)
+            assertEquals(name,model.uploadDraft.state.value.single().name)
             compose.runOnUiThread{model.transfers.download("inbox",name,context.cacheDir,true)}
             await{!model.transfers.state.value.running&&(model.transfers.state.value.readyToSave||model.transfers.state.value.error!=null)}
             assertNull(model.transfers.state.value.error);assertTrue(model.transfers.state.value.readyToSave)

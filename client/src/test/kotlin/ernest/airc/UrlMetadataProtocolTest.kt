@@ -43,6 +43,47 @@ class UrlMetadataProtocolTest {
             assertNull(done.error); assertEquals("completed", done.phase)
             assertEquals("data", File(state, "files/电视.apk").readText())
             assertEquals("GET", server.takeRequest(2, TimeUnit.SECONDS)!!.method)
+            // Existing destination is reported before making another HTTP request.
+            controller.start(true)
+            val collision = withTimeout(5000) { controller.state.first { !it.busy } }
+            assertNull(collision.error); assertEquals("电视 (1).apk", collision.conflict?.suggestedName)
+            assertNull(server.takeRequest(100, TimeUnit.MILLISECONDS))
+            server.enqueue(MockResponse().setBody("new copy"))
+            controller.renameConflict("电视 (1).apk", true)
+            assertNull(withTimeout(5000) { controller.state.first { !it.busy } }.error)
+            assertEquals("data", File(state, "files/电视.apk").readText())
+            assertEquals("new copy", File(state, "files/电视 (1).apk").readText())
+            assertEquals("GET", server.takeRequest(2, TimeUnit.SECONDS)!!.method)
+            controller.editName("电视.apk"); controller.start(true)
+            withTimeout(5000) { controller.state.first { !it.busy && it.conflict != null } }
+            controller.start(true, overwrite = true)
+            withTimeout(5000) { controller.state.first { it.overwriteProposal != null } }
+            controller.confirmOverwrite(false)
+            withTimeout(5000) { controller.state.first { !it.busy } }
+            assertEquals("data", File(state, "files/电视.apk").readText())
+            assertNull(server.takeRequest(100, TimeUnit.MILLISECONDS))
+            controller.start(true)
+            withTimeout(5000) { controller.state.first { !it.busy && it.conflict != null } }
+            controller.start(true, overwrite = true)
+            withTimeout(5000) { controller.state.first { it.overwriteProposal != null } }
+            assertEquals("data", File(state, "files/电视.apk").readText())
+            server.enqueue(MockResponse().setBody("replacement"))
+            controller.confirmOverwrite(true)
+            val replaced = withTimeout(5000) { controller.state.first { !it.busy } }
+            assertNull(replaced.error); assertEquals("completed", replaced.phase)
+            assertEquals("replacement", File(state, "files/电视.apk").readText())
+            assertEquals("GET", server.takeRequest(2, TimeUnit.SECONDS)!!.method)
+            controller.start(true)
+            withTimeout(5000) { controller.state.first { !it.busy && it.conflict != null } }
+            controller.start(true, overwrite = true)
+            withTimeout(5000) { controller.state.first { it.overwriteProposal != null } }
+            server.enqueue(MockResponse().setResponseCode(404))
+            controller.confirmOverwrite(true)
+            assertNotNull(withTimeout(5000) { controller.state.first { !it.busy } }.error)
+            assertEquals("replacement", File(state, "files/电视.apk").readText())
+            assertEquals("GET", server.takeRequest(2, TimeUnit.SECONDS)!!.method)
+
+
         } finally {
             controller.clear(); scope.cancel(); runtime.close(); server.shutdown(); process.destroy()
             if (!process.waitFor(5, TimeUnit.SECONDS)) { process.destroyForcibly(); process.waitFor(5, TimeUnit.SECONDS) }

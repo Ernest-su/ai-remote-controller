@@ -47,6 +47,7 @@ data class RemoteUiState(
     val keepAwake: Boolean = false,
     val floatingRemoteTransparency: Int = RemoteDimensions.FloatingRemoteDefaultTransparency,
     val runtimeUid: Int? = null,
+    val remoteLayout: RemoteLayout = RemoteLayout(),
     val routines: List<QuickRoutine> = emptyList(),
     val shortcuts: AppShortcuts = AppShortcuts(),
     val apps: List<InstalledApp> = emptyList(),
@@ -75,10 +76,13 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
         val port=record.adbPort ?: error("请先在设备页通过 ADB 连接此设备")
         record.wirelessGuid?.let{connector.wireless(it,host,port)} ?: connector.tcp(host,port)
     }
+    val uploadDraft = UploadDraftController()
     val transfers = FileTransferController(viewModelScope, runtime)
     val urlDownloads = UrlDownloadController(viewModelScope, runtime)
     val downloadDirectories = FileBrowserController(viewModelScope, runtime)
+    val batchTransfers = BatchTransferController(viewModelScope, runtime, application.cacheDir)
     val files = FileBrowserController(viewModelScope,runtime)
+    val schedules = ScheduleController(viewModelScope, runtime)
     val quickRoutines = QuickRoutineController(viewModelScope, runtime, readRoutineHistory(), ::writeRoutineHistory)
     val mediaControl = MediaControlController(viewModelScope, runtime)
     val virtualGamepad = VirtualGamepadController(viewModelScope, runtime)
@@ -151,7 +155,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
             runtime.connected.collect { connected ->
                 val lostConnection = state.value.connected && !connected
                 if (!connected) { deviceInfoGeneration++; deviceInfoJob?.cancel(); appsGeneration++; appsJob?.cancel(); gestureGeneration++ }
-                mutable.update { if (connected) it.copy(connected = true, shortcuts = readShortcuts(it.selected), routines = readRoutines(it.selected))
+                mutable.update { if (connected) it.copy(connected = true, shortcuts = readShortcuts(it.selected), routines = readRoutines(it.selected), remoteLayout = readRemoteLayout(it.selected))
                     else it.copy(connected = false, tools = emptyList(), touchBusy = false, deviceInfo = null, deviceInfoLoading = false, deviceInfoError = null, apps = emptyList(), appsLoading = false, appsError = null) }
                 if (lostConnection && automaticReconnectEnabled) {
                     state.value.history.find { it.id == state.value.selected }?.let(automaticConnection::start)
@@ -166,7 +170,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     private val mediaMonitor = viewModelScope.launch {
         runtime.session.collectLatest { session ->
             if (session == null) {
-                quickRoutines.cancel(); tvInput.cancel(); appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll()
+                quickRoutines.cancel(); schedules.clear(); tvInput.cancel(); appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll()
                 mutable.update { it.copy(mediaStatus = "未连接设备") }
             } else while (true) {
                 if (runtime.session.value != session) return@collectLatest
@@ -356,7 +360,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private suspend fun attachRuntime(host: String, port: Int, method: ConnectionMethod?, adbPort: Int?, guid: String?, model: String?, previousId: String? = null, expectedRelease: RuntimeRelease? = null) {
-        quickRoutines.cancel(); tvInput.cancel(); appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll()
+        quickRoutines.cancel(); schedules.clear(); tvInput.cancel(); appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll()
         val status = runtime.connect(host, port, expectedRelease ?: withContext(Dispatchers.IO) { installer.bundledRelease() })
         val previous = state.value.history.find { it.id == status.deviceId }
         val record = RememberedDevice(status.deviceId, model?.ifBlank { null } ?: previous?.name ?: status.name ?: "AI 设备",
@@ -366,7 +370,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
         releasePreferences.edit().putString("last-connected-device", record.id).apply()
         automaticReconnectEnabled = true
         tvInput.selectTarget(record.id)
-        mutable.update { it.copy(status = "已连接 ${history.first { it.id == record.id }.visibleName}", selected = record.id, version = status.version, tools = status.tools, runtimeUid = status.uid, modelConfigured = status.modelConfigured, history = history, shortcuts = readShortcuts(record.id), routines = readRoutines(record.id)) }
+        mutable.update { it.copy(status = "已连接 ${history.first { it.id == record.id }.visibleName}", selected = record.id, version = status.version, tools = status.tools, runtimeUid = status.uid, modelConfigured = status.modelConfigured, history = history, shortcuts = readShortcuts(record.id), routines = readRoutines(record.id), remoteLayout = readRemoteLayout(record.id)) }
     }
 
     fun discovered(service: DiscoveredService, adbPort: Int? = null) = connection {
@@ -415,11 +419,12 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     fun forget(id: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val history = store.remove(id)
-            listOf("app-shortcuts", "quick-routines").forEach { file ->
+            listOf("app-shortcuts", "quick-routines", "remote-layout").forEach { file ->
                 getApplication<Application>().getSharedPreferences(file, android.content.Context.MODE_PRIVATE).edit().remove(id).apply()
             }
+            LauncherActions.forget(getApplication(), id)
             quickRoutines.forget(id)
-            mutable.update { it.copy(history = history, shortcuts = if (it.selected == id) AppShortcuts() else it.shortcuts, routines = if (it.selected == id) emptyList() else it.routines) }
+            mutable.update { it.copy(history = history, shortcuts = if (it.selected == id) AppShortcuts() else it.shortcuts, routines = if (it.selected == id) emptyList() else it.routines, remoteLayout = if (it.selected == id) RemoteLayout() else it.remoteLayout) }
         }
     }
     private fun execute(feedbackToken: Long? = null, action: suspend () -> String) {
@@ -497,6 +502,65 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
     }
+    private fun readRemoteLayout(device: String?): RemoteLayout {
+        if (device == null) return RemoteLayout()
+        return runCatching { Json.decodeFromString<RemoteLayout>(getApplication<Application>().getSharedPreferences("remote-layout", 0).getString(device, "{}")!!).takeIf { it.valid() } ?: RemoteLayout() }.getOrDefault(RemoteLayout())
+    }
+    fun saveRemoteLayout(layout: RemoteLayout) {
+        val device = state.value.selected ?: return
+        if (!layout.valid()) return
+        getApplication<Application>().getSharedPreferences("remote-layout", 0).edit().putString(device, Json.encodeToString(layout)).apply()
+        mutable.update { if (it.selected == device) it.copy(remoteLayout = layout) else it }
+    }
+    fun addRemoteShortcut(shortcut: RemoteShortcut) {
+        val layout = state.value.remoteLayout
+        saveRemoteLayout(layout.copy(shortcuts = layout.shortcuts + shortcut))
+    }
+    private val pendingLauncher = MutableStateFlow<LauncherShortcutDraft?>(null)
+    internal val launcherDraft = pendingLauncher.asStateFlow()
+    fun pinLauncher(kind: String, value: String, label: String) {
+        val id = state.value.selected ?: return
+        val target = state.value.history.find { it.id == id }?.visibleName ?: return
+        val saved = LauncherActions.all(getApplication()).find { it.device == id && it.kind == kind && it.value == value }
+        pendingLauncher.value = LauncherShortcutDraft(java.util.UUID.randomUUID().toString(), id, target, kind, value,
+            saved?.label ?: "$target · $label", saved?.icon ?: "default")
+    }
+    internal fun dismissLauncher() { pendingLauncher.value = null }
+    internal fun confirmLauncher(name: String, icon: String) {
+        val draft = pendingLauncher.value ?: return
+        if (!validLauncherName(name) || launcherIcons.none { it.id == icon }) return
+        if (state.value.selected != draft.device || state.value.history.none { it.id == draft.device } ||
+            draft.kind == "routine" && readRoutines(draft.device).none { it.id == draft.value }) {
+            dismissLauncher()
+            showMessage("目标设备已切换或快捷操作已删除，请重新添加")
+            return
+        }
+        runCatching { LauncherActions.pin(getApplication(), draft.device, draft.kind, draft.value, name.trim(), icon) }
+            .onSuccess {
+                dismissLauncher()
+                showMessage(if (it) "已请求添加桌面快捷方式；桌面小组件也已更新" else "桌面不支持固定快捷方式，可添加 AI 遥控小组件")
+            }
+            .onFailure { showMessage(it.message ?: "添加桌面入口失败") }
+    }
+    private var launcherJob: Job? = null
+    fun receiveLauncherAction(intent: android.content.Intent?) {
+        val action = LauncherActions.resolve(getApplication(), intent) ?: return
+        launcherJob?.cancel()
+        launcherJob = viewModelScope.launch {
+            val device = state.value.history.find { it.id == action.device } ?: return@launch showMessage("该桌面入口的设备已删除")
+            if (!state.value.connected || state.value.selected != action.device) {
+                reconnectDevice(device, automatic = false)
+                val attempt = connectionGeneration
+                connectionJob?.join()
+                if (connectionGeneration != attempt) return@launch
+            }
+            if (!state.value.connected || state.value.selected != action.device) return@launch showMessage("连接目标失败，请重新操作桌面入口")
+            if (action.kind == "app") openApp(action.value)
+            else readRoutines(action.device).find { it.id == action.value }?.let {
+                if (!quickRoutines.start(it, true, action.device, device.visibleName)) showMessage("当前无法运行快捷操作")
+            } ?: showMessage("该快捷操作已删除")
+        }
+    }
     fun openApp(packageName: String) {
         if (!state.value.connected) return
         val send = runCatching { runtime.toolWriter() }.getOrNull() ?: return
@@ -529,7 +593,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     fun removeRoutine(id: String) {
         if (quickRoutines.state.value.busy) return
         writeRoutines(readRoutines(state.value.selected).filterNot { it.id == id })
-        state.value.selected?.let { quickRoutines.forget(it, id) }
+        state.value.selected?.let { quickRoutines.forget(it, id); LauncherActions.forget(getApplication(), it, id) }
     }
     private fun writeRoutines(value: List<QuickRoutine>) {
         val device = state.value.selected ?: return
@@ -562,11 +626,15 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
         transfers.select(sharedUploadSource(getApplication(), uri))
     }
     private var textSubmissionGeneration = 0L
-    fun text(text: String): Boolean {
+    fun stopText() {
+        val send = runCatching { runtime.commandWriter() }.getOrNull() ?: return
+        viewModelScope.launch { runCatching { send("cancel_text", buildJsonObject {}) }.onFailure { showMessage(it.message ?: "停止失败") } }
+    }
+    fun text(text: String, observeScreen: Boolean = false): Boolean {
         if (text.isBlank() || state.value.submitting) return false
         if (!state.value.connected) { showMessage("请先连接设备"); return false }
         if (!state.value.modelConfigured) { showMessage("请先在「功能 → 模型配置」配置目标设备的模型"); return false }
-        val send = runCatching { runtime.textWriter() }.getOrNull() ?: return false
+        val send = runCatching { runtime.textWriter(observeScreen) }.getOrNull() ?: return false
         val submission = ++textSubmissionGeneration
         mutable.update { it.copy(output = "正在思考…", submitting = true) }
         val token = feedback(FeedbackPhase.THINKING)
@@ -653,7 +721,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     override fun onCleared() {
         automaticConnection.stop()
         ascrcpyPreview.stop()
-        discovery.close(); transfers.close(); filePreviews.close(); runtime.close(); profiles.close(); adb?.close()
+        discovery.close(); batchTransfers.close(); transfers.close(); filePreviews.close(); runtime.close(); profiles.close(); adb?.close()
         super.onCleared()
     }
 }

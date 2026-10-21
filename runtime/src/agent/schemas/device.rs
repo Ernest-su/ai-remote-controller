@@ -2,6 +2,7 @@ use serde_json::{json, Value};
 
 pub(super) fn system() -> Vec<Value> {
     vec![
+        json!({"type":"function","function":{"name":"device_foreground","description":"Read current resumed foreground package; unknown is null.","parameters":{"type":"object","properties":{},"additionalProperties":false}}}),
         json!({"type":"function","function":{"name":"device_system_state","description":"Read-only Android power/keyguard observations for user 0. Reports interactive, keyguardLocked, deviceLocked, deviceSecure and elapsed realtime; unavailable fields are null. Does not execute actions or prove that a previous request completed.","parameters":{"type":"object","properties":{},"additionalProperties":false}}}),
         json!({"type":"function","function":{"name":"device_system_action","description":"Prepare a root-only lock, reboot or shutdown proposal. Never executes without separate manual App confirmation; never bypass using shell. A disconnected target is not proof of success.","parameters":{"type":"object","properties":{"action":{"type":"string","enum":["lock","reboot","shutdown"]}},"required":["action"],"additionalProperties":false}}}),
         json!({"type":"function","function":{"name":"device_system_pending","description":"List this connection system proposals awaiting manual confirmation.","parameters":{"type":"object","properties":{},"additionalProperties":false}}}),

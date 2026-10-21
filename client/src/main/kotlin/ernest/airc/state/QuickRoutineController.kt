@@ -76,7 +76,23 @@ class QuickRoutineController(private val scope: CoroutineScope, private val runt
                         checkpoint()
                         mutable.update { it.copy(index = index + 1, message = step.description()) }
                         publish { it.copy(steps = it.steps.mapIndexed { i, value -> if (i == index) value.copy(status = RoutineStepStatus.RUNNING, startedAt = System.currentTimeMillis()) else value }) }
-                        if (step.type == "wait") {
+                        if (step.type.startsWith("wait_")) {
+                            var remaining = step.timeoutSeconds * 1000L
+                            var lastOutput = ""
+                            while (true) {
+                                checkpoint()
+                                check(remaining > 0) { "等待条件超时：${step.description()}" }
+                                val before = System.nanoTime()
+                                val tool = when (step.type) { "wait_app" -> "device.foreground"; "wait_text" -> "device.ui_hierarchy"; else -> "media.status" }
+                                lastOutput = withTimeout(remaining) {
+                                    if (runtime != null) runtime.requestAt(checkNotNull(target), tool, buildJsonObject {}) else request(tool, buildJsonObject {})
+                                }
+                                if (routineConditionMet(step, lastOutput)) break
+                                delay(minOf(500L, remaining))
+                                remaining -= ((System.nanoTime() - before) / 1_000_000).coerceAtLeast(1)
+                            }
+                            finishStep(RoutineStepStatus.SUCCEEDED, lastOutput)
+                        } else if (step.type == "wait") {
                             var activeWait = step.value.toLong()
                             while (activeWait > 0) {
                                 checkpoint()

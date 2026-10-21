@@ -13,6 +13,7 @@ internal val remoteFeatures = listOf(
     RemoteFeature(RemotePage.HELP, R.drawable.ic_help),
     RemoteFeature(RemotePage.SCREENSHOT, R.drawable.ic_screenshot),
     RemoteFeature(RemotePage.FILES, R.drawable.ic_files),
+    RemoteFeature(RemotePage.SCHEDULES, R.drawable.ic_clock),
     RemoteFeature(RemotePage.SETTINGS, R.drawable.ic_settings),
 )
 

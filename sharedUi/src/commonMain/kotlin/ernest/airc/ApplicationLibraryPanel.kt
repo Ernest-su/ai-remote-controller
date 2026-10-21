@@ -16,7 +16,7 @@ fun ApplicationLibraryPanel(apps: List<InstalledApp>, favorites: List<String>, c
     loading: Boolean, error: String?, onRefresh: () -> Unit, onSelect: (InstalledApp) -> Unit,
     icon: @Composable (String) -> Unit = {}, onFavorite: ((String) -> Unit)? = null,
     recent: List<String> = emptyList(), onClearRecent: (() -> Unit)? = null,
-    onMove: ((String, Int) -> Unit)? = null, selected: String? = null, selectLabel: String = "打开应用", selectionAvailable: Boolean = connected, actionsBusy: Boolean = false) {
+    onMove: ((String, Int) -> Unit)? = null, selected: String? = null, selectLabel: String = "打开应用", selectionAvailable: Boolean = connected, actionsBusy: Boolean = false, onPin: ((InstalledApp) -> Unit)? = null) {
     var query by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf("all") }
     var count by rememberSaveable { mutableIntStateOf(30) }
@@ -81,6 +81,7 @@ fun ApplicationLibraryPanel(apps: List<InstalledApp>, favorites: List<String>, c
         items(filtered.take(count), key = { it.packageName }) { app ->
             ApplicationListRow(app, { onSelect(app) }, { icon(app.packageName) }, enabled = selectionAvailable && !actionsBusy && !sorting && app.packageName in installed,
                 clickLabel = selectLabel) {
+                if (!sorting && onPin != null) ManagementIconButton(ManagementIcons.More, "添加到桌面 ${app.label ?: app.packageName}") { onPin(app) }
                 if (sorting && onMove != null) {
                     val index = favorites.indexOf(app.packageName)
                     ManagementIconButton(ManagementIcons.Up, "上移 ${app.label ?: app.packageName}", index > 0) { onMove(app.packageName, -1) }

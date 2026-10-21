@@ -9,8 +9,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun AppInstallationPanel(state: AppInstallationState, apk: TargetApkInfo?, available: Boolean, onPrepare: (Boolean) -> Unit, onConfirm: (Boolean) -> Unit, onCancel: () -> Unit, onAdd: (() -> Unit)? = null, onRemove: ((TargetApkInfo) -> Unit)? = null, onPrepareSet: ((Boolean) -> Unit)? = null, installLabel: String = "准备安装此 APK") {
+fun AppInstallationPanel(state: AppInstallationState, apk: TargetApkInfo?, available: Boolean, onPrepare: (Boolean) -> Unit, onConfirm: (Boolean) -> Unit, onCancel: () -> Unit, onAdd: (() -> Unit)? = null, onRemove: ((TargetApkInfo) -> Unit)? = null, onPrepareSet: ((Boolean) -> Unit)? = null, installLabel: String = "准备安装此 APK", tasksOnly: Boolean = false) {
     var replacement by remember(apk?.sha256) { mutableStateOf(false) }
+    if (!tasksOnly) {
     apk?.let {
         ToggleSettingRow("允许覆盖安装现有应用", replacement, !state.busy, checkbox = true) { replacement = it }
         ActionButton(installLabel, available && !state.busy && it.split.isNullOrEmpty()) { onPrepare(replacement) }
@@ -27,6 +28,7 @@ fun AppInstallationPanel(state: AppInstallationState, apk: TargetApkInfo?, avail
         validationError?.let { Text(it, color=RemoteColors.Warning) }
         ToggleSettingRow("允许覆盖安装现有应用", replacement, !state.busy, checkbox = true) { replacement = it }
         ActionButton("准备安装整组 APK",available && !state.busy && validationError==null) { onPrepareSet(replacement) }
+    }
     }
     state.proposal?.let { proposal ->
         AlertDialog(onDismissRequest = { onConfirm(false) }, title = { Text(if (proposal.update) "确认覆盖安装" else "确认安装 APK") },

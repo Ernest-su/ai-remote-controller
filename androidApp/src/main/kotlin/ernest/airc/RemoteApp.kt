@@ -49,8 +49,12 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
     if (tvInput) ManagementDialog("电视输入", "tv-input-dialog", { tvInput = false; focusInputRequested = false }, grouped = true) {
         TvInputPanel(state, model, requestEditorFocus = focusInputRequested)
     }
+    var layoutEditor by rememberSaveable { mutableStateOf(false) }
+    if (layoutEditor) RemoteLayoutEditor(state, model) { layoutEditor = false }
     var quickApps by rememberSaveable { mutableStateOf(false) }
     if (quickApps) LibraryDialog("常用应用", "quick-apps-dialog", { quickApps = false }, subtitle = state.history.find { it.id == state.selected }?.visibleName) { AppShortcutsPanel(state, model) }
+    val launcherDraft by model.launcherDraft.collectAsState()
+    launcherDraft?.let { LauncherShortcutNameDialog(it, model::confirmLauncher, model::dismissLauncher) }
     var appDetailsPackage by rememberSaveable { mutableStateOf("") }
     var pageName by rememberSaveable { mutableStateOf(RemotePage.REMOTE.name) }
     var deviceOriginName by rememberSaveable { mutableStateOf(RemotePage.REMOTE.name) }
@@ -193,6 +197,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                         RemotePage.RESULTS -> PageContent(Modifier.testTag("results-page")) { ResultPanel(state.output) }
                         RemotePage.HELP -> HelpScreen()
                         RemotePage.SETTINGS -> AppearanceSettings(themeMode, onThemeChange) {
+                            OutlinedButton({ layoutEditor = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("自定义此电视的遥控按键") }
                             RemoteComfortSettings(state, model)
                             FloatingRemoteSettings(state.floatingRemoteTransparency, model::setFloatingRemoteTransparency)
                             Panel {
@@ -212,6 +217,10 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                         RemotePage.KEYPAD -> KeypadScreen(state, model)
                         RemotePage.SCREENSHOT -> ScreenshotScreen(state, model, mirrorFullscreen) { mirrorFullscreen = it }
                         RemotePage.MEDIA_CONTROL -> MediaControls(state, model)
+                        RemotePage.SCHEDULES -> {
+                            val scheduleState by model.schedules.state.collectAsState()
+                            SchedulePanel(state.connected, scheduleState, state.apps, model::listApps, model.schedules::refresh, model.schedules::save, model.schedules::delete, model.schedules::enable, state.history.find { it.id == state.selected }?.visibleName ?: "当前被控设备")
+                        }
                         RemotePage.FILES -> FileBrowserScreen(state, model)
                     }
                 }
@@ -361,6 +370,9 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
                                 RemoteKey(R.drawable.ic_home, "主页", state.connected, size = 58.dp, key = "home") { model.key("home") }
                                 RemoteKey(R.drawable.ic_device_menu, "设备菜单", state.connected, size = 58.dp, key = "menu") { model.key("menu") }
                             }
+                        }
+                        if (state.remoteLayout.shortcuts.isNotEmpty()) Column(Modifier.fillMaxWidth().padding(RemoteDimensions.InnerPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CustomRemoteKeys(state, model)
                         }
                     }
                 }

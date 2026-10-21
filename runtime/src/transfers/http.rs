@@ -110,6 +110,10 @@ pub async fn upload(Path(id): Path<String>, body: Body) -> Response {
         Ok(task) => task,
         Err(error) => return (StatusCode::NOT_FOUND, error.to_string()).into_response(),
     };
+    upload_for(task, body).await
+}
+
+pub(super) async fn upload_for(task: std::sync::Arc<Transfer>, body: Body) -> Response {
     if task.direction != "upload" || task.phase.lock().unwrap().as_str() != "awaiting_upload" {
         return (StatusCode::CONFLICT, "upload task not awaiting data").into_response();
     }
@@ -158,7 +162,14 @@ pub async fn upload(Path(id): Path<String>, body: Body) -> Response {
         {
             let mut phase=task.phase.lock().unwrap(); cancelled(&task)?; *phase="committing".into();
         }
-        {
+        let copy_target = {
+            let mut slot = task.destination.lock().unwrap();
+            if slot.as_ref().is_some_and(|target| target.copy_commit) { slot.take() } else { None }
+        };
+        if let Some(target) = copy_target {
+            let expected = task.digest.lock().unwrap().clone().context("upload digest missing")?;
+            super::commit::copy_to_exclusive(target, task.size, &expected).await?;
+        } else {
             let mut slot = task.destination.lock().unwrap();
             let target = slot.as_mut().context("upload cancelled")?;
             cancelled(&task)?;

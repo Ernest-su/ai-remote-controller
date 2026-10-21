@@ -68,7 +68,7 @@ class AppInstallationController(private val scope: CoroutineScope, private val r
     private fun run(available: Boolean, operation: suspend (Long, RuntimeTransferTarget) -> Unit) {
         if (!available || state.value.busy) return
         val token = generation
-        mutable.update { it.copy(busy = true, phase = "preparing", error=null, message=null) }
+        mutable.update { it.copy(noticeId = java.util.UUID.randomUUID().toString(), busy = true, phase = "preparing", error=null, message=null) }
         job = scope.launch {
             try { operation(token, runtime.transferTarget()) }
             catch (e: CancellationException) { if (token == generation) mutable.update { it.copy(phase = "cancelled") }; throw e }

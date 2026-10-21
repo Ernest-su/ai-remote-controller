@@ -120,16 +120,16 @@ App 的 root 开关默认关闭；开启后优先检测当前 root adbd，其次
 
 `files.list` / `files_list` 与 `files.stat` / `files_stat` 接收 `root`（`downloads` 默认、`inbox` 服务私有收件箱、`full` 文件系统 `/`）及相对 `path`。拒绝绝对路径、`..` 和符号链接穿越；权限沿用服务身份。列表额外接收 `limit`（1–100，默认 50）与 `cursor`；返回 root/path/entries/nextCursor，按文件名排序，最多扫描 4096 项。stat 返回 kind 与普通文件 sizeBytes。
 
-`task.start` / `task_start` 的 `direction=download` 配合 root/path 创建流式下载，轮询 `task.progress` / `task_progress` 等待 ready，读取其 sha256 和 `dataPath=/transfers/{id}/data`，随后 GET 该路径。上传使用 direction=upload、sizeBytes、sha256，再 PUT 原始二进制到 dataPath。GET/PUT 的 MIME 为 application/octet-stream，禁止缓存；固定 64 KiB 缓冲，单文件最大 1 TiB。上传长度/摘要必须匹配，fsync 后原子提交；默认 RENAME_NOREPLACE，不支持时明确失败。最多两个活动任务，最多保留 16 条记录；终态记录可提前淘汰，空闲记录在新任务时按 15 分钟清理。任务不跨进程重启恢复。
+`task.start` / `task_start` 的 `direction=download` 配合 root/path 创建流式下载，轮询 `task.progress` / `task_progress` 等待 ready，读取其 sha256 和 `dataPath=/transfers/{id}/data`，随后 GET 该路径。上传使用 direction=upload、sizeBytes、sha256，再 PUT 原始二进制到 dataPath。GET/PUT 的 MIME 为 application/octet-stream，禁止缓存；固定 64 KiB 缓冲，单文件最大 1 TiB。上传长度/摘要必须匹配，fsync 后优先使用 RENAME_NOREPLACE；目录返回 EINVAL/ENOSYS/EOPNOTSUPP 时，自动以 O_CREAT|O_EXCL|O_NOFOLLOW 排他创建目标文件，固定64 KiB缓冲复制、复核长度和摘要并 fsync。存在同名文件时失败且不覆盖；复制需要额外一份文件空间及16 MiB余量，提交期间目标可能可见但未完整，只有 completed 才能使用。普通失败或请求中断清理本次创建的未完成目标，且核对文件身份避免删除外部替换的文件；进程被强制终止可能留下残留。最多两个活动任务，最多保留 16 条记录；终态记录可提前淘汰，空闲记录在新任务时按 15 分钟清理。任务不跨进程重启恢复。
 
 `task.progress` 返回 id/direction/root/name/sizeBytes/bytesTransferred/phase/sha256/error/unit/dataPath。phase 包含 hashing、ready、awaiting_upload、uploading、downloading、committing、deleting、completed、failed、cancelled。unit 通常是 bytes，删除任务是 items。`task.cancel` / `task_cancel` 与 `DELETE /transfers/{id}` 可取消未提交任务，已提交文件保留；递归删除的已删除项无法恢复。
 
 
 `files.mkdir` / `files_mkdir` 接收 `root`（downloads/inbox/full）及必填相对 `path`，创建单个新目录并返回 `{root,path,created:true}`。父目录必须存在；不创建父目录、不覆盖文件/目录/链接、不跟随符号链接，不接受递归或权限参数。使用 mkdirat 按打开的父目录执行，权限沿用服务身份，新目录请求模式为 0700，实际模式由文件系统策略决定。
 
-`files.download_url` / `files_download_url` 接收必填 HTTP(S) `url`，可选 `root`（默认 downloads）、相对目录 `directory`（默认空）与 `name`（默认网址末段，无末段时 download.bin）。不允许嵌入用户名/密码，仅跟随 HTTP(S) 重定向，最多十次。复用文件管理的 no-follow 路径访问与上传临时文件；优先原子不覆盖重命名，存储卡不支持时在下载完成后独占创建目标并流式复制，仍不覆盖同名文件。复制保存阶段可能暂时显示未完成目标文件，异常退出可能留下该文件；常规失败会清理。返回 `direction=url_download` 的后台任务，使用 `task.progress`/`task.cancel` 查询或取消；阶段为 connecting、downloading、committing、completed、failed、cancelled。`bytesTransferred` 为已写字节，`sizeBytes=0`，实际总长度从 `result.totalBytes` 读取（未知时 null），`result.path` 为目标相对路径。完成时 totalBytes 为最终字节数并提供 SHA-256。最多 1 TiB，与其他传输共享活动任务限额；错误或取消清理临时文件，不覆盖现有文件，无断点续传或重启恢复。
+`files.download_url` / `files_download_url` 接收必填 HTTP(S) `url`，可选 `root`（默认 downloads）、相对目录 `directory`（默认空）、`name`（默认网址末段，无末段时 download.bin）与独立用户确认得到的 `overwriteToken`。不允许嵌入用户名/密码，仅跟随 HTTP(S) 重定向，最多十次。目标已存在且无覆盖 token 时，返回 `{conflict:{root,path,name,suggestedName,canOverwrite}}`，不创建后台任务、不请求下载网址；建议名保留扩展名并追加递增编号，目录和符号链接的 canOverwrite 为 false。传输过程中发生同名冲突时，failed 任务的 result.conflict 提供同样信息，原文件保留。覆盖复用 files.prepare_overwrite 与独立 approve，token 绑定 root/path 及原文件元数据；在开始及提交前重新核对，成功下载后原子替换。复用文件管理的 no-follow 路径访问与上传临时文件；无覆盖授权时优先原子不覆盖重命名，存储卡不支持时在下载完成后独占创建目标并流式复制，仍不覆盖同名文件。复制保存阶段可能暂时显示未完成目标文件，异常退出可能留下该文件；常规失败会清理。返回 `direction=url_download` 的后台任务，使用 `task.progress`/`task.cancel` 查询或取消；阶段为 connecting、downloading、committing、completed、failed、cancelled。`bytesTransferred` 为已写字节，`sizeBytes=0`，实际总长度从 `result.totalBytes` 读取（未知时 null），`result.path` 为目标相对路径。完成时 totalBytes 为最终字节数并提供 SHA-256。最多 1 TiB，与其他传输共享活动任务限额；错误或取消清理临时文件，保留现有文件；确认覆盖也只有在下载成功后才替换。无断点续传或重启恢复。
 
-`files.delete` / `files_delete` 接收 root/path/recursive，仅创建待确认提案，不立即删除。`files.prepare_overwrite` / `files_prepare_overwrite` 接收 root/path，返回覆盖提案。提案含 id/kind/root/path/exists/directory/sizeBytes/recursive/approvalRequired，15 分钟过期，最多 32 项。`files.pending` / `files_pending` 可查询尚未确认提案。控制端必须核对目标并让用户确认，再发送独立请求 `type=approve, arguments={id}`；`{id,accepted:false}` 丢弃提案。模型工具没有 approve。删除确认返回 task 描述；覆盖确认返回单次 token，随后 task.start 上传携带 overwriteToken。覆盖前重新核对目标信息，变化时失败；允许覆盖时使用原子替换。递归删除不跟随链接、不跨挂载点、最多 128 层；枚举子项和进入子项时均检查文件系统设备号，用户直接选中的顶层目录可以自身位于挂载点。
+`files.delete` / `files_delete` 接收 root/path/recursive，仅创建待确认提案，不立即删除。`files.prepare_overwrite` / `files_prepare_overwrite` 接收 root/path，返回覆盖提案。提案含 id/kind/root/path/exists/directory/sizeBytes/recursive/approvalRequired，15 分钟过期，最多 32 项。`files.pending` / `files_pending` 可查询尚未确认提案。控制端必须核对目标并让用户确认，再发送独立请求 `type=approve, arguments={id}`；`{id,accepted:false}` 丢弃提案。模型工具没有 approve。删除确认返回 task 描述；覆盖确认返回单次 token，随后 task.start 上传或 files.download_url 下载携带 overwriteToken。覆盖前重新核对目标信息，变化时失败；允许覆盖时使用原子替换。递归删除不跟随链接、不跨挂载点、最多 128 层；枚举子项和进入子项时均检查文件系统设备号，用户直接选中的顶层目录可以自身位于挂载点。
 
 `files.download` / `files_download` 保留小文件快照接口，最大 16 MiB，返回短期 FileArtifact（id/path/name/mimeType/sizeBytes/sha256/expiresInSeconds）。GET `/artifacts/{id}` 下载，60 秒过期，与截图共享四项资源容量；大文件应使用 task.start。界面所有文件下载均采用流式任务。详见[目标文件](guide/files.md)。
 
@@ -280,4 +280,42 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 
 `apps.prepare_control` 接收 package、action(force_stop/enable/disable/clear_data/grant/revoke)，grant/revoke 必须另有 permission。仅允许用户应用。返回 `{id,kind:"app_control",app,action,permission,approvalRequired:true,dataLoss,before}`，最多32份、15分钟有效。目标权限须由应用声明、属于可修改的运行时权限；系统/策略固定权限以及无法读取策略的权限拒绝修改。
 
-控制端独立 `type=approve_app_control`，arguments 为 id 和可选 accepted(false拒绝)，不向模型暴露确认函数。提案单次消费，确认时及后台任务执行前重新核对当前用户、应用安装身份和相关状态。固定 pm/am 参数明确指定用户；不接受任意 shell 或组件。返回 `task.progress` 格式、direction=app_control、unit=items、name=package，提交后不可取消。完成包含 package/userId/action/permission/completed/verifiedBy/state；权限、启停用和强停读取实际包状态核对，数据清除以包管理器 Success 和安装身份核对为准，不报告释放空间。控制端完成后再次读取详情。
+控制端独立 `type=approve_app_control`，arguments 为 id 和可选 accepted(false拒绝)，不向模型暴露确认函数。提案单次消费，确认时及后台任务执行前重新核对当前用户、应用安装身份和相关状态。固定 pm/am 参数明确指定用户；不接受任意 shell 或组件。返回 `task.progress` 格式、direction=app_control、unit=items、name=package，进入 committing 后不接受任务取消。完成包含 package/userId/action/permission/completed/verifiedBy/state；权限、启停用和强停读取实际包状态核对，数据清除以包管理器 Success 和安装身份核对为准，不报告释放空间。控制端完成后再次读取详情。
+
+## 被控端定时操作
+
+以下为控制端手动请求类型，不属于模型工具：
+
+| type | arguments | 行为 |
+| --- | --- | --- |
+| `schedule_list` | `{}` | 返回tasks、targetNow（Unix秒）、targetLocalTime、utcOffsetSeconds与runningRequired |
+| `schedule_save` | action、kind、confirmed=true，以及对应时间字段；应用动作带package | 明确用户确认后保存并启用任务 |
+| `schedule_toggle` | id、enabled；启用须confirmed=true | 暂停或启用，过期单次任务拒绝重新启用 |
+| `schedule_delete` | id | 删除未来调度；执行中拒绝删除 |
+
+`action`只允许`pause`、`shutdown`、`stop_app`、`open_app`。后两者必须提供package，前两者禁止携带package；不接受Shell或任意命令。`kind=delay`须带delaySeconds（60–604800秒），`once`须带localDateTime（`yyyy-MM-dd HH:mm`），`daily`须带dailyTime（`HH:mm`），禁止混用时间字段。日期时间按被控端本地时区解析。
+
+返回任务包含id、action、package、appIdentity、kind、dailyTime、nextAt（Unix秒）、enabled、lastAt、lastStatus、lastResult；列表额外给每项nextLocalTime。保存时绑定应用安装与用户身份，执行前重新检查。lastStatus区分pending、running、submitted、missed、interrupted、uncertain、failed；submitted只代表操作提交或工具返回，不能据断线认定关机成功。
+
+任务以0600权限原子保存于服务状态目录，调度不依赖创建请求的WebSocket存活。提交前先持久化running与下次时间，服务恢复不重试running任务，启动时跳过已过期单次执行并顺延每天任务；运行中错过超过60秒也跳过。服务停止、设备关机与休眠唤醒不在调度保证范围。
+
+## 视觉文字任务与停止
+
+`text`请求的arguments可携带`observeScreen=true`。该执行方式直接捕获被控端PNG，通过兼容的图片消息发送给用户配置的模型服务；不是从模型返回的任意URL下载图片。最多8轮决策、每张4 MiB/8百万像素，保留最新图片以核对执行结果；任务完成或失败后清除该视觉会话。普通文字请求默认false。客户端选择此执行方式时显示读取用途，不增加读取许可开关。
+
+`cancel_text`为空arguments的手动请求类型，取消当前连接模型等待及后续决策。已开始的输入事务仍按自身释放规则完成；取消不会撤销已提交的动作，不影响被控端已保存的定时任务。
+
+`device.foreground`/`device_foreground`只接受空参数，返回packageName（无法识别时null）、source=activity_resumed和readOnly=true，用于核对当前前台应用。
+
+## 分块传输
+
+原task.start创建的上传/下载任务提供`/transfers/{id}/range`：
+
+- GET必须携带`Range: bytes=start-end`，返回206、准确Content-Range/Content-Length及application/octet-stream；单次最多4 MiB，不接受多范围。
+- PUT携带同格式Range，起点必须等于任务上次确认的bytesTransferred；成功返回TransferProgress。未完整接收的分块截断回原起点，不增加已确认偏移。空文件以空body提交。
+- 上传全部完成后扫描完整文件核对SHA-256，再优先原子、不覆盖地提交；文件系统不支持时，排他创建目标文件并复制、复核摘要，任何同名文件都不覆盖。复制提交期间目标可能尚不完整，需等待 completed；进入 committing 后不接受任务取消，进程被强制终止可能留下残留。此分块流程拒绝覆盖；原独立确认的单文件覆盖流程仍使用原接口。
+- 同一任务只允许一个读写者；下载使用固定描述符，客户端最终核对全文件摘要。续传须显式查询并核对原设备、任务ID、方向、根、文件名、大小与摘要，不自动恢复到不同目标。
+
+分块检查点只保留在当前服务和控制端进程内，不声明跨重启恢复。原任务限额、取消与约15分钟闲置回收仍适用。
+
+定时任务 `schedule_save` 的 `action` 另支持 `set_volume`、`mute`、`unmute`；`set_volume` 必须提供整数 `volumePercent`（0–100），其他动作禁止该字段，三者均禁止 `package`。列表与被控端持久记录保留 `volumePercent`。音量百分比映射为媒体流最接近的系统档位；静音与解除使用明确状态操作，执行后核对系统状态，失败记录原因。

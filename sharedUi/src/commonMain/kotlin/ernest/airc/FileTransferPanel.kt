@@ -11,16 +11,17 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun FileTransferPanel(state: FileTransferState, root: String, directory: String, available: Boolean,
-    onSelect: () -> Unit, onUpload: (String) -> Unit, onCancel: () -> Unit, onSave: () -> Unit, onOverwrite: ((String) -> Unit)? = null, onConfirm: (Boolean) -> Unit = {}, operation: String = state.operation) {
+    onSelect: () -> Unit, onUpload: (String) -> Unit, onCancel: () -> Unit, onSave: () -> Unit, onOverwrite: ((String) -> Unit)? = null, onConfirm: (Boolean) -> Unit = {}, operation: String = state.operation, tasksOnly: Boolean = false, selectionEnabled: Boolean = !state.running) {
     state.proposal?.takeIf { state.operation == operation }?.let { proposal -> AlertDialog(onDismissRequest={onConfirm(false)},title={Text(if(proposal.kind=="delete") "确认删除" else "确认覆盖")},text={ Column(Modifier.verticalScroll(rememberScrollState())) {
         Text("${fileRootTitle(proposal.root)}/${proposal.path}")
         proposal.sizeBytes?.let { Text("当前大小：$it 字节") }
         Text(if(proposal.kind=="delete") { if(proposal.symlink) "只删除符号链接本身，不删除链接指向的文件或目录。" else if(proposal.directory) "将删除目录及其全部内容。操作不可恢复，取消不会恢复已删除项。" else "将永久删除该项。" } else "上传校验通过后会替换此路径的文件，原文件不可恢复。")
     } },confirmButton={TextButton({onConfirm(true)}, enabled=available, modifier=Modifier.heightIn(min=48.dp)) { Text("确认",color=RemoteColors.Warning) }},dismissButton={TextButton({onConfirm(false)}, modifier=Modifier.heightIn(min=48.dp)) { Text("取消") }}) }
     var name by rememberSaveable(state.sourceName) { mutableStateOf(state.sourceName.orEmpty()) }
-    if (operation == "upload") {
+    if (operation == "upload" && !tasksOnly) {
     Text("推送目录：${fileRootTitle(root)}/$directory",color=RemoteColors.Secondary)
-    OutlinedButton(onSelect,enabled=!state.running,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp), shape = MaterialTheme.shapes.small) { Text("选择本地文件") }
+    OutlinedButton(onSelect,enabled=selectionEnabled,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp), shape = MaterialTheme.shapes.small) { Text("选择本地文件") }
+    Text("可选择一个或多个文件，最多32个。", color = RemoteColors.Secondary)
     var overwrite by rememberSaveable { mutableStateOf(false) }
     state.sourceName?.let { source ->
         Text("来源：$source${state.sourceSize?.let{" · $it 字节"}.orEmpty()}",color=RemoteColors.Secondary)

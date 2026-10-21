@@ -33,7 +33,7 @@ fn eligible(cap: &Value, action: &str) -> bool {
         && cap[permission] == true
         && cap[interface] == true
 }
-async fn check(action: &str) -> Result<()> {
+pub(crate) async fn check(action: &str) -> Result<()> {
     let cap: Value = serde_json::from_str(&crate::system_capabilities::execute(&json!({})).await?)?;
     if !eligible(&cap, action) {
         bail!("system action requires root and verified framework permission/interface");

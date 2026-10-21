@@ -16,10 +16,11 @@ import androidx.compose.ui.unit.dp
 internal fun routineStepTitle(step: RoutineStep, apps: List<InstalledApp>): String = when (step.type) {
     "app" -> apps.find { it.packageName == step.value }?.label ?: step.value
     "wait" -> "等待 ${routineSeconds(step.value.toLongOrNull() ?: 0)} 秒"
+    "wait_app", "wait_text", "wait_playing" -> step.description() + "（${step.timeoutSeconds} 秒）"
     else -> routineKeyLabel(step.value)
 }
-internal fun routineStepKind(step: RoutineStep) = when (step.type) { "app" -> "打开应用"; "wait" -> "等待"; else -> "遥控按键" }
-internal fun routineStepIcon(type: String) = when (type) { "app" -> R.drawable.ic_apps; "wait" -> R.drawable.ic_clock; else -> R.drawable.ic_remote_types }
+internal fun routineStepKind(step: RoutineStep) = when (step.type) { "app" -> "打开应用"; "wait_app", "wait_text", "wait_playing" -> "条件等待"; "wait" -> "等待"; else -> "遥控按键" }
+internal fun routineStepIcon(type: String) = when (type) { "app" -> R.drawable.ic_apps; "wait", "wait_app", "wait_text", "wait_playing" -> R.drawable.ic_clock; else -> R.drawable.ic_remote_types }
 
 @Composable
 internal fun RoutineStepRow(step: RoutineStep, index: Int, apps: List<InstalledApp>, enabled: Boolean = true,

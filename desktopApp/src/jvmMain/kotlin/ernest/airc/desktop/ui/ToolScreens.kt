@@ -53,13 +53,20 @@ fun DesktopTouchpad(state: DesktopState, controller: DesktopController) =
 
 @Composable
 fun DesktopTextCommands(state: DesktopState, controller: DesktopController) {
+    var observe by rememberSaveable { mutableStateOf(false) }
     var draft by rememberSaveable { mutableStateOf("") }
     PageContent(Modifier.testTag("text-page")) {
         Panel {
             SectionTitle("告诉设备要做什么", "先将模型配置手动更新到目标。")
             OutlinedTextField(draft, { draft = it }, label = { Text("文字指令") }, modifier = Modifier.fillMaxWidth().heightIn(min = 144.dp).testTag("text-command-input"), minLines = 4, maxLines = 8)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(!observe, { observe = false }, enabled = !state.submitting, label = { Text("文字任务") }, modifier = Modifier.heightIn(min = 48.dp))
+                FilterChip(observe, { observe = true }, enabled = !state.submitting, label = { Text("看图操作") }, modifier = Modifier.heightIn(min = 48.dp))
+            }
+            if (observe) Text("此步骤需要读取电视画面并发送给已配置的模型服务；需要图片与工具调用支持，可能增加费用，最多8轮操作。", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
+            if (state.submitting) OutlinedButton(controller::stopText, modifier = Modifier.heightIn(min = 48.dp)) { Text("停止任务") }
             TextSubmissionHint(state.connected, state.modelConfigured, state.submitting)
-            ActionButton("发送指令", state.connected && state.modelConfigured && !state.submitting && draft.isNotBlank()) { if (controller.text(draft)) draft = "" }
+            ActionButton("发送指令", state.connected && state.modelConfigured && !state.submitting && draft.isNotBlank()) { if (controller.text(draft, observe)) draft = "" }
         }
         if (state.feedback.text.isNotBlank()) Text(state.feedback.phase.label + "：" +
             if (state.feedback.phase == FeedbackPhase.ERROR) state.feedback.text else if (state.submitting) "请等待指令执行" else "可展开查看操作详情",

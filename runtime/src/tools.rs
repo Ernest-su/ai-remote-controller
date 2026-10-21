@@ -9,6 +9,7 @@ mod apps;
 mod device_info;
 mod file_directories;
 pub(crate) mod files;
+mod foreground;
 pub(crate) mod gamepad;
 mod gestures;
 mod media;
@@ -61,6 +62,7 @@ pub const TOOLS: &[&str] = &[
     "apps.pending",
     "apps.open",
     "device.info",
+    "device.foreground",
     "device.ui_hierarchy",
     "device.system_capabilities",
     "device.system_state",
@@ -116,6 +118,10 @@ pub fn command_for(tool: &str, args: &Value) -> Result<(String, Vec<String>)> {
     Ok((program.into(), argv))
 }
 
+pub(crate) async fn pause_current_media() -> Result<String> {
+    media::pause_current().await
+}
+
 pub async fn execute_owned(tool: &str, args: &Value, owner: &str) -> Result<String> {
     if tool == "remote.key" && args.get("action").is_some() {
         return crate::remote_input::edge(args, owner).await;
@@ -157,6 +163,12 @@ pub async fn execute(tool: &str, args: &Value) -> Result<String> {
     }
     if tool == "apps.icon" {
         return app_icon::execute(args).await;
+    }
+    if tool == "device.foreground" {
+        if args.as_object().is_none_or(|object| !object.is_empty()) {
+            bail!("device.foreground accepts empty arguments only");
+        }
+        return foreground::execute().await;
     }
     if tool == "device.ui_hierarchy" {
         return ui_hierarchy::execute(args).await;

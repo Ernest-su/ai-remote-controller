@@ -10,9 +10,9 @@ data class TargetMediaOpen(val root: String, val path: String, val mimeType: Str
     val launched: Boolean, val playbackVerified: Boolean, val resourceId: String? = null, val output: String = "", @SerialName("package") val packageName: String? = null)
 data class FileMediaState(val players: TargetMediaPlayers? = null, val selectedPackage: String? = null,
     val busy: Boolean = false, val error: String? = null, val message: String? = null, val resourceId: String? = null, val publicationId: String? = null, val localCopy: Boolean = false,
-    val preparingCopy: Boolean = false, val bytes: Long = 0, val total: Long? = null, val retainedCopies: List<MediaPublication> = emptyList())
+    val preparingCopy: Boolean = false, val bytes: Long = 0, val total: Long? = null, val retainedCopies: List<MediaPublication> = emptyList(), val noticeId: String? = null)
 fun isTargetMedia(name: String): Boolean = name.substringAfterLast('.').lowercase() in
-    listOf("png","jpg","jpeg","webp","gif","mp4","mkv","webm","mp3","m4a","wav","ogg","flac")
+    listOf("png","jpg","jpeg","webp","gif","mp4","mkv","webm","mp3","m4a","aac","wav","ogg","flac")
 
 @Serializable
 data class MediaPublication(val id:String,val root:String,val path:String,val sizeBytes:Long,val sha256:String)

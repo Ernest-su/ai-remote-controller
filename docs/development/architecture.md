@@ -109,3 +109,10 @@ JVM 桌面按用户范围只保留单张截图的获取、刷新和保存；Desk
 手机电视输入由 TvInputController 承载仅内存草稿，ScrcpyTextInput 使用独立的无音视频 ADB 控制会话，通过 scrcpy 4.0 的剪贴板粘贴与回执传输 UTF-8；不修改 runtime 的 ASCII remote.text 接口，不自动读取电视剪贴板。连接代次变化或取消会停止请求并清理本次临时 server。IncomingShare 只接收 content URI 或文字并保存在进程中，SharePanel 复用下载目录选择、传输和媒体控制，不从外部 Intent 自动执行任务。
 
 AppShortcuts 与 QuickRoutine 按设备身份保存在控制手机，忘记设备时移除。QuickRoutineController 只执行类型限定的应用启动、普通按键与有界等待，捕获原连接并在每步核对；取消、错误与目标变化后不重放。管理 ADB 状态来自已有连接流，动态预览状态来自独立控制器，不将管理连接健康当作预览或 runtime 健康。
+
+
+定时操作位于 `runtime/src/schedules/`，用私有原子文件保存任务，独立于WebSocket连接调度。创建/启用由控制端的独立手动请求提交，不注册为模型工具；执行前重新核对权限与应用安装身份。调度先持久记录执行状态再提交动作，启动跳过错过任务，不自动重放结果不确定的动作。共享协议与页面分别为ScheduledActions、SchedulePanel，ScheduleController将确认绑定原连接代次。
+
+视觉任务由agent/vision构造兼容的图片消息，截图从screen_capture直接获取；执行方式随单次文字请求传入，图片不会进入普通工具JSON或持久历史。连接内cancel_text通知仅取消该连接上的模型等待与后续决策，不撤销已经提交的动作。
+
+批量传输使用transfers/chunks的有界Range读写，复用原任务临时文件与最终摘要校验。BatchTransferController按设备绑定内存队列与检查点，重连后需显式继续；不跨进程或服务重启恢复。Android LauncherActions保存不含凭据的设备/应用/组合引用，用随机入口标识生成固定快捷方式与小组件PendingIntent。

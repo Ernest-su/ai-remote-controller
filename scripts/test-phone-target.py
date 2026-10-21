@@ -13,9 +13,17 @@ from instrumentation_result import require_passed
 
 ROOT = Path(__file__).resolve().parent.parent
 SUITES = {
+    "storage-task-tabs-ui": ("ernest.airc.StorageFriendlyUiTest,ernest.airc.FileTaskTabsUiTest", 4),
+    "upload-local-picker-ui": ("ernest.airc.UploadLocalPickerUiTest,ernest.airc.FileTaskNavigationUiTest#completedDownloadsDoNotDisableLocalSelectionOrLeakFeedbackToUpload", 2),
+    "file-task-navigation-ui": ("ernest.airc.FileTaskNavigationUiTest,ernest.airc.ManagementUiTest#closeToolsRetainsTransferDraftAndTaskEntry", 5),
+    "batch-download-mode-ui": ("ernest.airc.BatchDownloadModeUiTest,ernest.airc.BatchDocumentSaveTest", 3),
+    "file-multiselect-ui": ("ernest.airc.FileMultiSelectUiTest", 3),
+    "url-conflict-ui": ("ernest.airc.UrlDownloadConflictUiTest", 2),
+    "launcher-shortcut-ui": ("ernest.airc.LauncherShortcutUiTest", 3),
+    "scheduled-features-ui": ("ernest.airc.ScheduledFeaturesUiTest", 6),
     "tv-input-ui": ("ernest.airc.TvInputUiTest,ernest.airc.TvInputFocusUiTest", 2),
     "remote-menu-ui": ("ernest.airc.RemoteQuickMenuUiTest,ernest.airc.RemoteLayoutUiTest", 5),
-    "file-page-ui": ("ernest.airc.FilePageLayoutUiTest,ernest.airc.FileLinkUiTest", 2),
+    "file-page-ui": ("ernest.airc.FilePageLayoutUiTest,ernest.airc.FileLinkUiTest,ernest.airc.FileTaskNoticeUiTest", 3),
     "library-layout-ui": ("ernest.airc.LibraryLayoutUiTest", 1),
     "mobile-convenience-ui": ("ernest.airc.MobileConvenienceUiTest", 4),
     "remote-haptics-input-ui": ("ernest.airc.RemoteHapticsInputUiTest", 7),
@@ -58,7 +66,7 @@ def main():
     parser.add_argument("--preview-quality", choices=["流畅", "均衡", "清晰"], help="Initial quality for live floating-remote validation")
     parser.add_argument("--suite", choices=[*SUITES, "all"], default="all")
     args = parser.parse_args()
-    phone_only=args.suite in ("tv-input-ui", "remote-menu-ui", "file-page-ui", "library-layout-ui", "mobile-convenience-ui", "app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-surface-ui", "mirror-toolbar-ui", "mirror-ui", "gamepad-ui", "models", "profile-isolation", "controller-ui")
+    phone_only=args.suite in ("storage-task-tabs-ui", "upload-local-picker-ui", "file-task-navigation-ui", "batch-download-mode-ui", "file-multiselect-ui", "url-conflict-ui", "launcher-shortcut-ui", "scheduled-features-ui", "tv-input-ui", "remote-menu-ui", "file-page-ui", "library-layout-ui", "mobile-convenience-ui", "app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-surface-ui", "mirror-toolbar-ui", "mirror-ui", "gamepad-ui", "models", "profile-isolation", "controller-ui")
     if not phone_only and (not args.target or not args.host):
         parser.error("This suite requires --target and --host")
     if not phone_only and args.phone == args.target:

@@ -275,11 +275,11 @@ class ManagementUiTest {
                 FileTransferPanel(FileTransferState(sourceName = "source.txt"), "downloads", "", true, {}, {}, {}, {})
             })
         } }
-        compose.onNodeWithTag("files-tools").performClick()
+        compose.onNodeWithTag("files-upload").performClick()
         compose.onNodeWithText("目标文件名").performScrollTo().performTextReplacement("renamed.txt")
         compose.onNodeWithTag("files-tools-dialog-close").performClick()
         restoration.emulateSavedInstanceStateRestore()
-        compose.onNodeWithTag("files-tools").performClick()
+        compose.onNodeWithTag("files-upload").performClick()
         compose.onNodeWithText("目标文件名").performScrollTo().assertTextContains("renamed.txt")
     }
 

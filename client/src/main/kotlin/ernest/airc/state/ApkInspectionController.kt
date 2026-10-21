@@ -16,7 +16,8 @@ class ApkInspectionController(private val scope: CoroutineScope, private val run
     fun inspect(root: String, path: String, available: Boolean) {
         if (!available || state.value.busy) return
         val token = generation
-        mutable.value = ApkInspectionState(busy = true, phase = "inspecting")
+        val noticeId = java.util.UUID.randomUUID().toString()
+        mutable.value = ApkInspectionState(noticeId = noticeId, busy = true, phase = "inspecting")
         job = scope.launch {
             var taskId: String? = null
             var terminal = false
@@ -36,7 +37,7 @@ class ApkInspectionController(private val scope: CoroutineScope, private val run
                     checkTarget()
                     check(task.id == taskId && task.direction == "apk_inspect" && task.root == root && task.name == path) { "APK 任务对象不匹配" }
                     check(task.sizeBytes in 1..4L * 1024 * 1024 * 1024 && task.bytesTransferred in 0..task.sizeBytes) { "APK 任务进度无效" }
-                    if (token == generation) mutable.value = ApkInspectionState(busy = true, phase = task.phase, bytes = task.bytesTransferred, total = task.sizeBytes)
+                    if (token == generation) mutable.value = ApkInspectionState(noticeId = noticeId, busy = true, phase = task.phase, bytes = task.bytesTransferred, total = task.sizeBytes)
                     if (task.phase in listOf("completed", "failed", "cancelled")) { terminal = true; break }
                     delay(300)
                     task = json.decodeFromString(boundRequest("task.progress", buildJsonObject { put("id", taskId) }))
@@ -49,7 +50,7 @@ class ApkInspectionController(private val scope: CoroutineScope, private val run
                 val info = json.decodeFromJsonElement<TargetApkInfo>(checkNotNull(task.result) { "APK 信息结果缺失" })
                 check(info.root == root && info.path == path) { "APK 信息对象不匹配" }
                 check(info.sizeBytes == task.sizeBytes && info.sha256.matches(Regex("[a-f0-9]{64}"))) { "APK 信息响应无效" }
-                if (token == generation) mutable.value = ApkInspectionState(info = info, phase = "completed", bytes = task.bytesTransferred, total = task.sizeBytes)
+                if (token == generation) mutable.value = ApkInspectionState(noticeId = noticeId, info = info, phase = "completed", bytes = task.bytesTransferred, total = task.sizeBytes)
             } catch (e: CancellationException) {
                 if (token == generation) mutable.update { it.copy(busy = false, phase = "cancelled") }
                 throw e

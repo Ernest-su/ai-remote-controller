@@ -21,6 +21,7 @@ pub(crate) fn mime(path: &str, explicit: Option<&Value>) -> Result<&'static str>
             "webm" => "video/webm",
             "mp3" => "audio/mpeg",
             "m4a" => "audio/mp4",
+            "aac" => "audio/aac",
             "wav" => "audio/wav",
             "ogg" => "audio/ogg",
             "flac" => "audio/flac",
@@ -37,6 +38,7 @@ pub(crate) fn mime(path: &str, explicit: Option<&Value>) -> Result<&'static str>
         "video/x-matroska" => Ok("video/x-matroska"),
         "audio/mpeg" => Ok("audio/mpeg"),
         "audio/mp4" => Ok("audio/mp4"),
+        "audio/aac" => Ok("audio/aac"),
         "audio/wav" => Ok("audio/wav"),
         "audio/ogg" => Ok("audio/ogg"),
         "audio/flac" => Ok("audio/flac"),
@@ -198,6 +200,9 @@ mod tests {
     #[test]
     fn media_types_and_players_are_explicit() {
         assert_eq!(mime("clip.MP4", None).unwrap(), "video/mp4");
+        assert_eq!(mime("recording.aac", None).unwrap(), "audio/aac");
+        assert_eq!(mime("recording.AAC", None).unwrap(), "audio/aac");
+        assert_eq!(mime("recording", Some(&json!("audio/aac"))).unwrap(), "audio/aac");
         assert!(mime("file.apk", None).is_err());
         assert!(mime("file", Some(&json!("text/html"))).is_err());
         assert_eq!(parse_players("1 activities found:\ncom.example.player/.Main\ncom.android.tv.frameworkpackagestubs/.Stub").unwrap(),vec!["com.example.player"]);

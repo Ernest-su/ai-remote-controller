@@ -29,7 +29,7 @@ class ProductPagesUiTest {
         val pages = listOf("apps" to "apps-page", "text" to "text-page", "model" to "model-page",
             "service" to "service-page", "permissions" to "permissions-page", "device_info" to "device-info-page",
             "results" to "results-page", "help" to "help-page", "screenshot" to "screenshot-page",
-            "files" to "files-page", "settings" to "settings-page")
+            "files" to "files-page", "schedules" to "schedule-page", "settings" to "settings-page")
         for (dark in listOf(false, true)) {
             compose.runOnUiThread {
                 val model = ViewModelProvider(compose.activity)[RemoteViewModel::class.java]

@@ -182,7 +182,7 @@ class RuntimeConnection(private val language: () -> String = { java.util.Locale.
         }
     }
 
-    fun textWriter(): suspend (String, ((RuntimeProgress) -> Unit)?) -> String {
+    fun textWriter(observeScreen: Boolean = false): suspend (String, ((RuntimeProgress) -> Unit)?) -> String {
         val target = transferTarget()
         val destination = checkNotNull(socket) { "请先连接设备" }
         checkTransferTarget(target)
@@ -191,7 +191,20 @@ class RuntimeConnection(private val language: () -> String = { java.util.Locale.
             val guarded = onProgress?.let { handler -> { event: RuntimeProgress ->
                 if (runCatching { checkTransferTarget(target) }.isSuccess) handler(event)
             } }
-            val result = requestOnSocket(destination, "text", null, JsonObject(emptyMap()), text, guarded)
+            val result = requestOnSocket(destination, "text", null, kotlinx.serialization.json.buildJsonObject { put("observeScreen", kotlinx.serialization.json.JsonPrimitive(observeScreen)) }, text, guarded)
+            checkTransferTarget(target)
+            result
+        }
+    }
+
+    /** Manual commands use the exact connection captured when the user submits. */
+    fun commandWriter(): suspend (String, JsonObject) -> String {
+        val target = transferTarget()
+        val destination = checkNotNull(socket) { "请先连接设备" }
+        checkTransferTarget(target)
+        return { kind, args ->
+            checkTransferTarget(target)
+            val result = requestOnSocket(destination, kind, null, args, null, null)
             checkTransferTarget(target)
             result
         }

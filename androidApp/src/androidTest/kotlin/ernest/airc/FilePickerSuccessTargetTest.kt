@@ -40,11 +40,11 @@ class FilePickerSuccessTargetTest {
             compose.runOnUiThread{model=ViewModelProvider(compose.activity)[RemoteViewModel::class.java];initialized=true;model.discovered(DiscoveredService("Owned successful picker target",host,port,emptyMap()))}
             await{model.state.value.connected&&!model.state.value.busy}
             compose.onNodeWithTag("open-menu").performClick();compose.onNodeWithTag("feature-files").performScrollTo().performClick()
-            compose.onNodeWithTag("files-tools").performClick()
+            compose.onNodeWithTag("files-upload").performClick()
             compose.onNodeWithText("选择本地文件").performScrollTo().performClick()
             picker.downloads();stage="source selection";println("picker-stage: select owned source");delay(300);picker.click(picker.locate{it.text?.toString()?.replace("\n","")?.startsWith("airc-source-${suffix.take(8)}")==true})
-            await{model.transfers.state.value.sourceName==sourceName};compose.waitForIdle()
-            compose.runOnUiThread{model.transfers.upload("inbox",savedName,true)}
+            await{model.uploadDraft.state.value.singleOrNull()?.name==sourceName};compose.waitForIdle()
+            compose.runOnUiThread{model.transfers.select(model.uploadDraft.state.value.single());model.transfers.upload("inbox",savedName,true)}
             await{!model.transfers.state.value.running&&model.transfers.state.value.phase in listOf("completed","failed")}
             assertNull(model.transfers.state.value.error);assertEquals("completed",model.transfers.state.value.phase)
             compose.runOnUiThread{model.transfers.download("inbox",savedName,context.cacheDir,true)}

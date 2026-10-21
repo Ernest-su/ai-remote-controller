@@ -13,10 +13,17 @@ class StorageAnalysisController(private val scope: CoroutineScope, private val r
     private var job: Job? = null
     fun clear() { generation++; job?.cancel(); mutable.value = StorageAnalysisState() }
     fun cancel() { job?.cancel() }
+    fun fileDeleted(root: String, path: String) {
+        mutable.update { current ->
+            val report=current.report
+            if (report == null || report.root != root || report.largestFiles.none { it.path == path }) current
+            else current.copy(outdated=true,report=report.copy(largestFiles=report.largestFiles.filterNot { it.path == path }))
+        }
+    }
     fun analyze(root: String, path: String, available: Boolean) {
         if (!available || state.value.busy) return
         val token = generation
-        mutable.value = StorageAnalysisState(busy = true, root = root, path = path, phase = "scanning")
+        mutable.value = StorageAnalysisState(noticeId = java.util.UUID.randomUUID().toString(), busy = true, root = root, path = path, phase = "scanning")
         job = scope.launch {
             var id: String? = null; var terminal = false; var target: RuntimeTransferTarget? = null
             fun checkTarget() { if(runtime != null) runtime.checkTransferTarget(checkNotNull(target)) else check(token == generation) { "目标连接已改变" } }

@@ -54,7 +54,7 @@ internal fun ManagementIconButton(icon: ImageVector, label: String, enabled: Boo
 }
 
 @Composable
-fun ManagementDialog(title: String, tag: String, onDismiss: () -> Unit, grouped: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
+fun ManagementDialog(title: String, tag: String, onDismiss: () -> Unit, grouped: Boolean = false, header: @Composable () -> Unit = {}, content: @Composable ColumnScope.() -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.widthIn(max = RemoteDimensions.ManagementWidth).fillMaxWidth().padding(16.dp)
             .heightIn(max = RemoteDimensions.ManagementDialogHeight).testTag(tag), shape = MaterialTheme.shapes.small, color = RemoteColors.Surface) {
@@ -64,6 +64,7 @@ fun ManagementDialog(title: String, tag: String, onDismiss: () -> Unit, grouped:
                     ManagementIconButton(ManagementIcons.Close, "关闭$title", tag = "$tag-close", action = onDismiss)
                 }
                 HorizontalDivider(color = RemoteColors.Divider, thickness = 0.5.dp)
+                header()
                 Column(Modifier.weight(1f, fill = false).background(if (grouped) RemoteColors.Background else RemoteColors.Surface).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
             }
         }

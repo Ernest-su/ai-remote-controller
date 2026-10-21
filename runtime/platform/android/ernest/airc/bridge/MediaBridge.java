@@ -46,6 +46,18 @@ public final class MediaBridge {
             if(args[0].equals("status")&&args.length==2) {
                 JSONArray values=new JSONArray();for(MediaController controller:controllers)values.put(snapshot(controller));
                 System.out.println(new JSONObject().put("sessions",values).put("seekAvailable",true).put("customActionAvailable",true).put("source","media_controller").put("userId",user).toString());
+            } else if(args[0].equals("pause_current")&&args.length==2) {
+                MediaController selected=null;
+                // Android returns active sessions in priority order. Pause one playing session,
+                // never send a toggle that could resume an already paused player.
+                for(MediaController controller:controllers) {
+                    PlaybackState state=controller.getPlaybackState();
+                    if(state!=null&&(state.getState()==PlaybackState.STATE_PLAYING||state.getState()==PlaybackState.STATE_BUFFERING||state.getState()==PlaybackState.STATE_FAST_FORWARDING||state.getState()==PlaybackState.STATE_REWINDING)
+                        &&(state.getActions()&PlaybackState.ACTION_PAUSE)!=0) { selected=controller;break; }
+                }
+                if(selected==null)throw new IllegalStateException("no playing media session with pause support");
+                selected.getTransportControls().pause();
+                System.out.println(new JSONObject().put("operation","pause").put("packageName",selected.getPackageName()).put("submitted",true).put("playbackVerified",false).toString());
             } else if(args[0].equals("custom_action")&&args.length==5) {
                 System.out.println(MediaCustomActions.send(controllers,args[2],args[3],args[4]).toString());
             } else if(args[0].equals("seek")&&args.length==5) {

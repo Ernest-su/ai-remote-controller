@@ -9,6 +9,7 @@ mod media_publications;
 mod media_resources;
 mod platform_bridge;
 mod remote_input;
+mod schedules;
 mod screen_capture;
 mod screen_mirror;
 mod screen_preview;
@@ -46,6 +47,7 @@ struct AppState {
     directory: PathBuf,
     binary_sha256: String,
     config: RwLock<ModelConfig>,
+    schedules: schedules::Scheduler,
 }
 
 #[derive(Deserialize)]
@@ -110,12 +112,23 @@ async fn dispatch(
                 &progress,
                 owner,
                 request.arguments.get("allowedTools"),
+                request
+                    .arguments
+                    .get("observeScreen")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
             )
             .await;
-            if result.is_err() {
+            if result.is_err() || request.arguments["observeScreen"] == true {
                 history.clear();
             }
             result
+        }
+        "schedule_list" | "schedule_save" | "schedule_delete" | "schedule_toggle" => {
+            state
+                .schedules
+                .request(&request.kind, &request.arguments)
+                .await
         }
         "approve_system" => crate::system_actions::approve(&request.arguments, owner).await,
         "approve_cache" => crate::app_actions::cache::approve(&request.arguments).await,
@@ -155,6 +168,7 @@ async fn connection(socket: WebSocket, state: Arc<AppState>, language: i18n::Lan
     // does not time out during a long decision. All queues have bounded memory.
     let owner = uuid::Uuid::new_v4().to_string();
     let (mut writer, mut reader) = socket.split();
+    let (cancel_text, cancel_receiver) = tokio::sync::watch::channel(0u64);
     let (requests, incoming) = tokio::sync::mpsc::channel(16);
     let history = Arc::new(Mutex::new(Vec::new()));
     let (controls, control_incoming) = tokio::sync::mpsc::channel(16);
@@ -168,6 +182,7 @@ async fn connection(socket: WebSocket, state: Arc<AppState>, language: i18n::Lan
         history.clone(),
         owner.clone(),
         language,
+        cancel_receiver.clone(),
     ));
     let worker = tokio::spawn(process_messages(
         incoming,
@@ -176,6 +191,7 @@ async fn connection(socket: WebSocket, state: Arc<AppState>, language: i18n::Lan
         history.clone(),
         owner.clone(),
         language,
+        cancel_receiver.clone(),
     ));
     let key_worker = tokio::spawn(process_messages(
         key_incoming,
@@ -184,6 +200,7 @@ async fn connection(socket: WebSocket, state: Arc<AppState>, language: i18n::Lan
         history,
         owner.clone(),
         language,
+        cancel_receiver.clone(),
     ));
     loop {
         tokio::select! {
@@ -201,8 +218,20 @@ async fn connection(socket: WebSocket, state: Arc<AppState>, language: i18n::Lan
                             Message::Text(text) => serde_json::from_str::<Request>(text).map(|request| (request.kind, request.id, request.tool)).unwrap_or_default(),
                             _ => (String::new(), String::new(), None),
                         };
+                        if kind == "cancel_text" {
+                            let valid=match &frame {Message::Text(text)=>serde_json::from_str::<Request>(text).is_ok_and(|request| request.protocol==1 && request.arguments.as_object().is_some_and(|args| args.is_empty())),_=>false};
+                            if !valid {
+                                let reply=Response {id,protocol:1,ok:false,result:None,error:Some("cancel_text requires protocol 1 and empty arguments".into())};
+                                if writer.send(Message::Text(serde_json::to_string(&reply).unwrap().into())).await.is_err(){break;}
+                                continue;
+                            }
+                            cancel_text.send_modify(|value| *value += 1);
+                            let reply=Response { id, protocol:1, ok:true, result:Some("已停止后续模型操作；已提交动作不会撤销。".into()), error:None };
+                            if writer.send(Message::Text(serde_json::to_string(&reply).unwrap().into())).await.is_err() { break; }
+                            continue;
+                        }
                         let queue = if kind == "tool" && tool.as_deref() == Some("remote.key") { &keys }
-                            else if kind == "tool" || kind == "approve" || kind == "approve_app" || kind == "approve_app_control" || kind == "approve_install" || kind == "approve_cache" || kind == "approve_system" { &controls } else { &requests };
+                            else if kind == "tool" || kind == "approve" || kind == "approve_app" || kind == "approve_app_control" || kind == "approve_install" || kind == "approve_cache" || kind == "approve_system" || kind.starts_with("schedule_") { &controls } else { &requests };
                         match queue.try_send(frame) {
                             Ok(()) => {},
                             Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
@@ -240,17 +269,27 @@ async fn process_messages(
     history: Arc<Mutex<Vec<Value>>>,
     owner: String,
     language: i18n::Language,
+    mut cancel_text: tokio::sync::watch::Receiver<u64>,
 ) {
     while let Some(message) = incoming.recv().await {
         let response = match message {
             Message::Text(text) => match serde_json::from_str::<Request>(&text) {
                 Ok(request) => {
-                    let result = tokio::time::timeout(
+                    cancel_text.borrow_and_update();
+                    let execution = tokio::time::timeout(
                         std::time::Duration::from_secs(170),
                         dispatch(&request, &state, &history, &output, &owner),
-                    )
-                    .await
-                    .unwrap_or_else(|_| Err(anyhow::anyhow!("request execution timed out")));
+                    );
+                    let result = if request.kind == "text" {
+                        tokio::select! {
+                            result=execution => result.unwrap_or_else(|_| Err(anyhow::anyhow!("request execution timed out"))),
+                            _=cancel_text.changed() => Err(anyhow::anyhow!("已停止后续模型操作；已提交动作不会撤销。")),
+                        }
+                    } else {
+                        execution
+                            .await
+                            .unwrap_or_else(|_| Err(anyhow::anyhow!("request execution timed out")))
+                    };
                     if result.is_err() && request.kind == "text" {
                         history.lock().await.clear();
                     }
@@ -342,7 +381,11 @@ async fn serve(directory: PathBuf, port: u16, enable_mdns: bool) -> Result<()> {
     if let Err(error) = media_publications::initialize(&directory) {
         eprintln!("media publication recovery unavailable: {error}");
     }
+    let scheduler = schedules::Scheduler::load(&directory)?;
+    let (schedule_stop, schedule_receiver) = tokio::sync::watch::channel(false);
+    let schedule_worker = tokio::spawn(scheduler.clone().run(schedule_receiver));
     let state = Arc::new(AppState {
+        schedules: scheduler,
         id: id.clone(),
         binary_sha256: executable_sha256()?,
         name: name.clone(),
@@ -371,6 +414,10 @@ async fn serve(directory: PathBuf, port: u16, enable_mdns: bool) -> Result<()> {
             "/transfers/{id}/data",
             get(transfers::download).put(transfers::upload),
         )
+        .route(
+            "/transfers/{id}/range",
+            get(transfers::chunks::download).put(transfers::chunks::upload),
+        )
         .route("/transfers/{id}", axum::routing::delete(transfers::cancel))
         .route("/ws", get(websocket))
         .with_state(state);
@@ -380,11 +427,13 @@ async fn serve(directory: PathBuf, port: u16, enable_mdns: bool) -> Result<()> {
         }
     });
     axum::serve(listener, app)
-        .with_graceful_shutdown(async {
+        .with_graceful_shutdown(async move {
             let mut terminate =
                 tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
                     .expect("SIGTERM handler");
             tokio::select! { _ = tokio::signal::ctrl_c() => {}, _ = terminate.recv() => {} }
+            let _ = schedule_stop.send(true);
+            let _ = schedule_worker.await;
             virtual_gamepad::shutdown();
             remote_input::shutdown().await;
         })
