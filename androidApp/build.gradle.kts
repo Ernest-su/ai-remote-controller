@@ -1,3 +1,8 @@
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.FileSystemOperations
+import org.gradle.api.file.RegularFileProperty
+import javax.inject.Inject
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -11,8 +16,8 @@ android {
         applicationId = "ernest.airc"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.1.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
@@ -138,16 +143,34 @@ val validateProductionSigning by tasks.registering {
 }
 tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(validateProductionSigning) }
 
-// Bundle the matching, signed companion rather than relying on an installed older IME.
-listOf("debug", "release").forEach { variant ->
-    val capitalized = variant.replaceFirstChar { it.uppercase() }
-    val imeAssets = layout.buildDirectory.dir("generated/${variant}ImeAssets")
-    val prepareIme = tasks.register<Copy>("prepare${capitalized}Ime") {
-        dependsOn(":tvInputMethod:assemble$capitalized")
-        from(project(":tvInputMethod").layout.buildDirectory.file("outputs/apk/$variant/tvInputMethod-$variant.apk"))
-        rename { "airc-input-method.apk" }
-        into(imeAssets)
+// Register the producer with AGP so packaging and lint both depend on generated assets.
+abstract class PrepareImeAssets : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val apkFile: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @get:Inject
+    abstract val fileSystem: FileSystemOperations
+
+    @TaskAction
+    fun prepare() {
+        fileSystem.sync {
+            from(apkFile)
+            rename { "airc-input-method.apk" }
+            into(outputDirectory)
+        }
     }
-    android.sourceSets.getByName(variant).assets.directories.add(imeAssets.get().asFile.absolutePath)
-    tasks.matching { it.name == "merge${capitalized}Assets" }.configureEach { dependsOn(prepareIme) }
+}
+
+androidComponents.onVariants { variant ->
+    val capitalized = variant.name.replaceFirstChar { it.uppercase() }
+    val prepareIme = tasks.register<PrepareImeAssets>("prepare${capitalized}Ime") {
+        dependsOn(":tvInputMethod:assemble$capitalized")
+        apkFile.set(project(":tvInputMethod").layout.buildDirectory.file("outputs/apk/${variant.name}/tvInputMethod-${variant.name}.apk"))
+        outputDirectory.set(layout.buildDirectory.dir("generated/${variant.name}ImeAssets"))
+    }
+    variant.sources.assets?.addGeneratedSourceDirectory(prepareIme, PrepareImeAssets::outputDirectory)
 }

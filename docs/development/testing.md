@@ -99,10 +99,12 @@ Compose 桌面测试的取消事件实现与 Android 不同：越界/松开可�
 准备安装 `websockets`、`zeroconf` 的 Python 环境，并提供与当前信任根匹配的既有签名清单和相邻 `.sig`：
 
 ```sh
-python3 scripts/verify-local.py --python /path/to/test-python --release-fixture /path/to/manifest.json
+RUST_TEST_THREADS=1 python3 scripts/verify-local.py --python /path/to/test-python --release-fixture /path/to/manifest.json
 ```
 
 默认 `full` 执行共享/client/桌面/Android JVM、Rust 测试与 Clippy、主机协议和生命周期 fixture、App/测试 APK 构建，以及 APK 内三 ABI 大小/摘要核对。它不自动连接真实设备或调用真实提供商，也不运行文档严格构建。
+
+任务注册表的全局配额由多个主机 fixture 共用；完整门禁设置 `RUST_TEST_THREADS=1` 串行执行 Rust 用例，隔离不同用例的任务名额。用例内部的并发与配额验证照常执行；CI 使用相同设置。
 
 聚焦开发检查不要求维护者签名清单；缺少签名 fixture 时，相关用例按原规则跳过，报告必须注明。无需生成或索取维护者私钥。
 

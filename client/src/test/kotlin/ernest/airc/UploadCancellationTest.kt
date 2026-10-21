@@ -8,19 +8,20 @@ import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import kotlin.test.*
 class UploadCancellationTest {
-    @Test fun cancelClosesSourceBlockedInRead()=blockedSource(false)
+    @Test fun cancelClosesSourceBlockedInRead()=repeat(100) { blockedSource(false) }
     @Test fun clientCloseClosesSourceBlockedInRead()=blockedSource(true)
+    @Test fun sourceReadFailureWithoutCancellationIsReported()=blockedSource(false,true)
     @Test fun sourceOpenedAfterCancellationIsClosed():Unit=runBlocking {
         val guard=UploadInputGuard();val entered=CompletableDeferred<Unit>();val release=CountDownLatch(1);val closed=CountDownLatch(1)
         val opening=async(Dispatchers.IO){runCatching{guard.open { entered.complete(Unit);release.await();object:InputStream(){override fun read()=-1;override fun close(){closed.countDown()}} }}}
         try{withTimeout(3000){entered.await()};guard.close();release.countDown();assertIs<IOException>(withTimeout(2000){opening.await()}.exceptionOrNull());assertEquals(0L,closed.count)}
         finally{release.countDown();guard.close();opening.cancelAndJoin()}
     }
-    private fun blockedSource(closeClient:Boolean):Unit=runBlocking {
+    private fun blockedSource(closeClient:Boolean,failSource:Boolean=false):Unit=runBlocking {
         val server=MockWebServer();val runtime=RuntimeConnection();val client=RuntimeTransferClient(runtime)
         val reading=CompletableDeferred<Unit>();val closed=CountDownLatch(1)
         val input=object:InputStream(){
-            override fun read():Int{reading.complete(Unit);closed.await();throw IOException("fixture source closed")}
+            override fun read():Int{reading.complete(Unit);if(!failSource)closed.await();throw IOException("fixture source closed")}
             override fun close(){closed.countDown()}
         }
         val id="12345678-1234-1234-1234-123456789abc"
@@ -33,6 +34,12 @@ class UploadCancellationTest {
         var uploading:Job?=null
         try{
             runtime.connect(server.hostName,server.port)
+            if(failSource) {
+                val error=runCatching { client.upload("blocked.bin",1,"0".repeat(64),{input}) }.exceptionOrNull()
+                assertIs<IOException>(error)
+                assertTrue(currentCoroutineContext().isActive)
+                return@runBlocking
+            }
             uploading=launch(Dispatchers.IO){try{client.upload("blocked.bin",1,"0".repeat(64),{input});fail("blocked upload succeeded")}catch(error:Exception){if(!closeClient && error !is CancellationException)throw error}}
             withTimeout(3000){reading.await()}
             withTimeout(2000){if(closeClient){client.close();uploading.join()}else uploading.cancelAndJoin()}

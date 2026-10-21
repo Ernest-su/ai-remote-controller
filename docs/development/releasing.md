@@ -63,7 +63,7 @@ git push origin main
 git push origin v0.1.0
 ```
 
-`.github/workflows/release.yml` 先复用构建 workflow，对同一标签执行 Rust/协议与 JVM/Android 构建检查，再构建生产签名 APK、签名三 ABI runtime 清单，并验证 APK 证书与 APK/独立 runtime 的大小和摘要一致。任一 Secret 缺失、版本不匹配或签名不匹配都会失败，不降级为 debug 或 unsigned APK。
+`.github/workflows/release.yml` 先复用构建 workflow，对同一标签执行 Rust/协议与 JVM/Android 构建检查，再构建生产签名 APK、签名三 ABI runtime 清单，并验证 APK 证书与 APK/独立 runtime 的大小和摘要一致。签名作业只读复用前置检查的 Rust 编译缓存，仍构建并逐项核对实际发布文件。任一 Secret 缺失、版本不匹配或签名不匹配都会失败，不降级为 debug 或 unsigned APK。
 
 成功后上传 `signed-release-<tag>` artifact，并创建 **草稿 GitHub Release**。附件包括签名 APK、三 ABI runtime、`manifest.json`、原始二进制 `manifest.json.sig`、`SHA256SUMS`、项目与第三方许可证、公开证书和公钥。私钥只在 runner 临时目录中恢复，结束时清除，不写入 `gradle.properties`，发布 job 也不上传签名材料到缓存。
 

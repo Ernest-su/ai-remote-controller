@@ -46,7 +46,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install websockets zeroconf
-      - run: cargo test --locked --manifest-path runtime/Cargo.toml
+      - run: cargo test --locked --manifest-path runtime/Cargo.toml -- --test-threads=1
       - run: cargo clippy --locked --manifest-path runtime/Cargo.toml --all-targets -- -D warnings
       - run: cargo build --locked --manifest-path runtime/Cargo.toml
       - run: python runtime/smoke_test.py

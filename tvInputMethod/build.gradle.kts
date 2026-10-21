@@ -2,7 +2,7 @@ plugins { id("com.android.application") }
 android {
     namespace = "ernest.airc.ime"
     compileSdk = 36
-    defaultConfig { applicationId = "ernest.airc.ime"; minSdk = 26; targetSdk = 35; versionCode = 2; versionName = "0.1.1" }
+    defaultConfig { applicationId = "ernest.airc.ime"; minSdk = 26; targetSdk = 35; versionCode = 3; versionName = "0.1.2" }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     signingConfigs {
         create("release") {

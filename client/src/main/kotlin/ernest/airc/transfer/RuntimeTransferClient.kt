@@ -69,7 +69,9 @@ class RuntimeTransferClient(private val runtime: RuntimeConnection) : AutoClosea
             onProgress(current.copy(phase="completed",bytesTransferred=current.sizeBytes))
             return current.name to output.also { temporary = null }
         } catch(error: Exception) {
-            task?.let { cancel(target,it.id) }; throw error
+            task?.let { cancel(target,it.id) }
+            currentCoroutineContext().ensureActive()
+            throw error
         } finally { temporary?.delete() }
     }
     suspend fun upload(path: String, size: Long, sha256: String, source: () -> InputStream, root: String = "inbox", overwriteToken: String? = null, onProgress: (TransferProgress) -> Unit = {}): TransferProgress {
@@ -109,7 +111,13 @@ class RuntimeTransferClient(private val runtime: RuntimeConnection) : AutoClosea
             } } finally { inputMonitor.cancel() }
             }
             runtime.checkTransferTarget(target);onProgress(result);return result
-        } catch(error: Exception) { task?.let { cancel(target,it.id) };throw error }
+        } catch(error: Exception) {
+            task?.let { cancel(target,it.id) }
+            // A nested I/O scope may finish with its source-close IOException while
+            // cancellation is propagating. Preserve cancellation at the caller boundary.
+            currentCoroutineContext().ensureActive()
+            throw error
+        }
         finally { guard.close();uploadInputs.remove(guard) }
     }
     override fun close() { closed.set(true);uploadInputs.forEach{it.close()};client.dispatcher.cancelAll();client.connectionPool.evictAll();client.dispatcher.executorService.shutdown() }

@@ -61,6 +61,14 @@ jobs:
       - name: Install Android SDK and NDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;$ANDROID_NDK_VERSION"
       - uses: dtolnay/rust-toolchain@stable
+      - name: Restore checked runtime build cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            runtime/target
+          key: android-runtime-${{ runner.os }}-${{ hashFiles('runtime/Cargo.lock') }}
       - uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: true
