@@ -1699,9 +1699,10 @@ python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </sp
 <p>遥控震动诊断可在 debug App 使用 <code>adb -s &lt;手机序列号&gt; logcat -v threadtime -s AircHaptics:I</code>，结合 <code>adb -s &lt;手机序列号&gt; shell dumpsys vibrator_manager</code> 核对硬件状态。日志包含系统触摸时序、方向键名称、交互源和按下 token、派发完成/取消、计时开始/触发及停止；不记录文字内容或凭据。快速短按需核对同一按钮的多个 token：延迟派发可能正常完成后又出现合成按下/松开对，旧 token 必须在被替代时清理。<code>remote-haptics-input-ui</code> 覆盖 Compose 短按、不等待界面空闲的系统输入队列连按，以及按下约 100ms、靠近 Android 延迟按压反馈阈值的连按。</p>
 <h2 id="_4">完整本地门禁<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <p>准备安装 <code>websockets</code>、<code>zeroconf</code> 的 Python 环境，并提供与当前信任根匹配的既有签名清单和相邻 <code>.sig</code>：</p>
-<div class="highlight"><pre><span></span><code>python3<span class="w"> </span>scripts/verify-local.py<span class="w"> </span>--python<span class="w"> </span>/path/to/test-python<span class="w"> </span>--release-fixture<span class="w"> </span>/path/to/manifest.json
+<div class="highlight"><pre><span></span><code><span class="nv">RUST_TEST_THREADS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>python3<span class="w"> </span>scripts/verify-local.py<span class="w"> </span>--python<span class="w"> </span>/path/to/test-python<span class="w"> </span>--release-fixture<span class="w"> </span>/path/to/manifest.json
 </code></pre></div>
 <p>默认 <code>full</code> 执行共享/client/桌面/Android JVM、Rust 测试与 Clippy、主机协议和生命周期 fixture、App/测试 APK 构建，以及 APK 内三 ABI 大小/摘要核对。它不自动连接真实设备或调用真实提供商，也不运行文档严格构建。</p>
+<p>任务注册表的全局配额由多个主机 fixture 共用；完整门禁设置 <code>RUST_TEST_THREADS=1</code> 串行执行 Rust 用例，隔离不同用例的任务名额。用例内部的并发与配额验证照常执行；CI 使用相同设置。</p>
 <p>聚焦开发检查不要求维护者签名清单；缺少签名 fixture 时，相关用例按原规则跳过，报告必须注明。无需生成或索取维护者私钥。</p>
 <h2 id="_5">提交前文档检查<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p>MkDocs 严格构建只在准备提交时执行一次，日常编辑、UI 测试和完整业务门禁不自动触发：</p>
