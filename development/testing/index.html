@@ -452,6 +452,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/schedules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    定时操作
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/screenshots/" class="md-nav__link">
         
   
@@ -1581,6 +1609,10 @@ python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </sp
 </thead>
 <tbody>
 <tr>
+<td><code>launcher-shortcut-ui</code></td>
+<td>桌面入口默认名称、修改与校验、图标选择、亮暗大字体、草稿恢复、取消与系统快捷方式元数据；不操作外部目标</td>
+</tr>
+<tr>
 <td><code>product-pages</code></td>
 <td>320dp / 1.5 倍字体亮暗主题下逐页浏览、设备页返回来源、等高网格及离线截图；不操作外部目标</td>
 </tr>
@@ -1615,6 +1647,34 @@ python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </sp
 <tr>
 <td><code>mirror-toolbar-ui</code></td>
 <td>动态预览标题图标、画质档位保存、紧凑按键至少 48dp、全屏原生视图复用、布局切换及横竖屏草稿保留；不连接目标</td>
+</tr>
+<tr>
+<td><code>url-conflict-ui</code></td>
+<td>网址下载同名提示、新名称编辑与校验、覆盖前独立确认、目录与离线禁用，320dp/1.5倍字体亮暗主题</td>
+</tr>
+<tr>
+<td><code>upload-local-picker-ui</code></td>
+<td>上传打开实际系统文件选择器、取消保留草稿、待保存任务不禁用本地选择、下载保存反馈不串入上传</td>
+</tr>
+<tr>
+<td><code>storage-task-tabs-ui</code></td>
+<td>普通用户存储概览、折叠扫描详情、列表删除确认及离线禁用；任务分类计数、0项禁用、旋转恢复与任务变化</td>
+</tr>
+<tr>
+<td><code>file-task-navigation-ui</code></td>
+<td>文件任务统一入口、空态、任务汇总不出现创建表单、旋转恢复与窄屏亮暗截图；上传共用一个选择器入口</td>
+</tr>
+<tr>
+<td><code>batch-download-mode-ui</code></td>
+<td>下载前 ZIP/逐个选择、取消不提交与旋转恢复、独立文件保存状态；通过模拟器系统 DocumentsProvider 验证逐个保存及同名改名不覆盖</td>
+</tr>
+<tr>
+<td><code>file-multiselect-ui</code></td>
+<td>列表/网格多选下载、可见项选择、32项限制、筛选与恢复、目录切换和刷新、返回退出、离线/批量任务互斥，亮暗大字体</td>
+</tr>
+<tr>
+<td><code>file-page-ui</code></td>
+<td>文件布局与链接、任务提示同一行布局、关闭后导航/恢复/进度更新保持隐藏，新任务重新显示；使用隔离界面 fixture</td>
 </tr>
 <tr>
 <td><code>file-preview-ui</code></td>
@@ -1698,6 +1758,21 @@ uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </sp
 <p>悬浮吸附与淡化：<code>MirrorRemoteBehaviorTest</code> 核对四边吸附、自由位置、越界与窄视口；<code>mirror-toolbar-ui</code> 包含 <code>FloatingRemoteBehaviorUiTest</code>，检查离线透明度设置及重新加载、连续拖动后吸附、5秒闲置淡化与按住恢复后的持续可见。测试使用本地画面 fixture，不连接电视。</p>
 <p>真实电视预览与浮层联测使用 <code>python3 scripts/test-phone-target.py --phone &lt;控制端ADB&gt; --target &lt;电视ADB&gt; --host &lt;电视IP&gt; --suite mirror-floating-target</code>。先构建 App、AndroidTest 与 mediaFixture；专项创建配套隔离 runtime，在临时 ColorActivity 中核对实际解码像素变化、原生 Surface 保留、连续拖动与吸附、设置透明度、闲置淡化与唤醒、浮层不透传触控、电视实收方向键 DOWN/UP、完整/紧凑切换及后台恢复。退出后核对自建 scrcpy 文件/进程释放，恢复控制端历史和透明度、电视原前台 Activity，并卸载自建 fixture。控制端若是模拟器，应明确报告，不能称为实体手机实测。</p>
 <p>首次在新控制端进入全屏时，先关闭 Android 的全屏手势教学提示，避免系统遮罩干扰叠层像素检查。<code>mirror-floating-target</code> 支持 <code>--preview-quality 流畅|均衡|清晰</code> 选择初始档位；若测试进程被中断，驱动器通过 <code>DeviceHistoryRecoveryTest</code> 恢复设备历史与已记录的透明度，避免把临时目标留给自动重连。</p>
+<p>符号链接专项：<code>FileBrowserControllerTest</code> 检查链接目录的逻辑路径、返回与只读创建拦截；<code>FileLinkUiTest</code>（桌面与 Android，Android 归入 <code>file-page-ui</code>）验证链接目标/错误、预览与下载入口、链接删除确认和只读禁用，适配亮暗、320dp 与1.5倍字号。Rust <code>tools::files</code> 检查范围内相对/绝对/多级链接、越界、失效、循环、无权限、特殊文件、procfs链接和并发替换后的读取隔离；文件动作及传输测试检查只删除链接、下载可读而写入父目录仍拒绝链接。</p>
+<p>Android 文件系统专项只操作明确选择的自有模拟器，在 UUID 目录启动匹配 ABI 的独立服务，验证真实 HTTP 范围预览、固定来源、流式下载摘要、写入/扫描拒绝及链接删除，结束清理自建服务、文件与转发：</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </span>websockets<span class="w"> </span>python<span class="w"> </span>runtime/file_links_target_test.py<span class="w"> </span>--serial<span class="w"> </span>&lt;自有模拟器序列号&gt;<span class="w"> </span>--binary<span class="w"> </span>androidApp/src/main/assets/runtime/airc-runtime-x86_64
+</code></pre></div>
+<p>按目标 ABI 替换二进制；此专项不安装 App、不修改已有文件或系统设置，也不代替厂商共享存储兼容性测试。</p>
+<p>定时与批量功能的聚焦主机回归使用<code>ScheduleControllerTest</code>、<code>BatchTransferProtocolTest</code>、<code>RoutineConditionsTest</code>和<code>RemoteLayoutTest</code>，分别验证重连确认失效与音量参数传输、真实主机协议的多文件摘要/ZIP、条件等待与输入边界。Rust schedules测试使用可注入动作验证独立调度、单次不重放、每天顺延、音量参数边界与持久化恢复；chunks测试使用独立任务实例验证分块回退、偏移拒绝、摘要提交与范围读取，不占用其他测试共享注册表的任务名额。</p>
+<p>构建App和测试APK后，执行<code>python3 scripts/test-phone-target.py --phone &lt;自有模拟器&gt; --suite scheduled-features-ui</code>，验证窄屏大字体亮暗主题的定时运行说明、时间与动作下拉选择、单次未来时间推算、时间选择器确认/取消和恢复、离线草稿与提交禁用、媒体音量输入校验与旋转恢复、静音/解除静音提交、批量文件选择。<code>product-pages</code>同时覆盖定时入口和设备页返回。固定桌面快捷方式、小组件、厂商休眠限制、实际关机及真实视觉提供商兼容需按交付范围另行验证，主机和面板fixture不能替代这些行为。</p>
+<p>被控端定时执行专项可在自有模拟器运行：</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </span>websockets<span class="w"> </span>python<span class="w"> </span>runtime/scheduled_actions_target_test.py<span class="w"> </span>--serial<span class="w"> </span>&lt;自有目标序列号&gt;<span class="w"> </span>--binary<span class="w"> </span>androidApp/src/main/assets/runtime/airc-runtime-&lt;匹配ABI&gt;
+</code></pre></div>
+<p>专项构建并安装UUID包名的临时MediaSession/启动器接收应用，创建UUID服务目录，保存60/70/80秒后的暂停、打开应用与强停任务后断开WebSocket。同时保存90秒后的媒体音量40%，以及100/110秒静音和120/130秒解除静音任务。分别核对暂停回调、前台包、stopped标志、系统媒体音量与静音状态及被控端执行记录；重复静音和解除静音不会切换为相反状态。结束清理自己的APK、服务和ADB转发，并恢复原音量、静音状态和Activity。不会执行关机，也不证明厂商休眠或关机接口行为。</p>
+<p>Downloads 上传平台验证使用独立 Android 模拟器：<code>python3 runtime/upload_copy_target_test.py --serial &lt;模拟器序列号&gt; --binary androidApp/src/main/assets/runtime/airc-runtime-x86_64</code>（需要 Python websockets）。覆盖单文件、空文件、分块续传、摘要错误、同名冲突及临时文件清理；只创建 UUID 专属目录和服务，结束删除自有文件及 ADB 转发。可选 <code>--baseline-binary &lt;旧版匹配ABI二进制&gt;</code> 对照旧版的原子不覆盖报错。</p>
+<p>AAC 被控端播放验证使用独立模拟器：先构建 <code>:mediaFixture:assembleDebug</code>，再运行 <code>uv run --with av --with websockets python runtime/aac_media_target_test.py --serial &lt;模拟器序列号&gt; --binary androidApp/src/main/assets/runtime/airc-runtime-x86_64 --fixture-apk mediaFixture/build/outputs/apk/debug/mediaFixture-debug.apk</code>。临时生成静音 AAC，验证大小写扩展名、audio/aac、播放副本与实际 MediaPlayer 播放状态；不代表真实设备或其他 AAC 编码配置的兼容性。脚本拒绝替换已有 fixture App，结束移除自有应用、文件、服务和转发。</p>
+<p>标准遥控音量使用 <code>RemoteVolumeControllerTest</code> 验证连接发布时序、按比例设置与断线清理，<code>RemoteVolumeSliderUiTest</code> 验证触摸拖动、实时百分比及等待目标回复期间的位置和数值保持。构建 App 和测试 APK 后，<code>python3 scripts/test-phone-target.py --phone &lt;自有模拟器&gt; --suite remote-volume-ui</code> 从真实标准遥控界面验证 57% 读数、拖动时百分比更新、松手后数值保留、触摸拖动提交、目标音量变化后的滑块跟随、旋转与断线禁用；使用控制端回环服务，不改变电视音量。</p>
+<p>标准遥控器的真实电视音量验证使用 <code>python3 scripts/test-phone-target.py --phone &lt;控制端ADB&gt; --target &lt;电视ADB&gt; --host &lt;电视IP&gt; --suite remote-volume-target</code>。该专项在电视创建 UUID 配套 runtime，核对初始读数、左右触摸拖动后的实际系统音量、音量加减后的滑块跟随、外部修改与旋转恢复，并保存截图；退出恢复原媒体音量、静音状态及控制端历史，清理自建服务和测试包。控制端使用模拟器时明确报告。</p>
 
 
 

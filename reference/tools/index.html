@@ -452,6 +452,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../guide/schedules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    定时操作
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../guide/screenshots/" class="md-nav__link">
         
   
@@ -1202,6 +1230,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#media-volume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        媒体音量
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1971,6 +2010,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#media-volume" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        媒体音量
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2132,7 +2182,7 @@
 <p>控制端从同一目标的 <code>GET /artifacts/{id}</code> 下载 PNG。响应采用 <code>Cache-Control: no-store</code>、附件文件名和 <code>nosniff</code>，资源不存在、过期或被淘汰返回 404。服务限制截图输出 16 MiB、单次捕获并发为 1，内存最多保留四张；新的截图可能提前淘汰旧链接。60 秒后不再允许下载，过期内存项在下次资源操作时清理，进程退出后全部丢弃。不创建目标临时图片文件，不接受任意文件路径。</p>
 <p>大模型函数名为 <code>device_screenshot</code>，获得同一资源描述；当前并未将图像注入多模态模型。<code>client/</code> 下载器仅允许匹配资源 ID 的路径，禁用重定向，校验 MIME、PNG 标识与长度，超过描述长度即拒绝。手机和桌面已提供截图预览和保存页面，手机支持系统分享。预览有解码失败反馈，下载描述和 PNG 头的尺寸必须一致，像素数量上限为 32 Mi。这是单张截图，不是实时投屏。</p>
 <h2 id="_4">文件管理与流式传输<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
-<p><code>files.list</code> / <code>files_list</code> 与 <code>files.stat</code> / <code>files_stat</code> 接收 <code>root</code>（<code>downloads</code> 默认、<code>inbox</code> 服务私有收件箱、<code>full</code> 文件系统 <code>/</code>）及相对 <code>path</code>。拒绝绝对路径、<code>..</code> 和符号链接穿越；权限沿用服务身份。列表额外接收 <code>limit</code>（1–100，默认 50）与 <code>cursor</code>；返回 root/path/entries/nextCursor，按文件名排序，最多扫描 4096 项。stat 返回 kind 与普通文件 sizeBytes。</p>
+<p><code>files.list</code> / <code>files_list</code> 与 <code>files.stat</code> / <code>files_stat</code> 接收 <code>root</code>（<code>downloads</code> 默认、<code>inbox</code> 服务私有收件箱、<code>full</code> 文件系统 <code>/</code>）及相对 <code>path</code>。调用参数仍拒绝绝对路径和 <code>..</code>；只读解析允许普通符号链接，但目标必须留在所选根内，权限沿用服务身份。列表额外接收 <code>limit</code>（1–100，默认 50）与 <code>cursor</code>；返回 root/path/entries/nextCursor/readOnly，按文件名排序，最多扫描 4096 项。路径经过链接时 readOnly=true。条目的 kind 为解析后的 file/directory，另以 symlink=true、linkTarget 标注链接，targetName 提供解析后的文件名以识别无扩展名链接的预览类型；解析失败时 kind=symlink，linkError 区分 link_missing、link_outside_root、link_loop、link_permission、link_special、link_not_directory、link_invalid、link_changed、link_unavailable。stat 返回相同的类型、链接字段与普通文件 sizeBytes。解析使用固定目录/链接描述符，限制40次展开，拒绝特殊文件及 procfs 链接；不能用预先规范化路径后再按字符串打开替代。</p>
 <p><code>task.start</code> / <code>task_start</code> 的 <code>direction=download</code> 配合 root/path 创建流式下载，轮询 <code>task.progress</code> / <code>task_progress</code> 等待 ready，读取其 sha256 和 <code>dataPath=/transfers/{id}/data</code>，随后 GET 该路径。上传使用 direction=upload、sizeBytes、sha256，再 PUT 原始二进制到 dataPath。GET/PUT 的 MIME 为 application/octet-stream，禁止缓存；固定 64 KiB 缓冲，单文件最大 1 TiB。上传长度/摘要必须匹配，fsync 后原子提交；默认 RENAME_NOREPLACE，不支持时明确失败。最多两个活动任务，最多保留 16 条记录；终态记录可提前淘汰，空闲记录在新任务时按 15 分钟清理。任务不跨进程重启恢复。</p>
 <p><code>task.progress</code> 返回 id/direction/root/name/sizeBytes/bytesTransferred/phase/sha256/error/unit/dataPath。phase 包含 hashing、ready、awaiting_upload、uploading、downloading、committing、deleting、completed、failed、cancelled。unit 通常是 bytes，删除任务是 items。<code>task.cancel</code> / <code>task_cancel</code> 与 <code>DELETE /transfers/{id}</code> 可取消未提交任务，已提交文件保留；递归删除的已删除项无法恢复。</p>
 <p><code>files.mkdir</code> / <code>files_mkdir</code> 接收 <code>root</code>（downloads/inbox/full）及必填相对 <code>path</code>，创建单个新目录并返回 <code>{root,path,created:true}</code>。父目录必须存在；不创建父目录、不覆盖文件/目录/链接、不跟随符号链接，不接受递归或权限参数。使用 mkdirat 按打开的父目录执行，权限沿用服务身份，新目录请求模式为 0700，实际模式由文件系统策略决定。</p>
@@ -2245,7 +2295,7 @@
 <p><code>apps.icon</code> 接收 <code>{"package":"com.example.app"}</code>，返回关联包名、Android 用户及 96×96 PNG 的短时二进制资源描述；图像通过 <code>/artifacts/{id}</code> 读取，不内联到应用列表 JSON。单个 PNG 上限 128 KiB。</p>
 <p><code>apps.install</code> 保留 <code>root/path/sha256/update</code> 单包参数，也可用 <code>root/apks/update</code>，其中 <code>apks</code> 为 1–32 个 <code>{"path":"…apk","sha256":"…"}</code>。两种参数不可混用，总大小不超过 4 GiB。提案的 <code>apk</code> 为 base，<code>apks</code> 为完整清单；准备任务 name 仍为请求首个路径。模型只能准备提案，不能调用确认；用户独立确认后通过 install-create/write/commit 会话整组提交，失败尝试 install-abandon。</p>
 <h3 id="apk">文件预览与 APK 图标<a class="headerlink" href="#apk" title="Permanent link">&para;</a></h3>
-<p><code>files.preview</code> / <code>files_preview</code> 接收 <code>{root,path}</code>，只打开选定根中的普通文件，不跟随符号链接，返回 <code>{id,root,path,sizeBytes,dataPath}</code>；<code>dataPath</code> 为 <code>/media/{id}</code>，支持 HTTP GET/HEAD 与单范围 Range。范围响应携带精确 Content-Range 与长度，文件发生变化时返回409。最多八个预览资源、闲置五分钟失效，容量与目标播放资源分别计算。<code>files.preview_close</code> / <code>files_preview_close</code> 接收 <code>{id}</code> 释放预览，不能借此关闭目标播放资源。流不内联文件内容，不计算全文件摘要；需要完整校验的导出继续使用下载任务。</p>
+<p><code>files.preview</code> / <code>files_preview</code> 接收 <code>{root,path}</code>，只读打开选定根中的普通文件，允许受限跟随范围内的普通符号链接，返回 <code>{id,root,path,sizeBytes,dataPath}</code>；<code>dataPath</code> 为 <code>/media/{id}</code>，支持 HTTP GET/HEAD 与单范围 Range。范围响应携带精确 Content-Range 与长度，文件发生变化时返回409。最多八个预览资源、闲置五分钟失效，容量与目标播放资源分别计算。<code>files.preview_close</code> / <code>files_preview_close</code> 接收 <code>{id}</code> 释放预览，不能借此关闭目标播放资源。流不内联文件内容，不计算全文件摘要；需要完整校验的导出继续使用下载任务。</p>
 <p><code>apps.apk_icon</code> / <code>apps_apk_icon</code> 接收 <code>{root,path}</code>（<code>.apk</code> 普通文件，最多4 GiB），从已固定的文件描述符经 Android 包资源解析获取96×96 PNG，单图最多128 KiB；返回 BinaryArtifact 加 <code>root</code>、<code>filePath</code>，<code>path</code> 仍为 <code>/artifacts/{id}</code>。客户端核对原根、文件路径、尺寸与长度后读取。此接口不安装 APK、不从同包名的已安装应用借用图标；split 缺少独立图标、无访问权限或资源无法解析时可能失败，界面保留占位。</p>
 <h2 id="_10">应用详情操作<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
 <p><code>apps.control_info</code> 与 <code>apps.prepare_control</code> 为控制端应用详情提供只读快照和用户待确认操作；模型可读取状态或准备提案，独立确认接口不向模型暴露，不能自动执行。接口、能力字段、确认和结果语义见<a href="../../protocol/#app-controls">协议</a>，使用步骤见<a href="../../guide/apps/">应用管理</a>。</p>
@@ -2253,6 +2303,8 @@
 <p><code>remote.key</code> 只提供 <code>key</code> 时提交一次完整短按。按住请求必须且只包含 <code>key</code>、<code>action</code>、<code>pressId</code> 三个字段，<code>pressId</code> 是每次手势新建的 UUID；<code>action</code> 为 <code>down</code>、<code>keep</code>、<code>up</code> 或 <code>cancel</code>。<code>down</code> 注册按住，控制端每250ms发送 <code>keep</code>，正常松开使用 <code>up</code>，取消使用 <code>cancel</code>。同一按键同时只能由一个连接的一次手势持有；其他连接或旧 UUID 不得释放新手势，失效后的 <code>keep</code> 不会重新发送 DOWN。</p>
 <p>目标桥接使用 <code>SOURCE_KEYBOARD</code>，首次 DOWN 的重复次数为0；按系统长按阈值产生首次重复 DOWN（重复次数1、<code>FLAG_LONG_PRESS</code>），之后按系统重复间隔继续递增重复次数，均保留初始 <code>downTime</code>。UP 的重复次数为0，取消 UP 带 <code>FLAG_CANCELED</code>。不会通过多次 DOWN/UP 模拟连续点击。目标应用和系统策略决定最终行为。</p>
 <p>断线释放所属连接的按键。桥接线程独立于 RPC 计时，1500ms无保活或按住120秒即取消释放；服务退出时关闭桥接并释放剩余按键。出错后仅尝试抬起，不自动重放 DOWN。边沿响应包含 <code>operation</code>、<code>pressId</code>、<code>keyCode</code>、<code>submitted</code>、<code>released</code> 和 <code>source</code>；<code>down</code>/<code>keep</code> 的 <code>released</code> 为false，<code>up</code>/<code>cancel</code> 为true，提交成功不代表目标应用已经消费事件。</p>
+<h2 id="media-volume">媒体音量<a class="headerlink" href="#media-volume" title="Permanent link">&para;</a></h2>
+<p><code>media.volume</code> / <code>media_volume</code> 使用原生 AudioManager 读取媒体流音量。空参数对象只读取；<code>{"percent":57}</code> 设置 0–100 的整数百分比，映射到设备最小/最大音量档位，回读确认后返回 <code>verified=true</code>。结果包含 <code>volumeIndex</code>、<code>minVolumeIndex</code>、<code>maxVolumeIndex</code>、<code>muted</code>、<code>fixed</code>、<code>stream=media</code> 与 <code>operation</code>（<code>status</code> 或 <code>set_volume</code>）；设置还包含 <code>requestedPercent</code>。固定音量设备拒绝设置，权限不足或设置未生效返回错误，不把命令成功当成音量已改变。</p>
 
 
 
