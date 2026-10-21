@@ -80,11 +80,14 @@ fun DesktopRemoteScreen(state: DesktopState, model: DesktopController, showResul
                                     Icon(painterResource("drawable/ic_power.xml"), "电源", Modifier.size(24.dp),
                                         tint = if (state.connected) RemoteColors.Warning else RemoteColors.Disabled)
                                 }
-                                Row {
-                                    RemoteIconButton({ model.key("volume_down") }, enabled = state.connected, debugName = "volume_down") { Icon(painterResource("drawable/ic_volume_down.xml"), "音量 −") }
-                                    RemoteIconButton({ model.key("mute") }, enabled = state.connected, debugName = "mute") { Icon(painterResource("drawable/ic_mute.xml"), "静音") }
-                                    RemoteIconButton({ model.key("volume_up") }, enabled = state.connected, debugName = "volume_up") { Icon(painterResource("drawable/ic_volume_up.xml"), "音量 +") }
-                                }
+                            }
+                            val volume by model.remoteVolume.state.collectAsState()
+                            val volumeSetting by model.remoteVolume.setting.collectAsState()
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                                RemoteIconButton({ model.key("mute") }, enabled = state.connected, debugName = "mute") { Icon(painterResource("drawable/ic_mute.xml"), "静音") }
+                                RemoteIconButton({ model.key("volume_down") }, enabled = state.connected, debugName = "volume_down") { Icon(painterResource("drawable/ic_volume_down.xml"), "音量 −") }
+                                RemoteVolumeSlider(volume, state.connected, model.remoteVolume::setFraction, Modifier.weight(1f), setting = volumeSetting)
+                                RemoteIconButton({ model.key("volume_up") }, enabled = state.connected, debugName = "volume_up") { Icon(painterResource("drawable/ic_volume_up.xml"), "音量 +") }
                             }
                             Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {

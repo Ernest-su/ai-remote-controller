@@ -238,3 +238,7 @@ uv run --with websockets python runtime/scheduled_actions_target_test.py --seria
 Downloads 上传平台验证使用独立 Android 模拟器：`python3 runtime/upload_copy_target_test.py --serial <模拟器序列号> --binary androidApp/src/main/assets/runtime/airc-runtime-x86_64`（需要 Python websockets）。覆盖单文件、空文件、分块续传、摘要错误、同名冲突及临时文件清理；只创建 UUID 专属目录和服务，结束删除自有文件及 ADB 转发。可选 `--baseline-binary <旧版匹配ABI二进制>` 对照旧版的原子不覆盖报错。
 
 AAC 被控端播放验证使用独立模拟器：先构建 `:mediaFixture:assembleDebug`，再运行 `uv run --with av --with websockets python runtime/aac_media_target_test.py --serial <模拟器序列号> --binary androidApp/src/main/assets/runtime/airc-runtime-x86_64 --fixture-apk mediaFixture/build/outputs/apk/debug/mediaFixture-debug.apk`。临时生成静音 AAC，验证大小写扩展名、audio/aac、播放副本与实际 MediaPlayer 播放状态；不代表真实设备或其他 AAC 编码配置的兼容性。脚本拒绝替换已有 fixture App，结束移除自有应用、文件、服务和转发。
+
+标准遥控音量使用 `RemoteVolumeControllerTest` 验证连接发布时序、按比例设置与断线清理，`RemoteVolumeSliderUiTest` 验证触摸拖动、实时百分比及等待目标回复期间的位置和数值保持。构建 App 和测试 APK 后，`python3 scripts/test-phone-target.py --phone <自有模拟器> --suite remote-volume-ui` 从真实标准遥控界面验证 57% 读数、拖动时百分比更新、松手后数值保留、触摸拖动提交、目标音量变化后的滑块跟随、旋转与断线禁用；使用控制端回环服务，不改变电视音量。
+
+标准遥控器的真实电视音量验证使用 `python3 scripts/test-phone-target.py --phone <控制端ADB> --target <电视ADB> --host <电视IP> --suite remote-volume-target`。该专项在电视创建 UUID 配套 runtime，核对初始读数、左右触摸拖动后的实际系统音量、音量加减后的滑块跟随、外部修改与旋转恢复，并保存截图；退出恢复原媒体音量、静音状态及控制端历史，清理自建服务和测试包。控制端使用模拟器时明确报告。

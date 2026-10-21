@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -111,6 +113,7 @@ class RemoteLayoutUiTest {
     }
 
     @Test fun shortNarrowWindowAndLargeTextKeepReferenceKeySizesAndNavigationAccessible() {
+        val dark = mutableStateOf(false)
         configuredOfflineComposer(compose)
         compose.runOnUiThread {
             val model = ViewModelProvider(compose.activity)[RemoteViewModel::class.java]
@@ -118,11 +121,32 @@ class RemoteLayoutUiTest {
                 val density = LocalDensity.current.density
                 CompositionLocalProvider(LocalDensity provides Density(density, fontScale = 1.5f)) {
                     Box(Modifier.width(320.dp).height(480.dp)) {
-                        RemoteTheme { RemoteApp(model) }
+                        RemoteTheme(darkTheme = dark.value) { RemoteApp(model) }
                     }
                 }
             }
         }
+        compose.onNodeWithTag("remote-volume-slider").assertIsDisplayed().assertIsNotEnabled()
+        val volumeNodes = listOf(
+            compose.onNodeWithContentDescription("静音"),
+            compose.onNodeWithContentDescription("音量 −"),
+            compose.onNodeWithTag("remote-volume-slider"),
+            compose.onNodeWithContentDescription("音量 +"),
+        ).map { it.fetchSemanticsNode().boundsInRoot }
+        volumeNodes.zipWithNext().forEach { (left, right) ->
+            assertTrue("Volume controls must be ordered without overlap: $volumeNodes", left.right <= right.left + 1f)
+            assertEquals(left.center.y, right.center.y, 1f)
+        }
+        for (theme in listOf(false, true)) {
+            compose.runOnIdle { dark.value = theme }
+            compose.onNodeWithTag("remote-volume-slider").assertIsDisplayed()
+            val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+            val directory = java.io.File(compose.activity.getExternalFilesDir(null), "ui-review").apply { mkdirs() }
+            java.io.File(directory, "remote-volume-$theme.png").outputStream().use {
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            }
+        }
+        compose.runOnIdle { dark.value = false }
         compose.onNodeWithTag("remote-dpad").performScrollTo().assertWidthIsEqualTo(220.dp)
         compose.onNodeWithTag("remote-command-input").performTextInput("打开设置")
         // This case checks the fixed short viewport; the two IME cases above cover the keyboard.

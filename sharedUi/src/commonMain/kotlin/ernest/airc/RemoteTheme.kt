@@ -94,6 +94,7 @@ object RemoteColors {
     val Surface: Color @Composable get() = LocalRemotePalette.current.Surface
     val Text: Color @Composable get() = LocalRemotePalette.current.Text
     val Secondary: Color @Composable get() = LocalRemotePalette.current.Secondary
+    val Outline: Color @Composable get() = LocalRemotePalette.current.Outline
     val Divider: Color @Composable get() = LocalRemotePalette.current.Divider
     val Fill: Color @Composable get() = LocalRemotePalette.current.Fill
     val Disabled: Color @Composable get() = LocalRemotePalette.current.Disabled
@@ -161,6 +162,8 @@ object RemoteDimensions {
     val GamepadRowMinWidth = 400.dp
     val GamepadStickSize = 132.dp
     val GamepadStickKnobRadius = 22.dp
+    val VolumeThumbSize = 16.dp
+    val VolumeTrackHeight = 4.dp
     val MinimumControlsHeight = 600.dp
 }
 

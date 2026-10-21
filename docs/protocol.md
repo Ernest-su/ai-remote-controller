@@ -319,3 +319,5 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 分块检查点只保留在当前服务和控制端进程内，不声明跨重启恢复。原任务限额、取消与约15分钟闲置回收仍适用。
 
 定时任务 `schedule_save` 的 `action` 另支持 `set_volume`、`mute`、`unmute`；`set_volume` 必须提供整数 `volumePercent`（0–100），其他动作禁止该字段，三者均禁止 `package`。列表与被控端持久记录保留 `volumePercent`。音量百分比映射为媒体流最接近的系统档位；静音与解除使用明确状态操作，执行后核对系统状态，失败记录原因。
+
+`media.volume` 提供原生媒体流音量快照和经过回读确认的百分比设置。空对象为读取，设置参数为 `{"percent":0..100}`；字段和错误语义见[媒体音量](reference/tools.md#media-volume)。标准遥控滑块使用该接口。

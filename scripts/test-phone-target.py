@@ -22,6 +22,8 @@ SUITES = {
     "launcher-shortcut-ui": ("ernest.airc.LauncherShortcutUiTest", 3),
     "scheduled-features-ui": ("ernest.airc.ScheduledFeaturesUiTest", 6),
     "tv-input-ui": ("ernest.airc.TvInputUiTest,ernest.airc.TvInputFocusUiTest", 2),
+    "remote-volume-target": ("ernest.airc.LiveRemoteVolumeTargetTest", 1),
+    "remote-volume-ui": ("ernest.airc.RemoteVolumeUiTest", 1),
     "remote-menu-ui": ("ernest.airc.RemoteQuickMenuUiTest,ernest.airc.RemoteLayoutUiTest", 5),
     "file-page-ui": ("ernest.airc.FilePageLayoutUiTest,ernest.airc.FileLinkUiTest,ernest.airc.FileTaskNoticeUiTest", 3),
     "library-layout-ui": ("ernest.airc.LibraryLayoutUiTest", 1),
@@ -66,7 +68,7 @@ def main():
     parser.add_argument("--preview-quality", choices=["流畅", "均衡", "清晰"], help="Initial quality for live floating-remote validation")
     parser.add_argument("--suite", choices=[*SUITES, "all"], default="all")
     args = parser.parse_args()
-    phone_only=args.suite in ("storage-task-tabs-ui", "upload-local-picker-ui", "file-task-navigation-ui", "batch-download-mode-ui", "file-multiselect-ui", "url-conflict-ui", "launcher-shortcut-ui", "scheduled-features-ui", "tv-input-ui", "remote-menu-ui", "file-page-ui", "library-layout-ui", "mobile-convenience-ui", "app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-surface-ui", "mirror-toolbar-ui", "mirror-ui", "gamepad-ui", "models", "profile-isolation", "controller-ui")
+    phone_only=args.suite in ("storage-task-tabs-ui", "upload-local-picker-ui", "file-task-navigation-ui", "batch-download-mode-ui", "file-multiselect-ui", "url-conflict-ui", "launcher-shortcut-ui", "scheduled-features-ui", "tv-input-ui", "remote-menu-ui", "remote-volume-ui", "file-page-ui", "library-layout-ui", "mobile-convenience-ui", "app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-surface-ui", "mirror-toolbar-ui", "mirror-ui", "gamepad-ui", "models", "profile-isolation", "controller-ui")
     if not phone_only and (not args.target or not args.host):
         parser.error("This suite requires --target and --host")
     if not phone_only and args.phone == args.target:
@@ -107,7 +109,7 @@ def main():
         if not asset.is_file() or hashlib.sha256(asset.read_bytes()).digest() != hashlib.sha256(embedded).digest():
             parser.error("Runtime asset differs from the app APK; rebuild before testing")
 
-    selected = [value for name,value in SUITES.items() if name not in ("app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-toolbar-ui", "mirror-floating-target", "gamepad-lifecycle", "models", "model-sync", "profile-isolation", "controller-ui")] if args.suite == "all" else [SUITES[args.suite]]
+    selected = [value for name,value in SUITES.items() if name not in ("remote-volume-target", "app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-toolbar-ui", "mirror-floating-target", "gamepad-lifecycle", "models", "model-sync", "profile-isolation", "controller-ui")] if args.suite == "all" else [SUITES[args.suite]]
     directory = f"/data/local/tmp/airc-phone-acceptance-{uuid.uuid4()}"
     binary = f"{directory}/airc-runtime"
     touch_selected = not phone_only and (args.suite in ("all", "touchpad", "ascrcpy", "gamepad-lifecycle", "mirror-floating-target") or args.with_touch_receiver)
@@ -129,7 +131,35 @@ def main():
     created = copied = False
     tests_installed = False
     service=None
+    original_audio = None
+    def target_audio():
+        volume = adb(args.target, "shell", "cmd media_session volume --stream 3 --get")
+        match = re.search(r"volume is (\d+) in range \[(\d+)\.\.(\d+)\]", volume)
+        dump = adb(args.target, "shell", "dumpsys audio")
+        muted = re.search(r"- STREAM_MUSIC:\s+Muted: (true|false)", dump)
+        if not match or not muted:
+            raise RuntimeError("Cannot read target media volume and mute state")
+        return int(match[1]), muted[1] == "true", int(match[2]), int(match[3])
+    def restore_target_audio():
+        if original_audio is None:
+            return
+        index, muted, minimum, maximum = original_audio
+        if target_audio() != original_audio:
+            dex = adb(args.target, "shell", f"ls {directory}/state/platform/android-*.dex").strip()
+            if not dex.startswith(directory + "/state/platform/") or "\n" in dex:
+                raise RuntimeError("Cannot identify the owned audio bridge for restoration")
+            user = int(adb(args.target, "shell", "am get-current-user").strip())
+            percent = int((index - minimum) * 100 / (maximum - minimum) + .5)
+            adb(args.target, "shell", f"CLASSPATH={shlex.quote(dex)} app_process /system/bin ernest.airc.bridge.AudioBridge set_volume {user} {percent}")
+            if target_audio()[1] != muted:
+                adb(args.target, "shell", "input keyevent 164")
+            if target_audio() != original_audio:
+                raise RuntimeError("Target audio restoration failed")
+        print(f"Restored TV audio: index={index}, muted={muted}", flush=True)
     try:
+        if args.suite == "remote-volume-target":
+            original_audio = target_audio()
+            print(f"Original TV audio: index={original_audio[0]}, muted={original_audio[1]}", flush=True)
         if args.use_installed_phone:
             for package, apk in (("ernest.airc", app), ("ernest.airc.test", tests)):
                 paths = adb(args.phone, "shell", "pm", "path", package).splitlines()
@@ -171,7 +201,10 @@ def main():
     finally:
         try:
             if copied:
-                target_shell(f"{binary} service stop --state-dir {directory}/state")
+                try:
+                    restore_target_audio()
+                finally:
+                    target_shell(f"{binary} service stop --state-dir {directory}/state")
         finally:
             try:
                 if created:

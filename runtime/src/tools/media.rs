@@ -244,3 +244,64 @@ mod tests {
         assert!(parse("Permission Denial").is_err());
     }
 }
+
+fn volume_percent(args: &Value) -> Result<Option<u64>> {
+    let object = args
+        .as_object()
+        .context("media.volume requires an object")?;
+    if object.is_empty() {
+        return Ok(None);
+    }
+    if object.len() != 1 || !object.contains_key("percent") {
+        bail!("media.volume accepts only percent");
+    }
+    Ok(Some(
+        object["percent"]
+            .as_u64()
+            .filter(|v| *v <= 100)
+            .context("percent must be an integer from 0 to 100")?,
+    ))
+}
+
+pub(super) async fn volume(args: &Value) -> Result<String> {
+    let percent = volume_percent(args)?;
+    let mut arguments = vec![current_user().await?];
+    let action = if let Some(percent) = percent {
+        arguments.push(percent.to_string());
+        "set_volume"
+    } else {
+        "status"
+    };
+    let payload = crate::platform_bridge::scheduled_audio(action, &arguments).await?;
+    let value: Value = serde_json::from_str(&payload)?;
+    if value["stream"] != "media" || value["operation"] != action || value["verified"] != true {
+        bail!("invalid media volume acknowledgement");
+    }
+    Ok(payload)
+}
+
+#[cfg(test)]
+mod volume_tests {
+    use super::*;
+    #[test]
+    fn accepts_read_and_bounded_integer_percent_only() {
+        assert_eq!(volume_percent(&json!({})).unwrap(), None);
+        for percent in [0, 57, 100] {
+            assert_eq!(
+                volume_percent(&json!({"percent":percent})).unwrap(),
+                Some(percent)
+            );
+        }
+        for invalid in [
+            json!(null),
+            json!([]),
+            json!({"percent":-1}),
+            json!({"percent":101}),
+            json!({"percent":0.5}),
+            json!({"percent":"50"}),
+            json!({"percent":50,"stream":0}),
+        ] {
+            assert!(volume_percent(&invalid).is_err(), "{invalid}");
+        }
+    }
+}

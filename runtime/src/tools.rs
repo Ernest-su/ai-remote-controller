@@ -69,6 +69,7 @@ pub const TOOLS: &[&str] = &[
     "device.system_action",
     "device.system_pending",
     "media.status",
+    "media.volume",
     "media.seek",
     "media.custom_action",
     "media.players",
@@ -256,6 +257,9 @@ pub async fn execute(tool: &str, args: &Value) -> Result<String> {
     }
     if tool == "media.seek" {
         return media::seek(args).await;
+    }
+    if tool == "media.volume" {
+        return media::volume(args).await;
     }
     if tool == "media.status" {
         return media::execute(args).await;

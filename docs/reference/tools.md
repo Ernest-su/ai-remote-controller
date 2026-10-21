@@ -266,3 +266,7 @@ remote.key 的 power 参数仅供直接手动控制；模型别名 remote_key �
 目标桥接使用 `SOURCE_KEYBOARD`，首次 DOWN 的重复次数为0；按系统长按阈值产生首次重复 DOWN（重复次数1、`FLAG_LONG_PRESS`），之后按系统重复间隔继续递增重复次数，均保留初始 `downTime`。UP 的重复次数为0，取消 UP 带 `FLAG_CANCELED`。不会通过多次 DOWN/UP 模拟连续点击。目标应用和系统策略决定最终行为。
 
 断线释放所属连接的按键。桥接线程独立于 RPC 计时，1500ms无保活或按住120秒即取消释放；服务退出时关闭桥接并释放剩余按键。出错后仅尝试抬起，不自动重放 DOWN。边沿响应包含 `operation`、`pressId`、`keyCode`、`submitted`、`released` 和 `source`；`down`/`keep` 的 `released` 为false，`up`/`cancel` 为true，提交成功不代表目标应用已经消费事件。
+
+## 媒体音量 {#media-volume}
+
+`media.volume` / `media_volume` 使用原生 AudioManager 读取媒体流音量。空参数对象只读取；`{"percent":57}` 设置 0–100 的整数百分比，映射到设备最小/最大音量档位，回读确认后返回 `verified=true`。结果包含 `volumeIndex`、`minVolumeIndex`、`maxVolumeIndex`、`muted`、`fixed`、`stream=media` 与 `operation`（`status` 或 `set_volume`）；设置还包含 `requestedPercent`。固定音量设备拒绝设置，权限不足或设置未生效返回错误，不把命令成功当成音量已改变。
