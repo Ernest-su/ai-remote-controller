@@ -311,7 +311,7 @@ class DesktopUiTest {
             compose.onNodeWithTag("navigate-back").performClick()
             for ((feature, page) in listOf("apps" to "apps-page", "service" to "service-page",
                 "permissions" to "permissions-page", "device_info" to "device-info-page", "results" to "results-page",
-                "help" to "help-page", "screenshot" to "screenshot-page", "files" to "files-page", "touchpad" to "touchpad-page", "settings" to "settings-page")) {
+                "help" to "help-page", "screenshot" to "screenshot-page", "files" to "files-page", "touchpad" to "touchpad-page", "settings" to "settings-page", "about" to "about-page")) {
                 compose.onNodeWithTag("feature-$feature").performScrollTo().performClick()
                 compose.onNodeWithTag(page).assertIsDisplayed()
                 if(feature=="screenshot") {

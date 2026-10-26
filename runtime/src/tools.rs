@@ -8,6 +8,7 @@ mod app_icon;
 mod apps;
 mod device_info;
 mod file_directories;
+mod file_rename;
 pub(crate) mod files;
 mod foreground;
 pub(crate) mod gamepad;
@@ -35,6 +36,7 @@ pub const TOOLS: &[&str] = &[
     "task.progress",
     "task.cancel",
     "files.mkdir",
+    "files.rename",
     "files.download_url",
     "files.url_info",
     "files.pending",
@@ -221,6 +223,9 @@ pub async fn execute(tool: &str, args: &Value) -> Result<String> {
     }
     if tool == "files.download_url" {
         return crate::transfers::download_url(args);
+    }
+    if tool == "files.rename" {
+        return file_rename::execute(args);
     }
     if tool == "files.mkdir" {
         return file_directories::execute(args);

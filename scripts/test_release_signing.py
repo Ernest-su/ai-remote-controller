@@ -24,6 +24,22 @@ release = module('build_release', 'build-release.py')
 
 
 class SigningTests(unittest.TestCase):
+    def test_release_rejects_mismatched_companion_input_method(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("runtime", "androidApp", "tvInputMethod"):
+                (root / name).mkdir()
+            (root / "runtime/Cargo.toml").write_text('[package]\nversion = "1.2.3"\n')
+            (root / "androidApp/build.gradle.kts").write_text('versionName = "1.2.3"; versionCode = 7')
+            ime = root / "tvInputMethod/build.gradle.kts"
+            with patch.object(release, "ROOT", root):
+                ime.write_text('versionName = "1.2.3"; versionCode = 7')
+                self.assertEqual(7, release.validate_version("v1.2.3"))
+                for version, code in (("1.2.2", 7), ("1.2.3", 6)):
+                    ime.write_text(f'versionName = "{version}"; versionCode = {code}')
+                    with self.assertRaisesRegex(ValueError, "TV input method"):
+                        release.validate_version("v1.2.3")
+
     def test_output_must_be_outside_checkout_and_cannot_replace_existing_directory(self):
         with self.assertRaises(ValueError):
             signing.create_directory(signing.ROOT / 'build/private-keys')
@@ -91,6 +107,8 @@ class ReleaseTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         (self.root / 'runtime').mkdir()
         (self.root / 'androidApp').mkdir()
+        (self.root / 'tvInputMethod').mkdir()
+        (self.root / 'tvInputMethod/build.gradle.kts').write_text('versionName = "1.2.3"; versionCode = 7')
         (self.root / 'docs').mkdir()
         (self.root / 'runtime/Cargo.toml').write_text('[package]\nversion = "1.2.3"\n')
         (self.root / 'androidApp/build.gradle.kts').write_text('versionName = "1.2.3"\nversionCode = 7\n')

@@ -19,6 +19,8 @@ fun DesktopFileBrowser(state: DesktopState, controller: DesktopController) {
     val downloadDirectory by controller.downloadDirectories.state.collectAsState()
     val storage by controller.storageAnalysis.state.collectAsState()
     val files by controller.files.state.collectAsState()
+    val textFile by controller.textFiles.state.collectAsState()
+    val textTransfer by controller.textFiles.transfers.state.collectAsState()
     val installation by controller.appInstallation.state.collectAsState()
     val apk by controller.apkInspection.state.collectAsState()
     val media by controller.fileMedia.state.collectAsState()
@@ -39,12 +41,18 @@ fun DesktopFileBrowser(state: DesktopState, controller: DesktopController) {
     val cache=remember { File(DesktopController.defaultStateDirectory().toFile(),"downloads") }
     val uploadLocked = transfer.running || transfer.proposal != null || transfer.readyToSave || batch.running || batch.paused || batch.readyToSave || batch.saving
     fun path(name: String)=listOf(files.path,name).filter{it.isNotEmpty()}.joinToString("/")
+    FileTextEditor(textFile, textTransfer, available, controller.textFiles::edit, { controller.textFiles.save(available) },
+        controller.textFiles::continueLoading, controller.textFiles::retry, controller.textFiles::closeDocument,
+        controller.textFiles.transfers::cancel, controller.textFiles.transfers::confirm)
     FileBrowserPanel(files, available, { controller.files.refresh(available) }, { controller.files.parent(available) },
         { controller.files.more(available) }, { controller.files.enter(it, available) }, { controller.files.inspect(it, available) },
         taskGroups=fileTaskGroups(batch, transfer, download, storage, apk, installation, media),
         selectionDeviceKey=state.deviceId,
         onDownloadSelected={ names, mode -> controller.batchTransfers.download(files.root, files.path, names, mode) },
         batchDownloadEnabled=canTransfer && !transfer.running && transfer.proposal == null && !batch.running && !batch.paused && !batch.readyToSave && !batch.saving,
+        onText=if ("files.preview" in state.tools) ({ entry -> controller.textFiles.open(files.root, path(entry.name), entry, available, !files.readOnly && listOf("files.prepare_overwrite", "task.start", "task.progress", "task.cancel").all { it in state.tools }) }) else null,
+        onRename=if ("files.rename" in state.tools && !uploadLocked) ({ entry, name -> controller.files.rename(entry, name, available && !uploadLocked) }) else null,
+        apkInstallationAvailable=available && !apk.busy && !installation.busy && installation.proposal == null && listOf("apps.apk_info", "apps.install", "task.progress", "task.cancel").all { it in state.tools },
         directoryAvailable=available&&!transfer.running,
         onCreateDirectory=if("files.mkdir" in state.tools) ({name -> controller.files.createDirectory(name,available&&!transfer.running)})else null,
         onRoot=controller.files::selectRoot,
@@ -198,7 +206,7 @@ fun DesktopFileBrowser(state: DesktopState, controller: DesktopController) {
                 controller.appInstallation::confirm, controller.appInstallation::cancel,
                 onAdd = { apk.info?.let(controller.appInstallation::add) }, onRemove = controller.appInstallation::remove,
                 tasksOnly=tasksOnly,installLabel = "在被控设备安装此 APK", onPrepareSet = { update -> controller.appInstallation.prepareSelected(update, available) })
-            if (apk.info == null && !apk.busy && apk.error == null) Text("从 APK 文件的更多菜单选择 APK 信息，读取后可准备安装。", color=RemoteColors.Secondary)
+            if (apk.info == null && !apk.busy && apk.error == null) Text("点击文件管理的“安装 APK”选择被控设备上的文件，读取信息后确认安装。", color=RemoteColors.Secondary)
             }
             if (section == "media") {
             FileMediaPanel(media,available,controller.fileMedia::choose,{controller.fileMedia.open(available)},{controller.fileMedia.release(available)},onMode={local -> media.players?.let{controller.fileMedia.inspect(it.root,it.path,available,local)}},onCancel=controller.fileMedia::cancel,onRecover=if("media.publications" in state.tools) ({controller.fileMedia.recover(available)})else null,onReleaseCopy={id -> controller.fileMedia.releaseCopy(id,available)},tasksOnly=tasksOnly)

@@ -23,6 +23,11 @@ def validate_version(tag):
     code = int(re.search(r'versionCode\s*=\s*(\d+)', android).group(1))
     if tag != "v" + cargo or version != cargo:
         raise ValueError("Tag, Android versionName and runtime Cargo version must match")
+    ime = (ROOT / "tvInputMethod/build.gradle.kts").read_text()
+    ime_version = re.search(r'versionName\s*=\s*"([^"]+)"', ime).group(1)
+    ime_code = int(re.search(r'versionCode\s*=\s*(\d+)', ime).group(1))
+    if ime_version != version or ime_code != code:
+        raise ValueError("TV input method versionName and versionCode must match the Android controller")
     return code
 
 

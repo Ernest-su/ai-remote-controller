@@ -39,7 +39,7 @@ fun groupFileTaskSections(sections: List<String>, batchUpload: Boolean = false, 
             else -> FileTaskType.MEDIA
         } == type }
         FileTaskGroup(type,matching,matching.sumOf { if(it=="apk") apkCount else 1 })
-    }
+    }.sortedBy { it.count == 0 }
 fun fileTaskGroups(batch: BatchTransferState, transfer: FileTransferState, download: UrlDownloadState,
     storage: StorageAnalysisState, apk: ApkInspectionState, installation: AppInstallationState, media: FileMediaState): List<FileTaskGroup> {
     val apkPresent=apk.noticeId!=null || apk.busy || apk.info!=null || apk.error!=null

@@ -29,4 +29,10 @@ class FileTaskSummaryTest {
         assertEquals(listOf("batch","upload"),groups.single {it.type==FileTaskType.UPLOAD}.sections)
     }
 
+    @Test fun populatedGroupsComeFirstInStableTypeOrder() {
+        val groups = groupFileTaskSections(listOf("media", "apk", "download"))
+        assertEquals(listOf(FileTaskType.DOWNLOAD, FileTaskType.APK, FileTaskType.MEDIA), groups.take(3).map { it.type })
+        assertEquals(listOf(FileTaskType.UPLOAD, FileTaskType.URL, FileTaskType.DELETE, FileTaskType.STORAGE), groups.drop(3).map { it.type })
+        assertEquals(FileTaskType.entries.toList(), groupFileTaskSections(emptyList()).map { it.type })
+    }
 }

@@ -12,7 +12,7 @@ class AppInstallationController(private val scope: CoroutineScope, private val r
     private var job: Job? = null
     private var approval: CompletableDeferred<Boolean>? = null
     fun confirm(accepted: Boolean) { approval?.complete(accepted) }
-    fun cancel() { if (state.value.phase != "committing") job?.cancel() }
+    fun cancel() { if (state.value.phase !in listOf("committing", "verifying")) job?.cancel() }
     fun clear() { generation++; job?.cancel(); mutable.value = AppInstallationState() }
     fun add(apk: TargetApkInfo) {
         if(state.value.busy) return
@@ -76,6 +76,29 @@ class AppInstallationController(private val scope: CoroutineScope, private val r
             finally { if (token == generation) mutable.update { it.copy(busy = false, proposal = null) } }
         }
     }
+    private suspend fun confirmInstalled(proposal: AppInstallProposal, requireChange: Boolean, token: Long, target: RuntimeTransferTarget) {
+        if (token == generation) mutable.update { it.copy(phase = "verifying") }
+        var failure = "未能确认被控设备上的安装状态"
+        repeat(3) { attempt ->
+            runtime.checkTransferTarget(target)
+            try {
+                val info = json.decodeFromString<TargetAppInfo>((withTimeoutOrNull(5_000) { runtime.requestAt(target, "apps.info", buildJsonObject { put("package", proposal.apk.packageName) }) } ?: error("查询超时")))
+                runtime.checkTransferTarget(target)
+                val matches = info.packageName == proposal.apk.packageName && info.userId == proposal.userId && info.versionCode == proposal.apk.versionCode
+                val previous = proposal.currentApp
+                val changed = previous == null || previous.versionCode != info.versionCode || previous.codePath != info.codePath || previous.lastUpdateTime != info.lastUpdateTime
+                if (matches && (!requireChange || changed)) return
+                failure = if (matches) "自动查询发现仍为安装前的相同版本，无法确认本次安装完成"
+                    else "自动查询的安装状态不匹配：${info.packageName}，版本 ${info.versionCode}，用户 ${info.userId}"
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                runtime.checkTransferTarget(target)
+                failure = "自动查询最终安装状态失败：${e.message ?: "设备未返回应用信息"}"
+            }
+            if (attempt < 2) delay(500)
+        }
+        error(failure)
+    }
     private suspend fun executeProposal(proposal: AppInstallProposal, token: Long, target: RuntimeTransferTarget) {
         check(proposal.kind == "app_install" && proposal.approvalRequired && (proposal.currentApp == null || proposal.update)) { "安装提案无效" }
         val apks = proposal.apks.ifEmpty { listOf(proposal.apk) }
@@ -97,13 +120,15 @@ class AppInstallationController(private val scope: CoroutineScope, private val r
                 delay(300); runtime.checkTransferTarget(target)
                 task = json.decodeFromString(runtime.requestAt(target, "task.progress", buildJsonObject { put("id", id) }))
             }
-            check(task.phase == "completed") { task.error ?: "安装未完成；请查询应用信息" }
+            if (task.phase == "completed") {
             val result = checkNotNull(task.result).jsonObject
             check(result["installed"]?.jsonPrimitive?.boolean == true && result["package"]?.jsonPrimitive?.content == proposal.apk.packageName && result["versionCode"]?.jsonPrimitive?.long == proposal.apk.versionCode && result["userId"]?.jsonPrimitive?.int == proposal.userId && result["sha256"]?.jsonPrimitive?.content == proposal.apk.sha256) { "安装结果对象不匹配，请查询应用信息" }
             if(apks.size > 1) {
                 val installedApks = json.decodeFromJsonElement<List<TargetApkInfo>>(checkNotNull(result["apks"]))
                 check(installedApks.toSet() == apks.toSet()) { "多包安装结果不匹配，请查询应用信息" }
             }
+            }
+            confirmInstalled(proposal, task.phase != "completed", token, target)
             if (token == generation) mutable.update { it.copy(phase = "completed", message = "安装完成：${proposal.apk.packageName}（版本 ${proposal.apk.versionCode}，用户 ${proposal.userId}）") }
         } finally {
             if (approval === pending) approval = null

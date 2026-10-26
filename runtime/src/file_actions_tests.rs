@@ -139,3 +139,38 @@ fn deleting_a_link_preserves_target_and_mutations_reject_link_parents() {
     );
     std::fs::remove_dir_all(directory).unwrap();
 }
+
+#[tokio::test]
+async fn text_overwrite_requires_original_content_and_rechecks_before_approval() {
+    use sha2::{Digest, Sha256};
+    let directory = std::env::temp_dir().join(format!("airc-text-guard-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir(&directory).unwrap();
+    let file = directory.join("code.txt");
+    std::fs::write(&file, b"before").unwrap();
+    let path = file.to_str().unwrap().trim_start_matches('/');
+    assert!(prepare(
+        "files.prepare_overwrite",
+        &json!({"root":"full","path":path,"expectedSha256":"0".repeat(64)})
+    )
+    .is_err());
+    let digest = format!("{:x}", Sha256::digest(b"before"));
+    let proposal: Value = serde_json::from_str(
+        &prepare(
+            "files.prepare_overwrite",
+            &json!({"root":"full","path":path,"expectedSha256":digest}),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    std::fs::write(&file, b"changed").unwrap();
+    approve(&json!({"id":proposal["id"]})).await.unwrap();
+    let (parent, _) = crate::tools::files::parent(std::path::Path::new("/"), path).unwrap();
+    assert!(consume_overwrite(proposal["id"].as_str().unwrap(), "full", path, &parent).is_err());
+    assert_eq!(std::fs::read(&file).unwrap(), b"changed");
+    assert!(prepare(
+        "files.delete",
+        &json!({"root":"full","path":path,"expectedSha256":digest})
+    )
+    .is_err());
+    std::fs::remove_dir_all(directory).unwrap();
+}

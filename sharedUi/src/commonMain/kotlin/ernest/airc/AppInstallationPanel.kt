@@ -52,7 +52,7 @@ fun AppInstallationPanel(state: AppInstallationState, apk: TargetApkInfo?, avail
     }
     if (state.busy) {
         LinearProgressIndicator(Modifier.fillMaxWidth())
-        Text(if (state.phase == "committing") "正在提交安装，不能取消" else if (state.phase == "awaiting_approval") "等待安装确认" else "正在准备 APK 安装")
+        Text(if (state.phase == "verifying") "正在确认被控设备安装结果，不能取消" else if (state.phase == "committing") "正在提交安装，不能取消" else if (state.phase == "awaiting_approval") "等待安装确认" else "正在准备 APK 安装")
         state.total?.takeIf { state.phase == "preparing" }?.let { Text("已处理 ${state.bytes} / $it 字节", color = RemoteColors.Secondary) }
         if (state.phase == "preparing") OutlinedButton(onCancel, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("取消安装准备") }
     }

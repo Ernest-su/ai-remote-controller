@@ -23,13 +23,14 @@ import org.junit.runner.RunWith
 /** Offline visual fixtures; never deploy to or operate an external target. */
 @RunWith(AndroidJUnit4::class)
 class ProductPagesUiTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rules: org.junit.rules.TestRule = org.junit.rules.RuleChain.outerRule(DeviceHistoryIsolation()).around(compose)
 
     @Test fun allFeaturePagesRemainBrowsableInBothThemesAndLargeText() {
         val pages = listOf("apps" to "apps-page", "text" to "text-page", "model" to "model-page",
             "service" to "service-page", "permissions" to "permissions-page", "device_info" to "device-info-page",
             "results" to "results-page", "help" to "help-page", "screenshot" to "screenshot-page",
-            "files" to "files-page", "schedules" to "schedule-page", "settings" to "settings-page")
+            "files" to "files-page", "schedules" to "schedule-page", "settings" to "settings-page", "about" to "about-page")
         for (dark in listOf(false, true)) {
             compose.runOnUiThread {
                 val model = ViewModelProvider(compose.activity)[RemoteViewModel::class.java]

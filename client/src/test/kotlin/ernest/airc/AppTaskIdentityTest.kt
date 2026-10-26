@@ -36,6 +36,7 @@ class AppTaskIdentityTest {
                 val result = when {
                     tool == (if(install) "apps.install_pending" else "apps.pending") -> proposal
                     message["type"]?.jsonPrimitive?.content == (if(install) "approve_install" else "approve_app") -> Json.encodeToString(TransferProgress("original",if(wrongInitialType) "delete" else direction,"fixture.app",0,0,"committing",dataPath="/transfers/original/data",root="apps",unit=unit))
+                    tool == "apps.info" -> Json.encodeToString(app)
                     tool == "task.progress" -> {
                         synchronized(requestedIds) { requestedIds += message.getValue("arguments").jsonObject.getValue("id").jsonPrimitive.content }
                         Json.encodeToString(TransferProgress(if(wrongResult) "original" else "foreign",direction,"fixture.app",0,1,"completed",dataPath="/transfers/foreign/data",root="apps",unit=unit,result=buildJsonObject { put("package","fixture.app");put("userId",0);if(install) { put("installed",true);put("versionCode",1);put("userId",if(validInstall || wrongDigest) 0 else 10);put("sha256",if(wrongDigest) "b".repeat(64) else apk.sha256) } else { put("cacheOnly",true);put("completed",true) } }))

@@ -16,6 +16,8 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
     val download by model.urlDownloads.state.collectAsState()
     val storage by model.storageAnalysis.state.collectAsState()
     val files by model.files.state.collectAsState()
+    val textFile by model.textFiles.state.collectAsState()
+    val textTransfer by model.textFiles.transfers.state.collectAsState()
     val installation by model.appInstallation.state.collectAsState()
     val apk by model.apkInspection.state.collectAsState()
     val media by model.fileMedia.state.collectAsState()
@@ -95,6 +97,9 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
             }
         }
     }
+    FileTextEditor(textFile, textTransfer, available, model.textFiles::edit, { model.textFiles.save(available) },
+        model.textFiles::continueLoading, model.textFiles::retry, model.textFiles::closeDocument,
+        model.textFiles.transfers::cancel, model.textFiles.transfers::confirm)
     FileBrowserPanel(files, available, { model.files.refresh(available) }, { model.files.parent(available) },
         { model.files.more(available) }, { model.files.enter(it, available) }, { model.files.inspect(it, available) },
         selectionBackHandler={ active, cancel -> androidx.activity.compose.BackHandler(active, onBack = cancel) },
@@ -102,6 +107,9 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
         selectionDeviceKey=state.selected,
         onDownloadSelected={ names, mode -> model.batchTransfers.download(files.root, files.path, names, mode) },
         batchDownloadEnabled=canTransfer && !transfer.running && transfer.proposal == null && !batch.running && !batch.paused && !batch.readyToSave && !batch.saving,
+        onText=if ("files.preview" in state.tools) ({ entry -> model.textFiles.open(files.root, path(entry.name), entry, available, !files.readOnly && listOf("files.prepare_overwrite", "task.start", "task.progress", "task.cancel").all { it in state.tools }) }) else null,
+        onRename=if ("files.rename" in state.tools && !uploadLocked) ({ entry, name -> model.files.rename(entry, name, available && !uploadLocked) }) else null,
+        apkInstallationAvailable=available && !apk.busy && !installation.busy && installation.proposal == null && listOf("apps.apk_info", "apps.install", "task.progress", "task.cancel").all { it in state.tools },
         directoryAvailable=available&&!transfer.running,
         onCreateDirectory=if("files.mkdir" in state.tools) ({name -> model.files.createDirectory(name,available&&!transfer.running)})else null,
         onRoot=model.files::selectRoot,
@@ -203,7 +211,7 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
                 model.appInstallation::confirm, model.appInstallation::cancel,
                 onAdd = { apk.info?.let(model.appInstallation::add) }, onRemove = model.appInstallation::remove,
                 tasksOnly = tasksOnly, installLabel = "在被控设备安装此 APK", onPrepareSet = { update -> model.appInstallation.prepareSelected(update, available) })
-            if (apk.info == null && !apk.busy && apk.error == null) Text("从 APK 文件的更多菜单选择 APK 信息，读取后可准备安装。", color=RemoteColors.Secondary)
+            if (apk.info == null && !apk.busy && apk.error == null) Text("点击文件管理的“安装 APK”选择被控设备上的文件，读取信息后确认安装。", color=RemoteColors.Secondary)
             }
             if (section == "media") {
             FileMediaPanel(media,available,model.fileMedia::choose,{model.fileMedia.open(available)},{model.fileMedia.release(available)},onMode={local -> media.players?.let{model.fileMedia.inspect(it.root,it.path,available,local)}},onCancel=model.fileMedia::cancel,onRecover=if("media.publications" in state.tools) ({model.fileMedia.recover(available)})else null,onReleaseCopy={id -> model.fileMedia.releaseCopy(id,available)},tasksOnly=tasksOnly)

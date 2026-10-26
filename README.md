@@ -83,8 +83,10 @@ Android 控制端与 JVM 桌面测试工具，共享协议与设备记录位于 
 - [连接状态](docs/guide/connections.md)：遥控服务、ADB 和动态预览分别展示并提供恢复入口。
 - [动态预览](docs/guide/screenshots.md)：流畅、均衡、清晰三档，默认使用便于点按的紧凑悬浮遥控。
 
-新功能入口：
+更多功能：
 
 - [条件快捷操作、桌面快捷入口与小组件、看图操作和自定义按键](docs/guide/remote.md#conditional-routines)。
 - [定时操作](docs/guide/schedules.md)：由被控端保存与执行，支持倒计时、单次时间及每天重复，手机退出不影响已运行服务的调度。
 - [批量传输与断点续传](docs/guide/files.md#batch-transfers)：多文件上传、打包 ZIP 或逐个下载，原服务任务有效时可手动续传。
+
+文件管理支持同目录重命名、被控端 APK 选择，以及保留编码的[文本与代码编辑](docs/guide/files.md#text-editing)。文本保存需确认覆盖，并校验原文件未被外部修改。功能菜单的“关于”显示当前版本，Android 的帮助与仓库入口在应用内网页打开。

@@ -39,6 +39,8 @@ fun DesktopPermissions(state: DesktopState, controller: DesktopController) = Pag
 
 @Composable
 fun DesktopHelp() = PageContent(Modifier.testTag("help-page")) {
+    val uri = androidx.compose.ui.platform.LocalUriHandler.current
+    ProjectDocumentation { uri.openUri(ProjectLinks.DOCUMENTATION) }
     Panel {
         SectionTitle("桌面测试工具")
         Text("右上角进入设备页，刷新并选择宿主机 adb 已授权设备，或直接连接局域网服务。")

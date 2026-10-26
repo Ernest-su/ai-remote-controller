@@ -100,6 +100,12 @@ Android 页面显示名称、包名、图标与类型，支持名称/包名搜�
 
 `files.download` / `files_download` 保留小文件快照接口，最大 16 MiB，返回短期 FileArtifact（id/path/name/mimeType/sizeBytes/sha256/expiresInSeconds）。GET `/artifacts/{id}` 下载，60 秒过期，与截图共享四项资源容量；大文件应使用 task.start。界面所有文件下载均采用流式任务。详见[目标文件](../guide/files.md)。
 
+## 文件重命名与文本覆盖 {#file-editing}
+
+`files.rename` / `files_rename` 接收 `root`、相对 `path` 和同目录单个新名称 `name`，返回 `{root,path,destination,renamed:true}`。支持普通文件、文件夹和链接本身，不跟随父目录链接，不跨目录移动，不覆盖已有目标；优先原子不覆盖重命名；Android共享存储不支持时，使用独占创建的副本，完整复制并复查源身份后移除原项。兼容复制最多128 MiB、2000项、64层，不跨挂载点；复制未完成时原项保留，新名称下可能保留部分副本，删除原项期间出现变动时新名称下保留完整副本并明确报错。
+
+`files.prepare_overwrite` 可附带 `expectedSha256`（64位小写十六进制），用于不超过2 MiB的文本编辑保存。文件必须仍存在、内容摘要一致且读取期间身份未变化；不一致时不创建覆盖提案。后续仍需用户确认，并在上传提交时复查文件身份。
+
 ## 媒体打开工具
 
 `media.players` / `media_players` 接收 root/path 与可选 mimeType，读取文件属性并查询目标 ACTION_VIEW 处理器。返回 root/path/mimeType/transport/packages；Downloads 使用 file URI，inbox/full 使用目标 loopback HTTP 地址。排除 frameworkpackagestubs 占位处理器。`media.open` / `media_open` 使用同样参数与可选 package（必须来自查询结果）启动播放器；返回 launched、playbackVerified=false、可选 resourceId 和 Android 启动结果。它不证明解码/播放成功，不接受任意外部 URI 或 shell 参数。
@@ -150,7 +156,7 @@ Android 页面显示名称、包名、图标与类型，支持名称/包名搜�
 
 `media.seek` / `media_seek` 接收 package、非负整数 positionMs 和可选 sessionTag。选择当前 Android 用户活动会话，检查 ACTION_SEEK_TO 和已知正时长边界；多个匹配会话时拒绝猜测。通过标准 TransportControls.seekTo 提交，不用方向/快进键模拟。返回 packageName、requestedMs、submitted=true、playbackVerified=false 和提交时 session 快照。提交不证明执行：控制端随后读取位置核对，播放器拒绝或未及时更新时如实显示未观察到目标位置。接口依据 [MediaSessionManager](https://developer.android.com/reference/android/media/session/MediaSessionManager#getActiveSessions(android.content.ComponentName)) 与 [TransportControls.seekTo](https://developer.android.com/reference/android/media/session/MediaController.TransportControls#seekTo(long))。
 
-常驻服务仍为 Rust 原生二进制。Android 构建时编译并嵌入短时 Java/Dex 桥接，只经系统 app_process 为当前请求调用 framework，不安装服务 APK或后台 Java 服务。初始化到服务私有 platform 目录中的 SHA-256 命名只读资产，核对 owner、模式、长度和内容；子进程默认限时 10 秒、输出 256 KiB；应用列表框架查询限时 30 秒、输出 1 MiB。反射只用于获取系统/当前用户上下文与 Android 媒体模块初始化；厂商或权限阻止时返回不可用，不切换或提权。最多 64 会话，标题限 256 字符、tag 超过 128 字符返回 null。Root 身份及其他 Android 版本尚未实机验收。
+常驻服务仍为 Rust 原生二进制。Android 构建时编译并嵌入短时 Java/Dex 桥接，只经系统 app_process 为当前请求调用 framework，不安装服务 APK或后台 Java 服务。初始化到服务私有 platform 目录中的 SHA-256 命名只读资产，核对 owner、模式、长度和内容；子进程默认限时 10 秒、输出 256 KiB；应用列表框架查询限时 30 秒、输出 1 MiB。反射只用于获取系统/当前用户上下文与 Android 媒体模块初始化；厂商或权限阻止时返回不可用，不切换或提权。最多 64 会话，标题限 256 字符、tag 超过 128 字符返回 null。Root 身份、Android 版本与厂商权限差异需在对应目标验证。
 
 ## 真实应用名称 {#app-labels}
 

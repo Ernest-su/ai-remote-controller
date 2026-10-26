@@ -102,7 +102,7 @@ App 的 root 开关默认关闭；开启后优先检测当前 root adbd，其次
 
 `media.status` 接收空参数对象，返回 `{"sessions":[...]}`。每个会话含 `packageName`、`active`、`state`、`positionMs`、`durationMs`、`updatedAtElapsedMs`、`seekSupported` 和 `description`。状态数字使用 Android PlaybackState 值；位置为系统报告的毫秒快照，不自动推算。未知字段为 null。时长仅在系统 dump 明确提供标准 duration 键时返回，常见系统输出不提供时长。
 
-`seekSupported` 表示播放器声明了 ACTION_SEEK_TO（256），不表示当前 runtime 已能执行 seek。读取权限失败返回工具错误。该工具也通过 `media_status` 函数提供给大模型。现有播放按键保持可用，精确 seek 尚未实现。
+`seekSupported` 表示播放器声明了 ACTION_SEEK_TO（256）。读取权限失败返回工具错误；该工具也通过 `media_status` 函数提供给大模型。精确定位通过 `media.seek` 提交，成功仅表示请求送出，需回读实际位置；参数见[播放定位](reference/tools.md#media-seek)。
 
 ## 截图二进制资源
 
@@ -293,7 +293,9 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 | `schedule_toggle` | id、enabled；启用须confirmed=true | 暂停或启用，过期单次任务拒绝重新启用 |
 | `schedule_delete` | id | 删除未来调度；执行中拒绝删除 |
 
-`action`只允许`pause`、`shutdown`、`stop_app`、`open_app`。后两者必须提供package，前两者禁止携带package；不接受Shell或任意命令。`kind=delay`须带delaySeconds（60–604800秒），`once`须带localDateTime（`yyyy-MM-dd HH:mm`），`daily`须带dailyTime（`HH:mm`），禁止混用时间字段。日期时间按被控端本地时区解析。
+`action`允许`pause`、`shutdown`、`stop_app`、`open_app`、`set_volume`、`mute`、`unmute`。`stop_app`和`open_app`必须提供package，其余动作禁止携带package；不接受Shell或任意命令。`kind=delay`须带delaySeconds（60–604800秒），`once`须带localDateTime（`yyyy-MM-dd HH:mm`），`daily`须带dailyTime（`HH:mm`），禁止混用时间字段。日期时间按被控端本地时区解析。
+
+`set_volume` 必须提供整数 `volumePercent`（0–100），其他动作禁止该字段，三者均禁止 `package`。列表与被控端持久记录保留 `volumePercent`。音量百分比映射为媒体流最接近的系统档位；静音与解除使用明确状态操作，执行后核对系统状态，失败记录原因。
 
 返回任务包含id、action、package、appIdentity、kind、dailyTime、nextAt（Unix秒）、enabled、lastAt、lastStatus、lastResult；列表额外给每项nextLocalTime。保存时绑定应用安装与用户身份，执行前重新检查。lastStatus区分pending、running、submitted、missed、interrupted、uncertain、failed；submitted只代表操作提交或工具返回，不能据断线认定关机成功。
 
@@ -318,6 +320,10 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 
 分块检查点只保留在当前服务和控制端进程内，不声明跨重启恢复。原任务限额、取消与约15分钟闲置回收仍适用。
 
-定时任务 `schedule_save` 的 `action` 另支持 `set_volume`、`mute`、`unmute`；`set_volume` 必须提供整数 `volumePercent`（0–100），其他动作禁止该字段，三者均禁止 `package`。列表与被控端持久记录保留 `volumePercent`。音量百分比映射为媒体流最接近的系统档位；静音与解除使用明确状态操作，执行后核对系统状态，失败记录原因。
-
 `media.volume` 提供原生媒体流音量快照和经过回读确认的百分比设置。空对象为读取，设置参数为 `{"percent":0..100}`；字段和错误语义见[媒体音量](reference/tools.md#media-volume)。标准遥控滑块使用该接口。
+
+## 文件重命名与文本覆盖 {#file-editing}
+
+`files.rename` / `files_rename` 接收 `root`、相对 `path` 和同目录单个新名称 `name`，返回 `{root,path,destination,renamed:true}`。支持普通文件、文件夹和链接本身，不跟随父目录链接，不跨目录移动，不覆盖已有目标；优先原子不覆盖重命名；Android共享存储不支持时，使用独占创建的副本，完整复制并复查源身份后移除原项。兼容复制最多128 MiB、2000项、64层，不跨挂载点；复制未完成时原项保留，新名称下可能保留部分副本，删除原项期间出现变动时新名称下保留完整副本并明确报错。
+
+`files.prepare_overwrite` 可附带 `expectedSha256`（64位小写十六进制），用于不超过2 MiB的文本编辑保存。文件必须仍存在、内容摘要一致且读取期间身份未变化；不一致时不创建覆盖提案。后续仍需用户确认，并在上传提交时复查文件身份。

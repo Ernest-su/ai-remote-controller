@@ -119,7 +119,7 @@ class RemoteNavigationUiTest {
             "apps" to "apps-page", "text" to "text-page",
             "model" to "model-page", "service" to "service-page", "permissions" to "permissions-page",
             "device_info" to "device-info-page", "results" to "results-page", "help" to "help-page",
-            "screenshot" to "screenshot-page", "files" to "files-page", "settings" to "settings-page",
+            "screenshot" to "screenshot-page", "files" to "files-page", "settings" to "settings-page", "about" to "about-page",
         )
         for ((feature, page) in destinations) {
             compose.onNodeWithTag("feature-$feature").performScrollTo().performClick()

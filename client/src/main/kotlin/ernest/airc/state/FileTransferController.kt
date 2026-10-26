@@ -18,8 +18,8 @@ class FileTransferController(private val scope: CoroutineScope, private val runt
     private val json = Json { ignoreUnknownKeys = true }
     private var approval: CompletableDeferred<Boolean>? = null
     fun confirm(accepted: Boolean) { approval?.complete(accepted) }
-    private suspend fun approve(target: RuntimeTransferTarget, token: Long, kind: String, root: String, path: String, recursive: Boolean = false): String {
-        val result = runtime.requestAt(target,if(kind=="delete") "files.delete" else "files.prepare_overwrite",buildJsonObject { put("root",root);put("path",path);if(kind=="delete")put("recursive",recursive) })
+    private suspend fun approve(target: RuntimeTransferTarget, token: Long, kind: String, root: String, path: String, recursive: Boolean = false, expectedSha256: String? = null): String {
+        val result = runtime.requestAt(target,if(kind=="delete") "files.delete" else "files.prepare_overwrite",buildJsonObject { put("root",root);put("path",path);if(kind=="delete")put("recursive",recursive);expectedSha256?.let { put("expectedSha256",it) } })
         val proposal = json.decodeFromString<FileActionProposal>(result)
         check(proposal.kind==kind && proposal.root==root && proposal.path==path && proposal.approvalRequired &&
             (kind!="delete" || proposal.recursive==recursive)) { "操作确认信息不匹配" }
@@ -70,11 +70,18 @@ class FileTransferController(private val scope: CoroutineScope, private val runt
             finally { update(token) { it.copy(running=false) } }
         }
     }
-    fun upload(root: String, path: String, available: Boolean, overwrite: Boolean = false) {
+    fun upload(root: String, path: String, available: Boolean, overwrite: Boolean = false) = uploadBound(root, path, available, overwrite, null, null)
+    internal fun uploadEdited(root: String, path: String, bytes: ByteArray, expectedSha256: String, target: RuntimeTransferTarget) {
+        runtime.checkTransferTarget(target)
+        select(UploadSource(path.substringAfterLast('/'), bytes.size.toLong()) { bytes.inputStream() })
+        uploadBound(root, path, true, true, expectedSha256, target)
+    }
+    private fun uploadBound(root: String, path: String, available: Boolean, overwrite: Boolean, expectedSha256: String?, boundTarget: RuntimeTransferTarget?) {
         val source=this.source ?: return
         if (!available || !validTargetFileName(path.substringAfterLast('/'))) return
         start(root,path) { token ->
-            val target=runtime.transferTarget()
+            val target=boundTarget ?: runtime.transferTarget()
+            runtime.checkTransferTarget(target)
             val sourceGuard=UploadInputGuard()
             val prepared=coroutineScope {
                 val monitor=launch(Dispatchers.Unconfined,start=CoroutineStart.UNDISPATCHED) { try { awaitCancellation() } finally { sourceGuard.close() } }
@@ -86,7 +93,7 @@ class FileTransferController(private val scope: CoroutineScope, private val runt
                 } } catch(error:Exception) { currentCoroutineContext().ensureActive();throw error } finally { monitor.cancel();sourceGuard.close() }
             }
             runtime.checkTransferTarget(target)
-            val overwriteToken=if(overwrite) { json.parseToJsonElement(approve(target,token,"overwrite",root,path)).jsonObject.getValue("id").jsonPrimitive.content } else null
+            val overwriteToken=if(overwrite) { json.parseToJsonElement(approve(target,token,"overwrite",root,path,expectedSha256=expectedSha256)).jsonObject.getValue("id").jsonPrimitive.content } else null
             client.uploadAt(target,path,prepared.first,prepared.second,source.open,root,overwriteToken) { progress(token,it) }
         }
     }

@@ -8,6 +8,27 @@ import okhttp3.mockwebserver.*
 import kotlinx.coroutines.flow.first
 
 class FileBrowserControllerTest {
+    @Test fun renameRefreshesOnlyAfterMatchingReplyAndKeepsOriginalOnFailure() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        var name = "old.txt"; var fail = false; var calls = 0
+        val browser = FileBrowserController(scope) { tool, args ->
+            when(tool) {
+                "files.rename" -> { calls++; if(fail) error("同名文件已存在"); name = args.getValue("name").jsonPrimitive.content
+                    buildJsonObject { put("root", "downloads"); put("path", "old.txt"); put("destination", name); put("renamed", true) }.toString() }
+                else -> """{"root":"downloads","path":"","entries":[{"name":"$name","kind":"file"}]}"""
+            }
+        }
+        try {
+            browser.refresh(true)
+            val entry = browser.state.value.entries.single()
+            browser.rename(entry, "../escape", true); browser.rename(entry, "new.txt", false)
+            assertEquals(0, calls)
+            fail = true; browser.rename(entry, "exists.txt", true)
+            assertEquals("old.txt", browser.state.value.entries.single().name); assertNotNull(browser.state.value.error)
+            fail = false; browser.rename(entry, "new.txt", true)
+            assertEquals("new.txt", browser.state.value.entries.single().name); assertNull(browser.state.value.error)
+        } finally { browser.clear(); scope.cancel() }
+    }
     @Test fun breadcrumbsOnlyNavigateToAncestorsAndPreserveCacheOnFailure() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val paths = mutableListOf<String>()

@@ -93,7 +93,9 @@ internal fun PermissionSettings(state: RemoteUiState, model: RemoteViewModel) {
 
 @Composable
 internal fun HelpScreen() {
+    val context = androidx.compose.ui.platform.LocalContext.current
     PageContent(Modifier.testTag("help-page")) {
+        ProjectDocumentation { ProjectWebActivity.open(context, ProjectLinks.DOCUMENTATION) }
         Panel {
             SectionTitle("开始遥控")
             Text("1. 点击右上角的连接状态，连接目标设备。")
@@ -109,5 +111,13 @@ internal fun HelpScreen() {
             Text("ADB 用于部署和管理设备端程序；日常遥控使用局域网服务。服务管理与运行权限切换需要目标 ADB 可访问。")
             Text("仅在可信局域网使用。设备端目前没有登录或交互确认，root 模式下工具会以 root 执行。", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
         }
+    }
+}
+
+@Composable
+internal fun AboutScreen() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    ProjectAbout("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") {
+        ProjectWebActivity.open(context, ProjectLinks.REPOSITORY)
     }
 }

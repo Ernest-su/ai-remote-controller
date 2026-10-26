@@ -24,6 +24,27 @@ class FileBrowserController(private val scope: CoroutineScope, private val runti
             catch(e:Exception){if(token==generation)mutable.update{it.copy(loading=false,error=e.message ?: "创建目录失败")}}
         }
     }
+    fun rename(entry: TargetFileEntry, name: String, available: Boolean) {
+        if (!available || state.value.loading || state.value.readOnly || !validTargetFileName(entry.name) || !validTargetFileName(name) || name == entry.name || entry.kind !in listOf("file", "directory", "symlink") || state.value.entries.none { it == entry }) return
+        val token = generation; val root = state.value.root; val parent = state.value.path
+        val path = listOf(parent, entry.name).filter { it.isNotEmpty() }.joinToString("/")
+        val destination = listOf(parent, name).filter { it.isNotEmpty() }.joinToString("/")
+        val owner = listedTarget
+        if (runtime != null) try { runtime.checkTransferTarget(checkNotNull(owner) { "请先刷新当前设备目录" }) }
+            catch (e: Exception) { mutable.update { it.copy(error = e.message ?: "目标连接已改变") }; return }
+        mutable.update { it.copy(loading = true, error = null) }
+        launchOperation {
+            try {
+                val arguments = buildJsonObject { put("root", root); put("path", path); put("name", name) }
+                val response = if (runtime != null) runtime.requestAt(checkNotNull(owner), "files.rename", arguments) else request("files.rename", arguments)
+                if (runtime != null) runtime.checkTransferTarget(checkNotNull(owner))
+                val result = json.parseToJsonElement(response).jsonObject
+                check(result["root"]?.jsonPrimitive?.content == root && result["path"]?.jsonPrimitive?.content == path && result["destination"]?.jsonPrimitive?.content == destination && result["renamed"]?.jsonPrimitive?.boolean == true) { "重命名响应与目标不匹配" }
+                if (token == generation) { mutable.update { it.copy(loading = false) }; load(parent, available) }
+            } catch (e: CancellationException) { if (token == generation) mutable.update { it.copy(loading = false) }; throw e }
+            catch (e: Exception) { if (token == generation) mutable.update { it.copy(loading = false, error = e.message ?: "重命名失败") } }
+        }
+    }
     private suspend fun query(tool:String,args:JsonObject):String {
         if(runtime==null)return request(tool,args)
         val target=runtime.transferTarget()
@@ -34,6 +55,7 @@ class FileBrowserController(private val scope: CoroutineScope, private val runti
     private val mutable = MutableStateFlow(FileBrowserState())
     val state = mutable.asStateFlow()
     private val json = Json { ignoreUnknownKeys = true }
+    private var listedTarget: RuntimeTransferTarget? = null
     private var generation = 0L
     private var job: Job? = null
     private fun launchOperation(action:suspend CoroutineScope.()->Unit) {
@@ -41,7 +63,7 @@ class FileBrowserController(private val scope: CoroutineScope, private val runti
         job=next
         next.start()
     }
-    fun clear() { generation++; job?.cancel(); job = null; mutable.value = FileBrowserState() }
+    fun clear() { listedTarget = null; generation++; job?.cancel(); job = null; mutable.value = FileBrowserState() }
     fun selectRoot(root: String) {
         if (root !in listOf("downloads","inbox","full") || state.value.loading || root == state.value.root) return
         clear(); mutable.value = FileBrowserState(root = root)
@@ -77,7 +99,10 @@ class FileBrowserController(private val scope: CoroutineScope, private val runti
         mutable.update { it.copy(loading = true, error = null, selected = null) }
         launchOperation {
             try {
-                val response = query("files.list", buildJsonObject { put("root",root); put("path", path); put("limit", 50); cursor?.let { put("cursor", it) } })
+                val destination = if (append) listedTarget else runtime?.transferTarget()
+                val arguments = buildJsonObject { put("root",root); put("path", path); put("limit", 50); cursor?.let { put("cursor", it) } }
+                val response = if (runtime != null) runtime.requestAt(checkNotNull(destination), "files.list", arguments) else request("files.list", arguments)
+                if (runtime != null) runtime.checkTransferTarget(checkNotNull(destination))
                 val page = json.decodeFromString<TargetFilesPage>(response)
                 check(page.root == root && page.path == path && page.entries.size <= 50) { "文件列表响应与请求不匹配" }
                 check(page.entries.all { entry ->
@@ -92,6 +117,7 @@ class FileBrowserController(private val scope: CoroutineScope, private val runti
                 val nextCursor = page.nextCursor
                 check(nextCursor == null || (validTargetFileName(nextCursor) && nextCursor != cursor && nextCursor == page.entries.lastOrNull()?.name)) { "无效分页游标" }
                 if (token == generation) mutable.update {
+                    listedTarget = destination
                     val entries = if (append) (it.entries + page.entries) else page.entries
                     check(entries.size <= 4096) { "目录缓存超过 4096 项，请选择更小目录" }
                     FileBrowserState(path, entries, page.nextCursor, loaded = true, root = root, contentRevision = it.contentRevision + if(append) 0 else 1, readOnly = page.readOnly)

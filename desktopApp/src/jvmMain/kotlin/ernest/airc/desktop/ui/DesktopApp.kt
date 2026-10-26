@@ -28,7 +28,7 @@ class DesktopNavigation {
 private val features = listOf(
     RemotePage.SCHEDULES to "ic_clock", RemotePage.APPS to "ic_apps", RemotePage.TEXT to "ic_text", RemotePage.MODEL to "ic_model",
     RemotePage.SERVICE to "ic_service", RemotePage.PERMISSIONS to "ic_permissions", RemotePage.DEVICE_INFO to "ic_device_info",
-    RemotePage.RESULTS to "ic_results", RemotePage.HELP to "ic_help", RemotePage.TOUCHPAD to "ic_touchpad", RemotePage.KEYPAD to "ic_keypad", RemotePage.SCREENSHOT to "ic_screenshot", RemotePage.FILES to "ic_files", RemotePage.MEDIA_CONTROL to "ic_media", RemotePage.GAMEPAD to "ic_gamepad", RemotePage.SETTINGS to "ic_settings",
+    RemotePage.RESULTS to "ic_results", RemotePage.HELP to "ic_help", RemotePage.TOUCHPAD to "ic_touchpad", RemotePage.KEYPAD to "ic_keypad", RemotePage.SCREENSHOT to "ic_screenshot", RemotePage.FILES to "ic_files", RemotePage.MEDIA_CONTROL to "ic_media", RemotePage.GAMEPAD to "ic_gamepad", RemotePage.SETTINGS to "ic_settings", RemotePage.ABOUT to "ic_about",
 )
 
 @Composable
@@ -100,6 +100,11 @@ fun DesktopApp(controller: DesktopController, navigation: DesktopNavigation = re
                             RemotePage.DEVICE_INFO -> DesktopDeviceInfo(state, controller)
                             RemotePage.RESULTS -> PageContent(Modifier.testTag("results-page")) { ResultPanel(state.output) }
                             RemotePage.HELP -> DesktopHelp()
+                            RemotePage.ABOUT -> {
+                                val version = remember { checkNotNull(DesktopNavigation::class.java.getResourceAsStream("/airc-version.txt")).bufferedReader().use { it.readText() } }
+                                val uri = androidx.compose.ui.platform.LocalUriHandler.current
+                                ProjectAbout(version) { uri.openUri(ProjectLinks.REPOSITORY) }
+                            }
                             RemotePage.SETTINGS -> AppearanceSettings(themeMode, onThemeChange)
                             RemotePage.TOUCHPAD -> DesktopTouchpad(state, controller)
                             RemotePage.GAMEPAD -> DesktopGamepad(state, controller)

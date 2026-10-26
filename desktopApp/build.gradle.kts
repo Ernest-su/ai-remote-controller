@@ -65,3 +65,18 @@ tasks.withType<Test>().configureEach {
         systemProperty("airc.splitFixtures",rootProject.file("build/split-fixtures").absolutePath)
     }
 }
+
+// Keep the About version tied to the Android controller's release configuration.
+val projectVersionSource = rootProject.layout.projectDirectory.file("androidApp/build.gradle.kts")
+val generateProjectVersion by tasks.registering {
+    inputs.file(projectVersionSource)
+    val destination = layout.buildDirectory.dir("generated/projectVersion")
+    outputs.dir(destination)
+    doLast {
+        val source = projectVersionSource.asFile.readText()
+        val name = Regex("versionName = \"([^\"]+)\"").find(source)!!.groupValues[1]
+        val code = Regex("versionCode = ([0-9]+)").find(source)!!.groupValues[1]
+        destination.get().file("airc-version.txt").asFile.apply { parentFile.mkdirs(); writeText("$name ($code)") }
+    }
+}
+kotlin.sourceSets.named("jvmMain") { resources.srcDir(generateProjectVersion) }

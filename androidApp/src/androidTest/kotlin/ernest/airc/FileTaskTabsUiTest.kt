@@ -37,9 +37,15 @@ class FileTaskTabsUiTest {
         compose.onNodeWithTag("file-task-tab-storage").performScrollTo().performClick().assertIsSelected()
         compose.onNodeWithText("存储分析(1)").assertExists()
         compose.onNodeWithText("任务内容:task:storage").assertIsDisplayed()
+        compose.runOnIdle { sections = listOf("media", "storage") }
+        compose.onNodeWithTag("file-task-tab-storage").assertIsSelected()
+        val storage = compose.onNodeWithTag("file-task-tab-storage").fetchSemanticsNode().boundsInRoot.left
+        val empty = compose.onNodeWithTag("file-task-tab-upload").fetchSemanticsNode().boundsInRoot.left
+        org.junit.Assert.assertTrue(storage < empty)
     }
     @Test fun allTabsAreDisabledWithoutTasks() {
         compose.setContent {RemoteTheme {FileBrowserPanel(FileBrowserState(loaded=true),true,{},{},{},{},{})}}
+        if (compose.onAllNodesWithTag("files-overflow").fetchSemanticsNodes().isNotEmpty()) compose.onNodeWithTag("files-overflow").performClick()
         compose.onNodeWithTag("files-tools").performClick()
         FileTaskType.entries.forEach {type -> compose.onNodeWithTag("file-task-tab-${type.name.lowercase()}").assertIsNotEnabled()}
         compose.onNodeWithText("暂无文件任务").assertIsDisplayed()

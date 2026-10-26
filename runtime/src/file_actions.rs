@@ -56,7 +56,7 @@ pub fn prepare(tool: &str, args: &Value) -> Result<String> {
     let object = args.as_object().context("arguments must be an object")?;
     if object
         .keys()
-        .any(|key| !["root", "path", "recursive"].contains(&key.as_str()))
+        .any(|key| !["root", "path", "recursive", "expectedSha256"].contains(&key.as_str()))
     {
         bail!("unknown file action parameter");
     }
@@ -89,6 +89,36 @@ pub fn prepare(tool: &str, args: &Value) -> Result<String> {
         .unwrap_or(false);
     if kind == "overwrite" && object.contains_key("recursive") {
         bail!("overwrite does not accept recursive");
+    }
+    if let Some(digest) = args.get("expectedSha256") {
+        use sha2::{Digest, Sha256};
+        use std::io::Read;
+        if kind != "overwrite" {
+            bail!("only overwrite accepts expectedSha256");
+        }
+        let digest = digest.as_str().context("expectedSha256 must be string")?;
+        if digest.len() != 64
+            || !digest
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+        {
+            bail!("invalid expectedSha256");
+        }
+        let original = expected.as_ref().context("原文件已不存在，请重新打开")?;
+        if !original.is_file() || original.len() > 2 * 1024 * 1024 {
+            bail!("文件超出文本保存大小限制");
+        }
+        let mut file = crate::tools::files::open(&crate::tools::files::root(root)?, path)?;
+        let mut bytes = Vec::new();
+        Read::by_ref(&mut file)
+            .take(2 * 1024 * 1024 + 1)
+            .read_to_end(&mut bytes)?;
+        if !same(original, &file.metadata()?)
+            || bytes.len() as u64 != original.len()
+            || format!("{:x}", Sha256::digest(&bytes)) != digest
+        {
+            bail!("文件已被其他操作修改，请重新打开后编辑；当前草稿已保留");
+        }
     }
     let proposal = Proposal {
         id: uuid::Uuid::new_v4().to_string(),

@@ -30,6 +30,7 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
     onRoot: ((String) -> Unit)? = null, onDelete: ((TargetFileEntry) -> Unit)? = null,
     onMedia: ((TargetFileEntry) -> Unit)? = null, onDownload: ((TargetFileEntry) -> Unit)? = null,
     onApk: ((TargetFileEntry) -> Unit)? = null, onCreateDirectory: ((String) -> Unit)? = null,
+    apkInstallationAvailable: Boolean = false, onText: ((TargetFileEntry) -> Unit)? = null, onRename: ((TargetFileEntry, String) -> Unit)? = null,
     directoryAvailable: Boolean = available, onNavigate: ((String) -> Unit)? = null,
     unavailableMessage: String = "请连接支持文件工具的目标服务。", operationMessage: String? = null, operationSection: String = "upload", operationActive: Boolean = false,
     operationNoticeIds: List<String> = emptyList(),
@@ -45,6 +46,9 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
     transfer: @Composable ColumnScope.(String) -> Unit = {}) {
     var dismissedNoticeIds by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val noticeIds = operationNoticeIds.ifEmpty { listOf("$operationSection:${operationMessage.orEmpty()}") }
+    var renameOriginal by rememberSaveable(state.root, state.path, selectionDeviceKey) { mutableStateOf<String?>(null) }
+    var renameDraft by rememberSaveable(state.root, state.path, selectionDeviceKey) { mutableStateOf("") }
+    var pickingApk by rememberSaveable(selectionDeviceKey) { mutableStateOf(false) }
     var previewName by rememberSaveable(state.root, state.path) { mutableStateOf<String?>(null) }
     var fullConfirmation by remember { mutableStateOf(false) }
     var query by rememberSaveable(state.root, state.path) { mutableStateOf("") }
@@ -83,28 +87,50 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
     LaunchedEffect(activeTaskType) { selectedTaskType=activeTaskType.name }
     var inspectedName by rememberSaveable(state.root, state.path) { mutableStateOf<String?>(null) }
     LaunchedEffect(operationSection, operationActive) { if (operationActive && toolSection != "tasks") toolSection = operationSection }
-    selectionBackHandler(multiSelect && !showTools) { exitSelection() }
+    selectionBackHandler((multiSelect || pickingApk) && !showTools) { if (pickingApk) pickingApk = false else exitSelection() }
     LaunchedEffect(state.entries, state.loading, state.loaded) {
         if (!state.loading && state.loaded) chosenDownloads = selectedDownloads
     }
     val drafts = rememberSaveableStateHolder()
     val enabled = available && !state.loading
-    val entries = remember(state.entries, query, sort,category,showHidden,onSelectDirectory) {
+    val entries = remember(state.entries, query, sort,category,showHidden,onSelectDirectory,pickingApk) {
         state.entries.filter { (onSelectDirectory == null || it.kind == "directory" && !it.isSymbolicLink) && it.name.contains(query.trim(), ignoreCase = true) &&
-            (showHidden || !it.name.startsWith(".")) && (category==FileCategory.ALL || fileCategory(it)==category) }
+            (showHidden || !it.name.startsWith(".")) && (if (pickingApk) !it.isSymbolicLink && (it.kind == "directory" || it.kind == "file" && it.name.endsWith(".apk", true)) else category==FileCategory.ALL || fileCategory(it)==category) }
             .sortedWith(compareBy<TargetFileEntry> { it.kind != "directory" }
                 .thenBy { if (sort == "size") -(it.sizeBytes ?: -1) else 0L }
                 .thenBy { if(sort=="type") fileCategory(it).title else "" }
                 .thenBy { it.name.lowercase() }.thenBy { it.name })
     }
     val list = rememberLazyListState()
-    LaunchedEffect(state.root, state.path, query, sort,category,showHidden,grid) { list.scrollToItem(0) }
+    LaunchedEffect(state.root, state.path, query, sort,category,showHidden,grid,pickingApk) { list.scrollToItem(0) }
     fun tools(section: String, action: () -> Unit = {}) { toolSection = section; showTools = true; action() }
     if (downloadChoice) BatchDownloadChoiceDialog(pendingDownloads.size,
         available && batchDownloadEnabled && !state.loading && selectionOwner == selectionScope && pendingDownloads.isNotEmpty() && pendingDownloads.all { name -> state.entries.any { it.name == name && selectableDownload(it) } },
         { mode -> downloadChoice = false; tools("batch") { onDownloadSelected?.invoke(pendingDownloads.toList(), mode) } }, { downloadChoice = false })
     fun inspect(entry: TargetFileEntry) { inspectedName = entry.name; onInspect(entry) }
 
+    LaunchedEffect(state.entries, state.loading, state.loaded) {
+        if (!state.loading && state.loaded && renameOriginal != null && state.entries.none { it.name == renameOriginal }) renameOriginal = null
+    }
+    renameOriginal?.let { original ->
+        val entry = state.entries.firstOrNull { it.name == original }
+        val valid = validTargetFileName(renameDraft) && renameDraft != original
+        val collision = state.entries.any { it.name == renameDraft && it.name != original }
+        ManagementDialog("重命名", "files-rename-dialog", { renameOriginal = null }) {
+            InfoRow("原名称", original)
+            Text("仅修改当前目录内的名称，不覆盖已有文件或目录。", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
+            OutlinedTextField(renameDraft, { renameDraft = it }, singleLine = true, enabled = !state.loading,
+                label = { Text("新名称") }, isError = !validTargetFileName(renameDraft) || collision,
+                modifier = Modifier.fillMaxWidth().testTag("files-rename-name"))
+            if (collision) ManagementMessage("同名文件或目录已存在，请更换名称。", error = true)
+            else if (!validTargetFileName(renameDraft)) ManagementMessage("名称不能为空，不能使用 /、控制字符、. 或 ..。", error = true)
+            state.error?.let { ManagementMessage(it, error = true) }
+            if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            ActionButton("重命名", enabled && !state.readOnly && valid && !collision && entry != null && onRename != null) {
+                entry?.let { onRename?.invoke(it, renameDraft) }
+            }
+        }
+    }
     previewName?.let { name ->
         val entry = state.entries.firstOrNull { it.name == name }
         if (entry != null && filePreviewKind(entry) != null && previewContent != null) ManagementDialog("文件预览", "files-preview-dialog", { previewName = null }) {
@@ -166,6 +192,7 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
         LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("files-page"), state = list, contentPadding = PaddingValues(16.dp)) {
         item(key = "tools") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (pickingApk) Text("选择被控设备上的 APK 文件，读取信息后确认安装。", modifier = Modifier.testTag("files-apk-selection"), style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
                 onRoot?.let { select -> FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                     listOf("downloads", "inbox", "full").forEach { root ->
                         FilterChip(state.root == root, { if (root == "full" && state.root != "full") fullConfirmation = true else select(root) },
@@ -205,11 +232,11 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                 if (multiSelect) Text("最多选择32个普通文件，可打包为 ZIP 或逐个下载；不包含文件夹和链接。", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
                 if (state.nextCursor != null) Text("仅搜索和排序已加载项目，加载下一页可查看更多。", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
                 FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(4.dp),itemVerticalAlignment=Alignment.CenterVertically) {
-                    Text(if (query.isBlank() && category==FileCategory.ALL && showHidden) "${state.entries.size} 项${if (state.nextCursor != null) " · 已加载" else ""}" else "${entries.size} / ${state.entries.size} 项", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
+                    Text(if (!pickingApk && query.isBlank() && category==FileCategory.ALL && showHidden) "${state.entries.size} 项${if (state.nextCursor != null) " · 已加载" else ""}" else "${entries.size} / ${state.entries.size} 项", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
                     Box {
-                        TextButton({filterMenu=true},Modifier.heightIn(min=48.dp).testTag("files-category")) { Text(category.title,style=MaterialTheme.typography.bodyMedium) }
+                        TextButton({filterMenu=true},Modifier.heightIn(min=48.dp).testTag("files-category")) { Text(if (pickingApk) "APK 文件" else category.title,style=MaterialTheme.typography.bodyMedium) }
                         DropdownMenu(filterMenu,{filterMenu=false}) {
-                            FileCategory.entries.forEach { value -> DropdownMenuItem(text={Text(value.title)},onClick={categoryName=value.name;filterMenu=false},modifier=Modifier.testTag("files-category-${value.name.lowercase()}")) }
+                            FileCategory.entries.filter { !pickingApk }.forEach { value -> DropdownMenuItem(text={Text(value.title)},onClick={categoryName=value.name;filterMenu=false},modifier=Modifier.testTag("files-category-${value.name.lowercase()}")) }
                             HorizontalDivider(color=RemoteColors.Divider)
                             DropdownMenuItem(text={Text(if(showHidden) "隐藏点开头文件" else "显示隐藏文件")},onClick={showHidden=!showHidden;filterMenu=false})
                         }
@@ -228,8 +255,8 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
         if (entries.isEmpty() && !state.loading) item(key = "empty") {
             Surface(color = RemoteColors.Surface, shape = MaterialTheme.shapes.small) {
                 ManagementEmpty(ManagementIcons.Folder,
-                    when { query.isNotBlank() || category!=FileCategory.ALL -> "没有匹配的文件"; state.error != null -> "暂时无法读取目录"; !state.loaded -> "尚未读取目录"; state.entries.isNotEmpty() -> "没有可显示的文件"; else -> "目录为空" },
-                    when { query.isNotBlank() -> "试试其他关键词${if (state.nextCursor != null) "，或继续加载下一页" else ""}。"; !state.loaded -> "连接设备后刷新，即可查看此位置的文件。"; state.entries.isNotEmpty() -> "可从分类菜单显示隐藏文件，或切换为全部文件。"; else -> "可以新建目录，或从操作与任务中推送文件。" },
+                    when { query.isNotBlank() || category!=FileCategory.ALL -> "没有匹配的文件"; state.error != null -> "暂时无法读取目录"; !state.loaded -> "尚未读取目录"; pickingApk -> "此目录没有可选择的 APK"; state.entries.isNotEmpty() -> "没有可显示的文件"; else -> "目录为空" },
+                    when { query.isNotBlank() -> "试试其他关键词${if (state.nextCursor != null) "，或继续加载下一页" else ""}。"; !state.loaded -> "连接设备后刷新，即可查看此位置的文件。"; pickingApk -> "可进入其他目录、切换位置或继续加载下一页。"; state.entries.isNotEmpty() -> "可从分类菜单显示隐藏文件，或切换为全部文件。"; else -> "可以新建目录，或从操作与任务中推送文件。" },
                     if (query.isNotBlank() || category!=FileCategory.ALL) "清除筛选" else null) { query = "";categoryName=FileCategory.ALL.name }
             }
         }
@@ -238,15 +265,17 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                 row.forEach { entry ->
                     Box(Modifier.weight(1f).then(if(grid) Modifier.fillMaxHeight() else Modifier)) {
                         val selectionEnabled = selectableDownload(entry) && (entry.name in chosenDownloads || chosenDownloads.size < 32)
-                        FileManagementRow(entry, if (multiSelect) selectionEnabled else enabled,
-                            { if(multiSelect) toggleDownload(entry) else if(selectedName!=null) selectedName=if(selectedName==entry.name) null else entry.name else if(entry.kind=="directory") onEnter(entry) else if(entry.name.endsWith(".apk",true) && onApk != null && !entry.isSymbolicLink && !state.readOnly) tools("apk") {onApk(entry)} else if(previewContent != null && filePreviewKind(entry) != null) previewName=entry.name else inspect(entry) },
+                        FileManagementRow(entry, if (pickingApk) enabled && (entry.kind == "directory" || apkInstallationAvailable && !state.readOnly && onApk != null) else if (multiSelect) selectionEnabled else enabled,
+                            { if(pickingApk) { if(entry.kind == "directory") onEnter(entry) else if(apkInstallationAvailable && !state.readOnly) { pickingApk = false; tools("apk") { onApk?.invoke(entry) } } } else if(multiSelect) toggleDownload(entry) else if(selectedName!=null) selectedName=if(selectedName==entry.name) null else entry.name else if(entry.kind=="directory") onEnter(entry) else if(entry.name.endsWith(".apk",true) && onApk != null && !entry.isSymbolicLink && !state.readOnly) tools("apk") {onApk(entry)} else if(onText != null && filePreviewKind(entry) == FilePreviewKind.TEXT) onText(entry) else if(previewContent != null && filePreviewKind(entry) != null) previewName=entry.name else inspect(entry) },
                             { inspect(entry) },onDownload?.let { { tools("download") { it(entry) } } },
                             onMedia?.takeUnless { entry.isSymbolicLink || state.readOnly }?.let { { tools("media") { it(entry) } } },onApk?.takeUnless { entry.isSymbolicLink || state.readOnly }?.let { { tools("apk") { it(entry) } } },
                             onDelete?.takeUnless { state.readOnly }?.let { { tools("delete") { it(entry) } } },
-                            grid=grid,selected=if (multiSelect) entry.name in chosenDownloads else selectedName==entry.name,
+                            onText=onText?.takeIf { entry.kind == "file" }?.let { { it(entry) } },
+                            onRename=onRename?.takeUnless { state.readOnly }?.let { { renameOriginal = entry.name; renameDraft = entry.name } },
+                            pickingFile=pickingApk, grid=grid,selected=if (multiSelect) entry.name in chosenDownloads else selectedName==entry.name,
                             selectionMode=multiSelect, canMultiSelect=onDownloadSelected != null && selectableDownload(entry),
-                            onSelect={ if (onDownloadSelected != null && selectableDownload(entry)) { if (!multiSelect) { multiSelect = true; selectedName = null }; toggleDownload(entry) } else selectedName=entry.name },
-                            thumbnail=thumbnail?.takeUnless { (entry.isSymbolicLink || state.readOnly) && entry.name.endsWith(".apk", true) }, onPreview=if(previewContent != null && filePreviewKind(entry) != null) ({previewName=entry.name}) else null)
+                            onSelect={ if (pickingApk) Unit else if (onDownloadSelected != null && selectableDownload(entry)) { if (!multiSelect) { multiSelect = true; selectedName = null }; toggleDownload(entry) } else selectedName=entry.name },
+                            thumbnail=thumbnail?.takeUnless { (entry.isSymbolicLink || state.readOnly) && entry.name.endsWith(".apk", true) }, onPreview=if(previewContent != null && filePreviewKind(entry) != null && !(onText != null && filePreviewKind(entry) == FilePreviewKind.TEXT)) ({previewName=entry.name}) else null)
                     }
                 }
                 if(grid && row.size==1) Spacer(Modifier.weight(1f))
@@ -262,6 +291,11 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                 if(onSelectDirectory != null) {
                     FileActionBar(listOf(FileBarAction("刷新目录", ManagementIcons.Refresh, "files-refresh", enabled, action = onRefresh)))
                     ActionButton("选择此目录", enabled && state.loaded && state.error == null && !state.readOnly, onSelectDirectory)
+                } else if (pickingApk) {
+                    FileActionBar(listOf(
+                        FileBarAction("刷新目录", ManagementIcons.Refresh, "files-refresh", enabled, action = onRefresh),
+                        FileBarAction("取消选择 APK", ManagementIcons.Close, "files-apk-cancel") { pickingApk = false },
+                    ))
                 } else if (multiSelect) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("已选择 ${selectedDownloads.size} / 32 个文件", Modifier.weight(1f).padding(8.dp).testTag("files-multi-count"), style = MaterialTheme.typography.bodyMedium)
@@ -282,7 +316,7 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                         ManagementIconButton(ManagementIcons.Close,"取消选择",tag="files-clear-selection") {selectedName=null}
                     }
                     FileActionBar(buildList {
-                        if (previewContent != null && filePreviewKind(selected) != null) add(FileBarAction("在主控设备预览 / 播放", ManagementIcons.Play, "files-preview", enabled) { previewName = selected.name })
+                        if (previewContent != null && filePreviewKind(selected) != null) add(FileBarAction(if (onText != null && filePreviewKind(selected) == FilePreviewKind.TEXT) "查看 / 编辑文本" else "在主控设备预览 / 播放", ManagementIcons.Play, "files-preview", enabled) { if (onText != null && filePreviewKind(selected) == FilePreviewKind.TEXT) onText(selected) else previewName = selected.name })
                         add(FileBarAction("文件属性", ManagementIcons.File, "files-properties", enabled) { inspect(selected) })
                         if (selected.kind == "file") onDownload?.let { action -> add(FileBarAction("下载文件", LibraryIcons.Down, "files-download", enabled) { tools("download") { action(selected) } }) }
                         if (!selected.isSymbolicLink && !state.readOnly && isTargetMedia(selected.name)) onMedia?.let { action -> add(FileBarAction("在被控设备播放", ManagementIcons.Play, "files-play-target", enabled) { tools("media") { action(selected) } }) }
@@ -296,6 +330,9 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                     onCreateDirectory?.let { add(FileBarAction("新建目录", ManagementIcons.AddFolder, "files-create-directory", directoryAvailable && !state.loading && !state.readOnly) { showDirectory = true }) }
                     add(FileBarAction("刷新目录", ManagementIcons.Refresh, "files-refresh", enabled, action = onRefresh))
                     add(FileBarAction(if (grid) "切换列表视图" else "切换网格视图", if (grid) ManagementIcons.List else ManagementIcons.Apps, "files-view") { grid = !grid })
+                    add(FileBarAction("安装 APK", ManagementIcons.Apps, "files-install-apk", enabled && apkInstallationAvailable && onApk != null && !state.readOnly) {
+                        query = ""; categoryName = FileCategory.ALL.name; pickingApk = true
+                    })
                     add(FileBarAction("文件任务", ManagementIcons.Transfer, "files-tools") { tools("tasks") })
                     add(FileBarAction("存储分析", ManagementIcons.Storage, "files-storage", !state.readOnly) { tools("storage") })
                 })
@@ -309,13 +346,13 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
 private fun FileManagementRow(
     entry: TargetFileEntry, enabled: Boolean, onOpen: () -> Unit, onInspect: () -> Unit,
     onDownload: (() -> Unit)?, onMedia: (() -> Unit)?, onApk: (() -> Unit)?, onDelete: (() -> Unit)?,
-    grid: Boolean = false, selected: Boolean = false, selectionMode: Boolean = false, canMultiSelect: Boolean = false, onSelect: () -> Unit = {},
+    onText: (() -> Unit)? = null, onRename: (() -> Unit)? = null, pickingFile: Boolean = false, grid: Boolean = false, selected: Boolean = false, selectionMode: Boolean = false, canMultiSelect: Boolean = false, onSelect: () -> Unit = {},
     thumbnail: (@Composable (TargetFileEntry, Modifier) -> Unit)? = null, onPreview: (() -> Unit)? = null,
 ) {
     var menu by remember(entry.name) { mutableStateOf(false) }
     val supported = entry.kind in listOf("directory", "file", "symlink") && validTargetFileName(entry.name)
     val interaction = Modifier.combinedClickable(enabled = enabled && supported, role = if (selectionMode) Role.Checkbox else Role.Button,
-        onClickLabel = if (selectionMode) "选择或取消选择文件" else if (entry.kind == "directory") "进入目录" else if(onPreview != null) "预览文件" else "查看属性",
+        onClickLabel = if (selectionMode) "选择或取消选择文件" else if (entry.kind == "directory") "进入目录" else if(pickingFile) "选择此 APK" else if(onPreview != null) "预览文件" else "查看属性",
         onLongClickLabel = "选择文件", onLongClick = onSelect, onClick = onOpen)
         .semantics { this.selected = selected }
     @Composable fun FileIcon() {
@@ -347,6 +384,7 @@ private fun FileManagementRow(
         entry.linkTarget?.let { Text("指向：$it", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary, maxLines = 2, overflow = TextOverflow.Ellipsis) }
     }
     @Composable fun MoreMenu() {
+        if (pickingFile) return
         if (selectionMode) {
             Checkbox(selected, { onSelect() }, enabled = enabled, modifier = Modifier.size(48.dp).testTag("file-check-${entry.name}").semantics { contentDescription = "选择 ${entry.name}" })
             return
@@ -362,6 +400,8 @@ private fun FileManagementRow(
                     if (isTargetMedia(entry.name)) onMedia?.let { DropdownMenuItem(text = { Text("在被控设备播放") }, enabled = enabled, onClick = { menu = false; it() }) }
                     if (entry.name.endsWith(".apk", true)) onApk?.let { DropdownMenuItem(text = { Text("APK 信息") }, enabled = enabled, onClick = { menu = false; it() }) }
                 }
+                onText?.let { DropdownMenuItem(text = { Text("以文本方式打开") }, enabled = enabled, onClick = { menu = false; it() }) }
+                onRename?.let { DropdownMenuItem(text = { Text("重命名") }, enabled = enabled, onClick = { menu = false; it() }) }
                 onDelete?.let { DropdownMenuItem(text = { Text(if (entry.isSymbolicLink) "删除链接" else "删除", color = RemoteColors.Warning) }, enabled = enabled, onClick = { menu = false; it() }) }
             }
         }

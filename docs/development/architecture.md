@@ -78,7 +78,7 @@ Rust 的 H.264 工具协议由 `screen_mirror` 管理 screenrecord 会话、子�
 停止及目标切换清空按住状态，不持久化输入或自动恢复。
 `RuntimeConnection.requestAt` 在核对连接代次前捕获 WebSocket，避免核对后解析到新连接。
 共享 VirtualGamepadPanel 负责按住/释放和双摇杆，平台 GamepadScreen 负责离页、后台/失焦停止；
-连接控制器在断线和更换目标时清空。当前基础由 JVM fixture 验证，物理手机交互另行验收。
+连接控制器在断线和更换目标时清空。状态逻辑使用 JVM fixture 验证，平台交互按测试矩阵选择模拟器或物理设备专项。
 
 H.264队列及任务生命周期独立放在`runtime/src/screen_mirror/producer.rs`；
 `screen_mirror.rs`负责票据、编码器与二进制记录。生产者以两块队列连接HTTP body，

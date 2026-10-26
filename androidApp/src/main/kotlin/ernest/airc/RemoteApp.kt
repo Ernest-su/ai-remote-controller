@@ -196,6 +196,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                         RemotePage.DEVICE_INFO -> DeviceInformation(state, model)
                         RemotePage.RESULTS -> PageContent(Modifier.testTag("results-page")) { ResultPanel(state.output) }
                         RemotePage.HELP -> HelpScreen()
+                        RemotePage.ABOUT -> AboutScreen()
                         RemotePage.SETTINGS -> AppearanceSettings(themeMode, onThemeChange) {
                             OutlinedButton({ layoutEditor = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("自定义此电视的遥控按键") }
                             RemoteComfortSettings(state, model)

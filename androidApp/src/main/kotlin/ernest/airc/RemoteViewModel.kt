@@ -94,6 +94,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     val appInstallation = AppInstallationController(viewModelScope, runtime)
     val apkInspection = ApkInspectionController(viewModelScope, runtime)
     val filePreviews = FilePreviewClient(runtime)
+    val textFiles = FileTextController(viewModelScope, runtime)
     val fileMedia = FileMediaController(viewModelScope,runtime)
     val appControl = AppControlController(viewModelScope,runtime)
     val appManagement = AppManagementController(viewModelScope,runtime)
@@ -722,7 +723,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     override fun onCleared() {
         automaticConnection.stop()
         ascrcpyPreview.stop()
-        discovery.close(); batchTransfers.close(); transfers.close(); filePreviews.close(); runtime.close(); profiles.close(); adb?.close()
+        discovery.close(); batchTransfers.close(); transfers.close(); filePreviews.close(); textFiles.close(); runtime.close(); profiles.close(); adb?.close()
         super.onCleared()
     }
 }
