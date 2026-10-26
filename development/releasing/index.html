@@ -1555,7 +1555,7 @@ gh<span class="w"> </span>secret<span class="w"> </span>list<span class="w"> </s
 </code></pre></div>
 <p>上传操作会更新同名 Secrets；确认使用的密钥与当前仓库公钥一致。无需手动创建 PAT 或 <code>GITHUB_TOKEN</code> Secret，workflow 使用 GitHub 自动提供的 token，仅发布 job 申请 <code>contents: write</code>。普通 PR 和 main 构建不读取生产签名密钥。<a href="https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/use-secrets">GitHub Secrets 文档</a>。</p>
 <h2 id="_3">版本与触发<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
-<p>先同步 <code>androidApp/build.gradle.kts</code> 与 <code>tvInputMethod/build.gradle.kts</code> 的 <code>versionName</code>、递增两者 <code>versionCode</code>，以及 <code>runtime/Cargo.toml</code> 的版本。标签必须为 <code>v</code> 加相同版本，例如 <code>v0.1.0</code>；清单兼容范围限定为该 APK versionCode。</p>
+<p>先同步 <code>androidApp/build.gradle.kts</code> 与 <code>tvInputMethod/build.gradle.kts</code> 的 <code>versionName</code>、递增两者 <code>versionCode</code>，以及 <code>runtime/Cargo.toml</code> 的版本。发布脚本同时校验电视输入法与控制端的版本名和版本码一致。标签必须为 <code>v</code> 加相同版本，例如 <code>v0.1.0</code>；清单兼容范围限定为该 APK versionCode。</p>
 <p>提交源码、公钥和 workflow 后创建并推送版本标签：</p>
 <div class="highlight"><pre><span></span><code>git<span class="w"> </span>tag<span class="w"> </span>-a<span class="w"> </span>v0.1.0<span class="w"> </span>-m<span class="w"> </span><span class="s1">'AIRC v0.1.0'</span>
 git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>main

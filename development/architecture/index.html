@@ -1538,7 +1538,7 @@
 停止及目标切换清空按住状态，不持久化输入或自动恢复。
 <code>RuntimeConnection.requestAt</code> 在核对连接代次前捕获 WebSocket，避免核对后解析到新连接。
 共享 VirtualGamepadPanel 负责按住/释放和双摇杆，平台 GamepadScreen 负责离页、后台/失焦停止；
-连接控制器在断线和更换目标时清空。当前基础由 JVM fixture 验证，物理手机交互另行验收。</p>
+连接控制器在断线和更换目标时清空。状态逻辑使用 JVM fixture 验证，平台交互按测试矩阵选择模拟器或物理设备专项。</p>
 <p>H.264队列及任务生命周期独立放在<code>runtime/src/screen_mirror/producer.rs</code>；
 <code>screen_mirror.rs</code>负责票据、编码器与二进制记录。生产者以两块队列连接HTTP body，
 等待发送也响应取消和期限，body销毁中止任务；资源仍由编码Reader的Drop管理。</p>

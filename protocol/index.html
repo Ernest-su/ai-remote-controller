@@ -1210,6 +1210,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#file-editing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        文件重命名与文本覆盖
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2009,6 +2020,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#file-editing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        文件重命名与文本覆盖
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2127,7 +2149,7 @@ airc-runtime<span class="w"> </span>service<span class="w"> </span>stop<span cla
 <p><code>remote.tap</code> 新增可选 <code>count</code>（1/2，默认 1）支持双击，旧调用方未传时语义不变。控制端触控板根据 <code>/status.tools</code> 决定启用状态；数字键盘使用现有 <code>remote.key</code> 枚举。</p>
 <h2 id="_4">媒体状态快照<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <p><code>media.status</code> 接收空参数对象，返回 <code>{"sessions":[...]}</code>。每个会话含 <code>packageName</code>、<code>active</code>、<code>state</code>、<code>positionMs</code>、<code>durationMs</code>、<code>updatedAtElapsedMs</code>、<code>seekSupported</code> 和 <code>description</code>。状态数字使用 Android PlaybackState 值；位置为系统报告的毫秒快照，不自动推算。未知字段为 null。时长仅在系统 dump 明确提供标准 duration 键时返回，常见系统输出不提供时长。</p>
-<p><code>seekSupported</code> 表示播放器声明了 ACTION_SEEK_TO（256），不表示当前 runtime 已能执行 seek。读取权限失败返回工具错误。该工具也通过 <code>media_status</code> 函数提供给大模型。现有播放按键保持可用，精确 seek 尚未实现。</p>
+<p><code>seekSupported</code> 表示播放器声明了 ACTION_SEEK_TO（256）。读取权限失败返回工具错误；该工具也通过 <code>media_status</code> 函数提供给大模型。精确定位通过 <code>media.seek</code> 提交，成功仅表示请求送出，需回读实际位置；参数见<a href="../reference/tools/#media-seek">播放定位</a>。</p>
 <h2 id="_5">截图二进制资源<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
 <p><code>device.screenshot</code> 接收空参数对象，执行固定命令 <code>screencap -p</code>，返回 JSON 描述而非图片文本：</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="s2">"随机 UUID"</span><span class="p">,</span><span class="nt">"path"</span><span class="p">:</span><span class="s2">"/artifacts/UUID"</span><span class="p">,</span><span class="nt">"mimeType"</span><span class="p">:</span><span class="s2">"image/png"</span><span class="p">,</span><span class="nt">"sizeBytes"</span><span class="p">:</span><span class="mi">12345</span><span class="p">,</span><span class="nt">"width"</span><span class="p">:</span><span class="mi">1920</span><span class="p">,</span><span class="nt">"height"</span><span class="p">:</span><span class="mi">1080</span><span class="p">,</span><span class="nt">"expiresInSeconds"</span><span class="p">:</span><span class="mi">60</span><span class="p">}</span>
@@ -2258,7 +2280,8 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 </tr>
 </tbody>
 </table>
-<p><code>action</code>只允许<code>pause</code>、<code>shutdown</code>、<code>stop_app</code>、<code>open_app</code>。后两者必须提供package，前两者禁止携带package；不接受Shell或任意命令。<code>kind=delay</code>须带delaySeconds（60–604800秒），<code>once</code>须带localDateTime（<code>yyyy-MM-dd HH:mm</code>），<code>daily</code>须带dailyTime（<code>HH:mm</code>），禁止混用时间字段。日期时间按被控端本地时区解析。</p>
+<p><code>action</code>允许<code>pause</code>、<code>shutdown</code>、<code>stop_app</code>、<code>open_app</code>、<code>set_volume</code>、<code>mute</code>、<code>unmute</code>。<code>stop_app</code>和<code>open_app</code>必须提供package，其余动作禁止携带package；不接受Shell或任意命令。<code>kind=delay</code>须带delaySeconds（60–604800秒），<code>once</code>须带localDateTime（<code>yyyy-MM-dd HH:mm</code>），<code>daily</code>须带dailyTime（<code>HH:mm</code>），禁止混用时间字段。日期时间按被控端本地时区解析。</p>
+<p><code>set_volume</code> 必须提供整数 <code>volumePercent</code>（0–100），其他动作禁止该字段，三者均禁止 <code>package</code>。列表与被控端持久记录保留 <code>volumePercent</code>。音量百分比映射为媒体流最接近的系统档位；静音与解除使用明确状态操作，执行后核对系统状态，失败记录原因。</p>
 <p>返回任务包含id、action、package、appIdentity、kind、dailyTime、nextAt（Unix秒）、enabled、lastAt、lastStatus、lastResult；列表额外给每项nextLocalTime。保存时绑定应用安装与用户身份，执行前重新检查。lastStatus区分pending、running、submitted、missed、interrupted、uncertain、failed；submitted只代表操作提交或工具返回，不能据断线认定关机成功。</p>
 <p>任务以0600权限原子保存于服务状态目录，调度不依赖创建请求的WebSocket存活。提交前先持久化running与下次时间，服务恢复不重试running任务，启动时跳过已过期单次执行并顺延每天任务；运行中错过超过60秒也跳过。服务停止、设备关机与休眠唤醒不在调度保证范围。</p>
 <h2 id="_19">视觉文字任务与停止<a class="headerlink" href="#_19" title="Permanent link">&para;</a></h2>
@@ -2274,8 +2297,10 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 <li>同一任务只允许一个读写者；下载使用固定描述符，客户端最终核对全文件摘要。续传须显式查询并核对原设备、任务ID、方向、根、文件名、大小与摘要，不自动恢复到不同目标。</li>
 </ul>
 <p>分块检查点只保留在当前服务和控制端进程内，不声明跨重启恢复。原任务限额、取消与约15分钟闲置回收仍适用。</p>
-<p>定时任务 <code>schedule_save</code> 的 <code>action</code> 另支持 <code>set_volume</code>、<code>mute</code>、<code>unmute</code>；<code>set_volume</code> 必须提供整数 <code>volumePercent</code>（0–100），其他动作禁止该字段，三者均禁止 <code>package</code>。列表与被控端持久记录保留 <code>volumePercent</code>。音量百分比映射为媒体流最接近的系统档位；静音与解除使用明确状态操作，执行后核对系统状态，失败记录原因。</p>
 <p><code>media.volume</code> 提供原生媒体流音量快照和经过回读确认的百分比设置。空对象为读取，设置参数为 <code>{"percent":0..100}</code>；字段和错误语义见<a href="../reference/tools/#media-volume">媒体音量</a>。标准遥控滑块使用该接口。</p>
+<h2 id="file-editing">文件重命名与文本覆盖<a class="headerlink" href="#file-editing" title="Permanent link">&para;</a></h2>
+<p><code>files.rename</code> / <code>files_rename</code> 接收 <code>root</code>、相对 <code>path</code> 和同目录单个新名称 <code>name</code>，返回 <code>{root,path,destination,renamed:true}</code>。支持普通文件、文件夹和链接本身，不跟随父目录链接，不跨目录移动，不覆盖已有目标；优先原子不覆盖重命名；Android共享存储不支持时，使用独占创建的副本，完整复制并复查源身份后移除原项。兼容复制最多128 MiB、2000项、64层，不跨挂载点；复制未完成时原项保留，新名称下可能保留部分副本，删除原项期间出现变动时新名称下保留完整副本并明确报错。</p>
+<p><code>files.prepare_overwrite</code> 可附带 <code>expectedSha256</code>（64位小写十六进制），用于不超过2 MiB的文本编辑保存。文件必须仍存在、内容摘要一致且读取期间身份未变化；不一致时不创建覆盖提案。后续仍需用户确认，并在上传提交时复查文件身份。</p>
 
 
 
