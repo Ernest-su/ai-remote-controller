@@ -30,6 +30,7 @@ class DesktopController(
     val downloadDirectories = FileBrowserController(scope, runtime)
     val batchTransfers = BatchTransferController(scope, runtime, defaultStateDirectory().resolve("batch-cache").toFile())
     val files = FileBrowserController(scope,runtime)
+    val screenPower = ScreenPowerController(scope, runtime, ::message)
     val remoteVolume = RemoteVolumeController(scope, runtime, ::message)
     val mediaControl = MediaControlController(scope, runtime)
     val virtualGamepad = VirtualGamepadController(scope, runtime)

@@ -17,10 +17,12 @@ mod media;
 pub(crate) mod media_open;
 mod remote_keys;
 mod remote_text;
+mod screen_power;
 mod screenshot;
 mod ui_hierarchy;
 
 pub const TOOLS: &[&str] = &[
+    "screen.power",
     "remote.key",
     "remote.text",
     "gamepad.pulse",
@@ -148,6 +150,9 @@ pub async fn execute_owned(tool: &str, args: &Value, owner: &str) -> Result<Stri
 }
 
 pub async fn execute(tool: &str, args: &Value) -> Result<String> {
+    if tool == "screen.power" {
+        return screen_power::execute(args).await;
+    }
     if tool == "remote.key" {
         let object = args.as_object().context("remote.key requires key")?;
         if object.len() != 1 {

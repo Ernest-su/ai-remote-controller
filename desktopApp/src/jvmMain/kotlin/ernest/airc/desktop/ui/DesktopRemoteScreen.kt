@@ -75,6 +75,13 @@ fun DesktopRemoteScreen(state: DesktopState, model: DesktopController, showResul
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                val screenOn by model.screenPower.state.collectAsState()
+                                val screenBusy by model.screenPower.busy.collectAsState()
+                                IconButton(model.screenPower::toggle, enabled = state.connected && screenOn != null && !screenBusy,
+                                    modifier = Modifier.size(48.dp)) {
+                                    Icon(painterResource(if (screenOn == false) "drawable/ic_screen_on.xml" else "drawable/ic_screen_off.xml"),
+                                        if (screenOn == false) "打开屏幕" else "关闭屏幕", Modifier.size(24.dp))
+                                }
                                 RemoteIconButton({ model.key("power") }, enabled = state.connected, debugName = "power",
                                     modifier = Modifier.size(48.dp).background(RemoteColors.Surface, CircleShape)) {
                                     Icon(painterResource("drawable/ic_power.xml"), "电源", Modifier.size(24.dp),

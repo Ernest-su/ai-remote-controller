@@ -120,6 +120,14 @@ pub(crate) async fn scheduled_audio(operation: &str, arguments: &[String]) -> Re
 pub(crate) async fn system_action(action: &str) -> Result<String> {
     invoke_class("ernest.airc.bridge.SystemActionBridge", action, &[]).await
 }
+pub(crate) async fn screen_power(on: bool) -> Result<String> {
+    invoke_class(
+        "ernest.airc.bridge.ScreenPowerBridge",
+        if on { "on" } else { "off" },
+        &[],
+    )
+    .await
+}
 pub(crate) async fn system_state() -> Result<String> {
     invoke_class("ernest.airc.bridge.SystemStateBridge", "state", &[]).await
 }

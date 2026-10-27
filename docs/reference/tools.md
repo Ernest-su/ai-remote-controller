@@ -276,3 +276,7 @@ remote.key 的 power 参数仅供直接手动控制；模型别名 remote_key �
 ## 媒体音量 {#media-volume}
 
 `media.volume` / `media_volume` 使用原生 AudioManager 读取媒体流音量。空参数对象只读取；`{"percent":57}` 设置 0–100 的整数百分比，映射到设备最小/最大音量档位，回读确认后返回 `verified=true`。结果包含 `volumeIndex`、`minVolumeIndex`、`maxVolumeIndex`、`muted`、`fixed`、`stream=media` 与 `operation`（`status` 或 `set_volume`）；设置还包含 `requestedPercent`。固定音量设备拒绝设置，权限不足或设置未生效返回错误，不把命令成功当成音量已改变。
+
+### 物理屏幕电源
+
+`screen.power` 接受 `{}` 读取服务最后成功提交的模式，或 `{"on":false}` / `{"on":true}` 关闭/打开物理显示，返回 `{"on":布尔值}`。不发送电源按键、不休眠、不锁屏；平台失败返回错误并保留上次模式。服务初始模式为打开，不探测其他应用或实体按键改变的显示状态。
