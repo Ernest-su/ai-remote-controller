@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun Devices(state: RemoteUiState, model: RemoteViewModel, onPreview: () -> Unit = {}) {
+internal fun Devices(state: RemoteUiState, model: RemoteViewModel) {
     var connectionExpanded by rememberSaveable { mutableStateOf(false) }
     var method by rememberSaveable { mutableStateOf(ConnectionMethod.TCP) }
     var host by rememberSaveable { mutableStateOf("") }
@@ -54,7 +54,7 @@ internal fun Devices(state: RemoteUiState, model: RemoteViewModel, onPreview: ()
         onDispose { lifecycle.removeObserver(observer); model.cancelAdbScan() }
     }
     PageContent(Modifier.testTag("devices-page")) {
-        ConnectionChannelsPanel(state, model, onPreview)
+        ConnectionChannelsPanel(state, model)
         Panel(Modifier.testTag("device-discovery-header")) {
             DeviceDiscoveryHeader(state.adbScanning, state.adbScanStatus, model::scanAdbDevices)
             Text("自动查找同网段 ADB 与遥控服务，点击设备后连接。", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)

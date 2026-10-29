@@ -1,34 +1,52 @@
 package ernest.airc
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import ernest.ascrcpy.scrcpy.ScrcpyState
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun ConnectionChannelsPanel(state: RemoteUiState, model: RemoteViewModel, onPreview: () -> Unit) {
+internal fun ConnectionChannelsPanel(state: RemoteUiState, model: RemoteViewModel) {
     val adb by model.adbStatus.collectAsState()
     val preview by model.ascrcpyPreview.state.collectAsState()
-    val record = state.history.find { it.id == state.selected }
-    Panel {
+    ConnectionStatusSummary(state.connected, state.reconnecting || state.busy, adb == "已连接", preview,
+        state.busy || state.reconnecting, model::cancelConnection)
+}
+
+@Composable
+internal fun ConnectionStatusSummary(connected: Boolean, connecting: Boolean, adbConnected: Boolean,
+    preview: ScrcpyState, cancellable: Boolean, cancel: () -> Unit,
+) {
+    Panel(Modifier.testTag("connection-summary")) {
         SectionTitle("当前连接")
-        InfoRow("遥控服务", if (state.connected) "可用" else if (state.busy) "正在连接" else "未连接")
-        InfoRow("ADB", adb)
-        InfoRow("动态预览", when (preview) {
-            is ScrcpyState.Streaming -> "正在显示"
-            is ScrcpyState.Failed -> "不可用，请进入预览重试"
-            ScrcpyState.Idle -> "未开启，进入预览后连接"
-            else -> "正在启动"
+        ConnectionStatusRow("遥控服务", connected, if (connected) "已连接" else if (connecting) "自动连接中" else "未连接")
+        ConnectionStatusRow("ADB", adbConnected, if (adbConnected) "已连接" else "按需自动连接")
+        ConnectionStatusRow("动态预览", preview is ScrcpyState.Streaming, when (preview) {
+            is ScrcpyState.Streaming -> "已开启"
+            ScrcpyState.Idle -> "未开启"
+            is ScrcpyState.Failed -> "暂不可用"
+            else -> "准备中"
         })
-        Text("遥控、ADB 和预览分别连接；预览关闭不影响普通遥控。", color = RemoteColors.Secondary)
-        FlowRow(Modifier.fillMaxWidth()) {
-            TextButton(model::reconnectCurrentDevice, enabled = record != null) { Text("恢复遥控服务") }
-            TextButton(model::reconnectAdbOnly, enabled = record?.adbPort != null) { Text("恢复 ADB") }
-        }
-        if (state.busy) TextButton(model::cancelConnection, modifier = Modifier.heightIn(min = 48.dp)) { Text("取消当前连接") }
-        TextButton(onPreview, enabled = state.connected && !state.busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("打开预览与重试") }
+        if (cancellable) TextButton(cancel, modifier = Modifier.heightIn(min = 48.dp)) { Text("取消连接") }
+    }
+}
+
+@Composable
+private fun ConnectionStatusRow(label: String, available: Boolean, description: String) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 32.dp).semantics(mergeDescendants = true) {
+        contentDescription = "$label，$description"
+    }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Box(Modifier.size(RemoteDimensions.ConnectionStatusDot).background(
+            if (available) RemoteColors.Brand else RemoteColors.Warning, CircleShape).testTag("connection-dot-$label"))
+        Text(description, style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
     }
 }

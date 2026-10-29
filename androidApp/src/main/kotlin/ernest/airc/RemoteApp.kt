@@ -172,15 +172,9 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                 if (isRemoteType) IconButton({ navigate(RemotePage.REMOTE_TYPES) }, Modifier.size(48.dp).testTag("open-remote-types")) {
                     Icon(painterResource(R.drawable.ic_remote_types), "切换遥控器类型", Modifier.size(24.dp))
                 }
-                Row(
-                    Modifier.heightIn(min = 48.dp).testTag("device-status")
-                        .clickable(role = Role.Button, onClickLabel = "管理设备") { navigate(RemotePage.DEVICES) }
-                        .padding(horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Box(Modifier.size(7.dp).background(if (state.connected) RemoteColors.Brand else RemoteColors.Disabled, CircleShape))
-                    Text(if (state.connected) "已连接" else "未连接", style = MaterialTheme.typography.bodyMedium)
-                }
+                ConnectionBadge(state.connected, state.reconnecting || state.busy,
+                    state.history.find { it.id == state.selected }?.visibleName.orEmpty(),
+                    onClick = { navigate(RemotePage.DEVICES) })
                 if (page == RemotePage.REMOTE) RemoteQuickMenu({ quickApps = true }, { tvInput = true }, { routinesOpen = true })
             }
         }
@@ -190,7 +184,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                     when (page) {
                         RemotePage.REMOTE_TYPES -> RemoteTypePicker(RemotePage.valueOf(selectedTypeName), ::navigate)
                         RemotePage.REMOTE -> RemoteControls(state, model) { navigate(RemotePage.RESULTS) }
-                        RemotePage.DEVICES -> Devices(state, model) { navigate(RemotePage.SCREENSHOT) }
+                        RemotePage.DEVICES -> Devices(state, model)
                         RemotePage.MENU -> FeatureMenu(::navigate)
                         RemotePage.APPS -> Applications(state, model) { name -> appDetailsPackage = name; navigate(RemotePage.APP_DETAILS) }
                         RemotePage.APP_DETAILS -> ApplicationDetails(appDetailsPackage, state, model) { navigate(RemotePage.APPS) }

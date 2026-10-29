@@ -13,7 +13,7 @@ from instrumentation_result import require_passed
 
 ROOT = Path(__file__).resolve().parent.parent
 SUITES = {
-    "device-recovery-ui": ("ernest.airc.ConnectionRecoveryIntegrationTest,ernest.airc.DeviceRecoveryUiTest", 5),
+    "device-recovery-ui": ("ernest.airc.ConnectionRecoveryIntegrationTest,ernest.airc.DeviceRecoveryUiTest,ernest.airc.ConnectionStatusUiTest", 10),
     "remote-composer-ui": ("ernest.airc.RemoteLayoutUiTest,ernest.airc.RemoteExecutionUiTest#unconfiguredStatusPreservesComposerButDisablesSubmitUntilConfigured,ernest.airc.RemoteExecutionUiTest#remoteInputSendsOnlyTextAndPreservesDraftAcrossNavigationAndRotation,ernest.airc.RemoteNavigationUiTest#textDraftSurvivesFeatureSwitchAndOfflineRemoteActionsStayDisabled,ernest.airc.RemoteNavigationUiTest#remoteTypePickerRestoresAndKeepsStandardRemoteDraft", 8),
     "voice-input-ui": ("ernest.airc.VoiceInputUiTest,ernest.airc.RemoteCommandInputUiTest", 5),
     "file-editing-ui": ("ernest.airc.FileEditingUiTest,ernest.airc.FileTaskTabsUiTest", 6),

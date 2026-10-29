@@ -30,6 +30,7 @@ data class RemoteUiState(
     val status: String = "请选择或连接目标设备",
     val output: String = "",
     val busy: Boolean = false,
+    val reconnecting: Boolean = false,
     val submitting: Boolean = false,
     val connected: Boolean = false,
     val tools: List<String> = emptyList(),
@@ -63,7 +64,8 @@ data class RemoteUiState(
     val deviceInfoError: String? = null,
 )
 
-class RemoteViewModel @JvmOverloads constructor(application: Application, private val connectionTimeoutMillis: Long = 900_000) : AndroidViewModel(application) {
+class RemoteViewModel @JvmOverloads constructor(application: Application, private val connectionTimeoutMillis: Long = 900_000,
+    private val adbConnectionFactory: (suspend (RememberedDevice) -> AdbSession)? = null) : AndroidViewModel(application) {
     private val store = DeviceStore(application)
     private val connector = AdbConnector(application)
     private val installer = RuntimeInstaller(application)
@@ -111,25 +113,46 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
     val diagnostics = NetworkDiagnostics(viewModelScope)
     internal val profiles = ModelProfileController(EncryptedModelProfileStore(application), ModelCatalogClient(), viewModelScope)
     private val adbSessionMutable = MutableStateFlow<AdbSession?>(null)
-    private val adbStatusMutable = MutableStateFlow("尚无授权会话")
+    private val adbStatusMutable = MutableStateFlow("按需自动连接")
     val adbStatus = adbStatusMutable.asStateFlow()
     private var adb: AdbSession? = null
         set(value) { field = value; adbSessionMutable.value = value }
     private var automaticReconnectEnabled = true
+    private var recoveryForeground = true
+    private var automaticTarget: RememberedDevice? = null
+    private var connectionAutomatic = false
+    private val adbMutex = Mutex()
     private var connectionJob: Job? = null
     private var connectionGeneration = 0L
     private val deploymentLocks = mutableMapOf<String, Mutex>()
-    private val automaticConnection = AutomaticConnection(viewModelScope, onExhausted = {
-        if (!state.value.connected && !state.value.busy) {
-            automaticReconnectEnabled = false
-            mutable.update { it.copy(status = "自动恢复未成功，请选择设备或手动重试") }
+    private val automaticConnection = AutomaticConnection(viewModelScope, cooldownMillis = 30_000, onExhausted = {
+        if (automaticReconnectEnabled && recoveryForeground && !state.value.connected && !state.value.busy) {
+            mutable.update { it.copy(reconnecting = true, status = "等待设备上线，将自动连接") }
         }
     }) { device ->
-        if (!state.value.busy && !state.value.connected) {
+        if (automaticReconnectEnabled && recoveryForeground && !state.value.busy && !state.value.connected) {
             reconnectDevice(device, automatic = true)
             connectionJob?.join()
         }
-        state.value.connected
+        state.value.connected || !automaticReconnectEnabled || !recoveryForeground
+    }
+    private fun startAutomaticRecovery(device: RememberedDevice, initialDelayMillis: Long = 0) {
+        automaticTarget = device
+        if (!automaticReconnectEnabled || state.value.connected) return
+        mutable.update { it.copy(reconnecting = true) }
+        if (recoveryForeground) automaticConnection.start(device, initialDelayMillis)
+    }
+    fun setConnectionForeground(foreground: Boolean) {
+        recoveryForeground = foreground
+        if (!foreground) {
+            automaticConnection.stop()
+            if (connectionAutomatic && !state.value.connected) {
+                retireConnection()
+                runtime.disconnect()
+            }
+        } else if (automaticReconnectEnabled && !state.value.connected) {
+            automaticTarget?.let { if (automaticConnection.isRunning) automaticConnection.wake() else startAutomaticRecovery(it) }
+        }
     }
     private var adbScanJob: Job? = null
     private var adbScanGeneration = 0L
@@ -152,16 +175,20 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
             if (service.attributes["protocol"] == PROTOCOL_VERSION.toString()) mutable.update {
                 it.copy(discovered = it.discovered.filterNot { old -> old.name == service.name } + service)
             }
+            if (automaticReconnectEnabled && !state.value.connected && automaticTarget?.host == service.host) automaticConnection.wake()
         },
         onLost = { name -> mutable.update { it.copy(discovered = it.discovered.filterNot { service -> service.name == name }) } },
-        onError = { error -> mutable.update { it.copy(status = "局域网发现：$error") } },
+        onError = { /* Saved addresses and automatic retry remain usable without mDNS. */ },
     )
     init {
         viewModelScope.launch {
             adbSessionMutable.collectLatest { session ->
-                if (session == null) adbStatusMutable.value = "尚无授权会话"
+                if (session == null) adbStatusMutable.value = "按需自动连接"
                 else session.client.state.collect { connection ->
-                    adbStatusMutable.value = if (connection is ernest.ascrcpy.adb.AdbConnectionState.Connected) "已连接" else "未连接，请恢复 ADB"
+                    adbStatusMutable.value = if (connection is ernest.ascrcpy.adb.AdbConnectionState.Connected) "已连接" else "按需自动连接"
+                    if (connection !is ernest.ascrcpy.adb.AdbConnectionState.Connected && adb === session) {
+                        adb = null; session.close()
+                    }
                 }
             }
         }
@@ -170,16 +197,15 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
             runtime.connected.collect { connected ->
                 val lostConnection = state.value.connected && !connected
                 if (!connected) { deviceInfoGeneration++; deviceInfoJob?.cancel(); appsGeneration++; appsJob?.cancel(); gestureGeneration++ }
-                mutable.update { if (connected) it.copy(connected = true, shortcuts = readShortcuts(it.selected), routines = readRoutines(it.selected), remoteLayout = readRemoteLayout(it.selected))
-                    else it.copy(connected = false, tools = emptyList(), touchBusy = false, deviceInfo = null, deviceInfoLoading = false, deviceInfoError = null, apps = emptyList(), appsLoading = false, appsError = null) }
+                if (!connected) mutable.update { it.copy(connected = false, tools = emptyList(), touchBusy = false, deviceInfo = null, deviceInfoLoading = false, deviceInfoError = null, apps = emptyList(), appsLoading = false, appsError = null) }
                 if (lostConnection && automaticReconnectEnabled) {
-                    state.value.history.find { it.id == state.value.selected }?.let(automaticConnection::start)
+                    (automaticTarget ?: state.value.history.find { it.id == state.value.selected })?.let { startAutomaticRecovery(it) }
                 }
             }
         }
         val lastId = releasePreferences.getString("last-connected-device", null)
         (state.value.history.find { it.id == lastId } ?: state.value.history.filter { it.runtimePort != null }.maxByOrNull { it.lastConnectedAt })
-            ?.let(automaticConnection::start)
+            ?.let { startAutomaticRecovery(it) }
     }
     // Prefer structured media snapshots; older runtimes retain shell compatibility.
     private val mediaMonitor = viewModelScope.launch {
@@ -297,70 +323,75 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         } else retired?.close()
     }
     private fun connection(disconnectRuntime: Boolean = true, automatic: Boolean = false,
-        timeoutMillis: Long = connectionTimeoutMillis, action: suspend () -> Unit) {
+        timeoutMillis: Long = connectionTimeoutMillis, target: RememberedDevice? = automaticTarget, action: suspend () -> Unit) {
         if (automatic && state.value.busy) return
-        if (!automatic) { automaticReconnectEnabled = false; automaticConnection.stop() }
+        if (!automatic) {
+            if (disconnectRuntime) automaticReconnectEnabled = false
+            automaticConnection.stop()
+            if (disconnectRuntime) automaticTarget = target
+        }
         // Explicit connection choices supersede any previous attempt immediately.
         retireConnection(detachAdb = disconnectRuntime || connectionJob?.isCompleted == false)
         val connectionToken = connectionGeneration
+        connectionAutomatic = automatic
         connectionJob = viewModelScope.launch {
-            mutable.update { it.copy(busy = true, status = "正在连接…", qr = null) }
+            mutable.update { it.copy(busy = !automatic, reconnecting = automatic, status = if (automatic) "正在自动连接设备…" else "正在连接…", qr = null) }
             val stages = ConnectionDeadline { message ->
-                if (connectionToken == connectionGeneration) mutable.update { it.copy(status = message) }
+                if (!automatic && connectionToken == connectionGeneration) mutable.update { it.copy(status = message) }
             }
             // Keep this independent of blocking ADB calls and protected deployment rollback.
             val deadline = viewModelScope.launch {
                 var failure: String? = null
                 while (failure == null) { delay(250); failure = stages.failure(timeoutMillis) }
-                if (connectionToken == connectionGeneration && state.value.busy) {
-                    automaticReconnectEnabled = false
-                    automaticConnection.stop()
+                if (connectionToken == connectionGeneration && (state.value.busy || state.value.reconnecting)) {
+                    if (!automatic) { automaticReconnectEnabled = false; automaticConnection.stop() }
                     retireConnection()
                     if (disconnectRuntime) runtime.disconnect()
-                    val message = checkNotNull(failure)
-                    mutable.update { it.copy(busy = false, qr = null, status = message) }
-                    feedback(FeedbackPhase.ERROR, message)
+                    val message = if (automatic) "等待设备上线，将自动连接" else checkNotNull(failure)
+                    mutable.update { it.copy(busy = false, reconnecting = automatic, qr = null, status = message) }
+                    if (!automatic) {
+                        feedback(FeedbackPhase.ERROR, message)
+                        if (disconnectRuntime && automaticTarget != null) {
+                            automaticReconnectEnabled = true
+                            startAutomaticRecovery(checkNotNull(automaticTarget), 3_000)
+                        }
+                    }
                 }
             }
             try {
                 if (disconnectRuntime) {
-                    feedbackGeneration.incrementAndGet()
-                    mutable.update { it.copy(feedback = RemoteFeedback(revision = it.feedback.revision + 1L)) }
+                    if (!automatic) {
+                        feedbackGeneration.incrementAndGet()
+                        mutable.update { it.copy(feedback = RemoteFeedback(revision = it.feedback.revision + 1L)) }
+                    }
                     runtime.disconnect()
                 }
                 withContext(stages) { action() }
             }
             catch (e: kotlinx.coroutines.TimeoutCancellationException) {
                 if (connectionToken != connectionGeneration) return@launch
-                val message = stages.timeoutMessage()
+                val message = if (automatic) "等待设备上线，将自动连接" else stages.timeoutMessage()
                 mutable.update { it.copy(status = message) }
-                feedback(FeedbackPhase.ERROR, message)
+                if (!automatic) feedback(FeedbackPhase.ERROR, message)
             }
             catch (e: CancellationException) { if (connectionToken == connectionGeneration) mutable.update { it.copy(status = "已取消") }; throw e }
             catch (e: Exception) {
                 if (connectionToken != connectionGeneration) return@launch
-                val message = e.message ?: "连接失败"
+                val message = if (automatic) "等待设备上线，将自动连接" else e.message ?: "连接失败"
                 mutable.update { it.copy(status = message) }
-                feedback(FeedbackPhase.ERROR, message)
+                if (!automatic) feedback(FeedbackPhase.ERROR, message)
             }
             finally {
                 deadline.cancel()
-                if (connectionToken == connectionGeneration) mutable.update { it.copy(busy = false, qr = null) }
+                if (connectionToken == connectionGeneration) {
+                    connectionAutomatic = false
+                    mutable.update { it.copy(busy = false, qr = null) }
+                    if (!automatic && (disconnectRuntime || automaticReconnectEnabled) && !state.value.connected && automaticTarget != null) {
+                        automaticReconnectEnabled = true
+                        startAutomaticRecovery(checkNotNull(automaticTarget), initialDelayMillis = 3_000)
+                    }
+                }
             }
-        }
-    }
-    fun reconnectCurrentDevice() {
-        state.value.history.find { it.id == state.value.selected }?.let { reconnectDevice(it, automatic = false) }
-    }
-    fun reconnectAdbOnly() {
-        val record = state.value.history.find { it.id == state.value.selected } ?: return
-        val host = record.host ?: return
-        val port = record.adbPort ?: return
-        connection(disconnectRuntime = false) {
-            val session = record.wirelessGuid?.let { connector.wireless(it, host, port) } ?: connector.tcp(host, port)
-            if (state.value.selected != record.id) { session.close(); error("目标已改变，请重新操作") }
-            adb?.close(); adb = session
-            mutable.update { it.copy(status = "ADB 已恢复，遥控服务保持当前连接") }
         }
     }
     fun diagnose(host: String, port: Int) {
@@ -373,14 +404,14 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         }
     }
 
-    fun tcp(host: String, port: Int, runtimePort: Int) = connection {
+    fun tcp(host: String, port: Int, runtimePort: Int) = connection(target = connectionTarget(host.trim(), port, runtimePort)) {
         attach(connector.tcp(host.trim(), port), ConnectionMethod.TCP, runtimePort)
     }
-    fun pair(host: String, pairingPort: Int, code: String, runtimePort: Int, connectionPort: Int? = null) = connection {
+    fun pair(host: String, pairingPort: Int, code: String, runtimePort: Int, connectionPort: Int? = null) = connection(target = null) {
         mutable.update { it.copy(status = "配对并发现目标连接端口…") }
         attach(connector.pair(host.trim(), pairingPort, code, connectionPort), ConnectionMethod.WIRELESS_CODE, runtimePort)
     }
-    fun qr(runtimePort: Int) = connection {
+    fun qr(runtimePort: Int) = connection(target = null) {
         val qr = PairingQr()
         mutable.update { it.copy(qr = qr, status = "请用目标设备无线调试页面扫描二维码") }
         attach(connector.qr(qr), ConnectionMethod.WIRELESS_QR, runtimePort)
@@ -388,7 +419,8 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
     fun cancelConnection() {
         automaticReconnectEnabled = false; automaticConnection.stop()
         retireConnection()
-        mutable.update { it.copy(busy = false, qr = null, status = "已取消") }
+        if (!state.value.connected) runtime.disconnect()
+        mutable.update { it.copy(busy = false, reconnecting = false, qr = null, status = "已取消") }
     }
 
     private suspend fun attach(session: AdbSession, method: ConnectionMethod, runtimePort: Int, releaseUrl: String? = null) {
@@ -408,18 +440,19 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
                 val adbRecord = RememberedDevice(known?.id ?: "adb:${session.guid ?: "${session.host}:${session.port}"}",
                     model.ifBlank { known?.name ?: "AI 设备" }, method, session.host, session.port, session.guid,
                     known?.runtimePort, System.currentTimeMillis())
+                automaticTarget = adbRecord.copy(runtimePort = runtimePort)
                 // A successful ADB session survives an interrupted or failed deployment.
                 val history = withContext(Dispatchers.IO) { store.remember(adbRecord) }
                 mutable.update { it.copy(history = history) }
-                val release = installer.install(session.client, releaseUrl, runtimePort, state.value.preferRoot) { message -> if (operation.isActive) mutable.update { it.copy(status = message) } }
+                val release = installer.install(session.client, releaseUrl, runtimePort, state.value.preferRoot) { message -> if (operation.isActive && !connectionAutomatic) mutable.update { it.copy(status = message) } }
                 operation.ensureActive()
-                mutable.update { it.copy(status = "启动目标服务…") }
+                if (!connectionAutomatic) mutable.update { it.copy(status = "启动目标服务…") }
                 val actualPort = installer.start(session.client, runtimePort, state.value.preferRoot)
                 try {
                     attachRuntime(session.host, actualPort, method, session.port, session.guid, model, previousId = adbRecord.id, expectedRelease = release)
                 } catch (e: RuntimeAlignmentRequired) {
                     // The file may already be current while an older executable is still running.
-                    mutable.update { it.copy(status = "目标文件已对齐，正在重启旧服务…") }
+                    if (!connectionAutomatic) mutable.update { it.copy(status = "目标文件已对齐，正在重启旧服务…") }
                     val restartedPort = installer.restart(session.client, actualPort, state.value.preferRoot)
                     attachRuntime(session.host, restartedPort, method, session.port, session.guid, model, previousId = adbRecord.id, expectedRelease = release)
                 }
@@ -439,11 +472,12 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         val history = withContext(Dispatchers.IO) { store.remember(record, previousId) }
         releasePreferences.edit().putString("last-connected-device", record.id).apply()
         automaticReconnectEnabled = true
+        automaticTarget = record
         tvInput.selectTarget(record.id)
-        mutable.update { it.copy(status = "已连接 ${history.first { it.id == record.id }.visibleName}", selected = record.id, version = status.version, tools = status.tools, runtimeUid = status.uid, modelConfigured = status.modelConfigured, history = history, shortcuts = readShortcuts(record.id), routines = readRoutines(record.id), remoteLayout = readRemoteLayout(record.id)) }
+        mutable.update { it.copy(connected = true, reconnecting = false, status = "已连接 ${history.first { it.id == record.id }.visibleName}", selected = record.id, version = status.version, tools = status.tools, runtimeUid = status.uid, modelConfigured = status.modelConfigured, history = history, shortcuts = readShortcuts(record.id), routines = readRoutines(record.id), remoteLayout = readRemoteLayout(record.id)) }
     }
 
-    fun discovered(service: DiscoveredService, adbPort: Int? = null) = connection {
+    fun discovered(service: DiscoveredService, adbPort: Int? = null) = connection(target = connectionTarget(service.host, adbPort ?: 5555, service.port)) {
         adb?.close(); adb = null
         val known = state.value.history.firstOrNull { it.id == service.attributes["id"] }
         connectWithDeploymentFallback(service.host, service.port, adbPort ?: known?.adbPort, known?.wirelessGuid,
@@ -452,7 +486,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
 
     fun reconnect(device: RememberedDevice) = reconnectDevice(device, automatic = false)
 
-    private fun reconnectDevice(device: RememberedDevice, automatic: Boolean) = connection(automatic = automatic) {
+    private fun reconnectDevice(device: RememberedDevice, automatic: Boolean) = connection(automatic = automatic, target = device) {
         adb?.close(); adb = null
         // Reuse LAN only after its running bytes match the bundled release.
         val live = state.value.discovered.find { it.attributes["id"] == device.id }
@@ -470,8 +504,8 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
                     else connector.tcp(host, target.adbPort)
                 attach(session, if (guid == null) ConnectionMethod.TCP else method, port)
             },
-            onDeploying = { message -> mutable.update { it.copy(status = message) } },
-            onDeploymentFailed = { failed -> mutable.update { it.copy(manualConnectionTarget = failed) } },
+            onDeploying = { message -> if (!connectionAutomatic) mutable.update { it.copy(status = message) } },
+            onDeploymentFailed = { failed -> if (!connectionAutomatic) mutable.update { it.copy(manualConnectionTarget = failed) } },
         )
     }
 
@@ -744,16 +778,33 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         result
     }
 
-    private suspend fun selectedAdb(): AdbSession {
-        adb?.let { return it }
+    private fun connectionTarget(host: String, port: Int, runtimePort: Int): RememberedDevice {
+        val known = state.value.history.find { it.host == host && it.adbPort == port }
+        return known?.copy(runtimePort = runtimePort) ?: RememberedDevice("adb:$host:$port", host, ConnectionMethod.TCP, host, port, runtimePort = runtimePort, lastConnectedAt = 0)
+    }
+    private suspend fun selectedAdb(): AdbSession = adbMutex.withLock {
         val record = state.value.history.find { it.id == state.value.selected } ?: error("请先选择目标设备")
-        val port = record.adbPort ?: error("请先在设备页通过 ADB 连接此设备")
+        val port = record.adbPort ?: error("此设备尚未保存调试授权，请先连接设备")
         val host = record.host ?: error("没有保存目标地址")
-        val session = record.wirelessGuid?.let { connector.wireless(it, host, port) } ?: connector.tcp(host, port)
+        val generation = connectionGeneration
+        adb?.let { cached ->
+            if (cached.host == host && cached.port == port && cached.client.state.value is ernest.ascrcpy.adb.AdbConnectionState.Connected) {
+                try { adbAttempt(3_000, cached::close) { cached.client.shell("true") }; return@withLock cached }
+                catch (error: CancellationException) { currentCoroutineContext().ensureActive() }
+                catch (_: Exception) { /* Recreate a failed management channel before doing any operation. */ }
+            }
+            if (adb === cached) adb = null
+            cached.close()
+        }
+        val session = adbConnectionFactory?.invoke(record)
+            ?: record.wirelessGuid?.let { connector.wireless(it, host, port) } ?: connector.tcp(host, port)
+        if (generation != connectionGeneration || state.value.selected != record.id) {
+            session.close(); error("目标连接已改变")
+        }
         adb = session
         val history = withContext(Dispatchers.IO) { store.remember(record.copy(host = session.host, adbPort = session.port)) }
         mutable.update { it.copy(history = history) }
-        return session
+        session
     }
     fun serviceStatus() = connection(disconnectRuntime = false) {
         val output = installer.status(selectedAdb().client, state.value.preferRoot)
@@ -805,7 +856,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         retireConnection()
         ascrcpyPreview.stop(); tvInput.cancel(); quickRoutines.cancel(); releaseHardwareKeys()
         runtime.disconnect(); adb?.close(); adb = null
-        mutable.update { it.copy(status = "已断开", runtimeUid = null, busy = false, qr = null) }
+        mutable.update { it.copy(status = "已断开", runtimeUid = null, busy = false, reconnecting = false, qr = null) }
     }
 
     override fun onCleared() {

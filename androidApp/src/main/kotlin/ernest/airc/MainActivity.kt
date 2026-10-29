@@ -68,9 +68,9 @@ class MainActivity : ComponentActivity() {
         model.receiveShare(intent)
         model.receiveLauncherAction(intent)
     }
-    override fun onStart() { super.onStart(); model.startDiscovery() }
+    override fun onStart() { super.onStart(); model.setConnectionForeground(true); model.startDiscovery() }
     override fun onStop() {
-        if (!isChangingConfigurations) model.quickRoutines.cancel()
+        if (!isChangingConfigurations) { model.quickRoutines.cancel(); model.setConnectionForeground(false) }
         model.stopDiscovery()
         super.onStop()
     }

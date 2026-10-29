@@ -55,4 +55,25 @@ class AutomaticConnectionTest {
         assertEquals(3, times.size)
     }
 
+    @Test fun backgroundRecoveryWaitsBetweenBurstsAndCanBeStopped() = runTest {
+        val times = mutableListOf<Long>()
+        val reconnect = AutomaticConnection(backgroundScope, cooldownMillis = 30_000) { times += currentTime; false }
+        reconnect.start(device)
+        advanceTimeBy(9_001); runCurrent()
+        assertEquals(listOf(0L, 3000L, 9000L), times)
+        advanceTimeBy(30_000); runCurrent()
+        assertEquals(39_000L, times[3])
+        reconnect.stop(); advanceTimeBy(120_000); runCurrent()
+        assertEquals(4, times.size)
+    }
+    @Test fun networkWakeupSkipsCooldownWithoutReplacingTheTarget() = runTest {
+        var attempts = 0
+        val reconnect = AutomaticConnection(backgroundScope, maxAttempts = 1, cooldownMillis = 30_000) { attempts++; attempts == 2 }
+        reconnect.start(device); runCurrent()
+        assertEquals(1, attempts)
+        advanceTimeBy(1000); reconnect.wake(); runCurrent()
+        assertEquals(2, attempts)
+        assertFalse(reconnect.isRunning)
+    }
+
 }
