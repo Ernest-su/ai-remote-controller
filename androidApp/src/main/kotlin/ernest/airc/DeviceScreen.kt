@@ -1,6 +1,10 @@
 package ernest.airc
 
 import androidx.compose.foundation.Image
+import androidx.compose.animation.core.*
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.*
@@ -51,19 +55,8 @@ internal fun Devices(state: RemoteUiState, model: RemoteViewModel, onPreview: ()
     }
     PageContent(Modifier.testTag("devices-page")) {
         ConnectionChannelsPanel(state, model, onPreview)
-        Panel {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Icon(painterResource(R.drawable.ic_device_tv), null, Modifier.size(RemoteDimensions.DeviceIcon), tint = RemoteColors.Secondary)
-                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                    SectionTitle("附近与已保存设备")
-                    Text(state.adbScanStatus, style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
-                }
-                IconButton(model::scanAdbDevices, enabled = !state.adbScanning,
-                    modifier = Modifier.size(48.dp).testTag("refresh-adb-devices")) {
-                    Icon(painterResource(R.drawable.ic_refresh), "重新扫描设备")
-                }
-            }
-            if (state.adbScanning) LinearProgressIndicator(Modifier.fillMaxWidth())
+        Panel(Modifier.testTag("device-discovery-header")) {
+            DeviceDiscoveryHeader(state.adbScanning, state.adbScanStatus, model::scanAdbDevices)
             Text("自动查找同网段 ADB 与遥控服务，点击设备后连接。", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
             Text(state.status, modifier = Modifier.testTag("device-connection-status"), style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
         }
@@ -91,23 +84,24 @@ internal fun Devices(state: RemoteUiState, model: RemoteViewModel, onPreview: ()
             if (connectionExpanded) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     listOf(ConnectionMethod.TCP to "TCP", ConnectionMethod.WIRELESS_CODE to "配对码", ConnectionMethod.WIRELESS_QR to "二维码").forEach { (value, label) ->
-                        FilterChip(modifier = Modifier.heightIn(min = 48.dp), selected = method == value, enabled = !state.busy, onClick = { method = value; port = if (value == ConnectionMethod.TCP) "5555" else "" }, label = { Text(label, style = MaterialTheme.typography.bodyMedium) })
+                        FilterChip(modifier = Modifier.heightIn(min = 48.dp), selected = method == value, onClick = { method = value; port = if (value == ConnectionMethod.TCP) "5555" else "" }, label = { Text(label, style = MaterialTheme.typography.bodyMedium) })
                     }
                 }
                 if (method != ConnectionMethod.WIRELESS_QR) {
-                    OutlinedTextField(host, { host = it }, label = { Text("目标设备 IP / 主机名") }, singleLine = true, modifier = Modifier.fillMaxWidth(), enabled = !state.busy)
-                    OutlinedTextField(port, { port = it }, label = { Text(if (method == ConnectionMethod.TCP) "ADB 端口" else "目标设备配对端口") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), enabled = !state.busy)
-                    if (method == ConnectionMethod.WIRELESS_CODE) OutlinedTextField(code, { code = it }, label = { Text("六位配对码") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), enabled = !state.busy)
+                    OutlinedTextField(host, { host = it }, label = { Text("目标设备 IP / 主机名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(port, { port = it }, label = { Text(if (method == ConnectionMethod.TCP) "ADB 端口" else "目标设备配对端口") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+                    if (method == ConnectionMethod.WIRELESS_CODE) OutlinedTextField(code, { code = it }, label = { Text("六位配对码") }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                     if (method == ConnectionMethod.WIRELESS_CODE) {
-                        OutlinedTextField(connectionPort, { connectionPort = it }, label = { Text("连接端口（可选）") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), enabled = !state.busy)
+                        OutlinedTextField(connectionPort, { connectionPort = it }, label = { Text("连接端口（可选）") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                         Text("留空自动发现；无法发现时，填写无线调试首页的连接端口，与配对端口不同。", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
-                OutlinedTextField(runtimePort, { runtimePort = it }, label = { Text("遥控服务端口") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), enabled = !state.busy)
+                OutlinedTextField(runtimePort, { runtimePort = it }, label = { Text("遥控服务端口") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 if (state.busy) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                     TextButton(model::cancelConnection) { Text("取消连接") }
-                } else Button(shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = {
+                }
+                Button(shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), onClick = {
                     val targetPort = validPort(runtimePort) ?: return@Button
                     when (method) {
                         ConnectionMethod.TCP -> model.tcp(host, validPort(port) ?: return@Button, targetPort)
@@ -130,6 +124,28 @@ internal fun Devices(state: RemoteUiState, model: RemoteViewModel, onPreview: ()
             { model.diagnose(diagnosticHost, diagnosticPort ?: return@NetworkDiagnosticsPanel) }, model.diagnostics::cancel,
             if (diagnosticHost.isBlank()) "" else "$diagnosticHost:${diagnosticPort ?: ""}")
         TextButton(model::disconnect, enabled = state.connected) { Text("断开当前连接") }
+    }
+}
+
+
+@Composable
+internal fun DeviceDiscoveryHeader(scanning: Boolean, status: String, refresh: () -> Unit) {
+    val rotation = if (scanning) {
+        val transition = rememberInfiniteTransition(label = "device-scan")
+        val angle by transition.animateFloat(0f, 360f,
+            infiniteRepeatable(tween(RemoteDimensions.DeviceScanRotationMillis, easing = LinearEasing)), label = "refresh-rotation")
+        angle
+    } else 0f
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Icon(painterResource(R.drawable.ic_device_tv), null, Modifier.size(RemoteDimensions.DeviceIcon), tint = RemoteColors.Secondary)
+        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            SectionTitle("附近与已保存设备")
+            Text(status, style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
+        }
+        IconButton(refresh, enabled = !scanning, modifier = Modifier.size(48.dp).testTag("refresh-adb-devices")
+            .semantics { stateDescription = if (scanning) "正在扫描设备" else "扫描已结束" }) {
+            Icon(painterResource(R.drawable.ic_refresh), "重新扫描设备", Modifier.size(24.dp).rotate(rotation).testTag("adb-scan-icon"))
+        }
     }
 }
 
@@ -158,7 +174,7 @@ internal fun UnifiedDeviceRow(
                 }
                 if (connected) Text("当前连接", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Action)
             }
-            TextButton(onClick = onConnect, enabled = !state.busy && !connected, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (connected) "已连接" else "连接") }
+            TextButton(onClick = onConnect, enabled = !connected, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (connected) "已连接" else "连接") }
             if (entry.history.isNotEmpty()) IconButton({ showManagement = !showManagement }, Modifier.size(48.dp)) {
                 Icon(painterResource(R.drawable.ic_more), "管理 ${entry.name}")
             }

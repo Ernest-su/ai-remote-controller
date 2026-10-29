@@ -9,7 +9,8 @@ import org.junit.Test
 
 /** Uses only the controller's loopback address, never an external ADB target. */
 class LanConnectionUiTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule val rules: org.junit.rules.TestRule = org.junit.rules.RuleChain.outerRule(DeviceHistoryIsolation()).around(compose)
 
     @Test fun startupConnectsLastSuccessfulDeviceAndUnexpectedLossReconnectsUntilExplicitDisconnect() {
         val context=androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext

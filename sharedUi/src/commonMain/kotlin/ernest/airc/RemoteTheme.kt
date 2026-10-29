@@ -103,6 +103,7 @@ object RemoteColors {
 
 /** Dimensions from AIVoice phoneRemoteApp, with scrolling for short windows / large text. */
 object RemoteDimensions {
+    const val DeviceScanRotationMillis = 900
     val FloatingRemoteSnapDistance = 24.dp
     const val FloatingRemoteMinTransparency = 60
     const val FloatingRemoteMaxTransparency = 90

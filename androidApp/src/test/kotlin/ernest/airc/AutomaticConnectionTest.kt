@@ -11,7 +11,7 @@ class AutomaticConnectionTest {
 
     @Test fun retriesWithBackoffUntilConnected() = runTest {
         val times = mutableListOf<Long>()
-        val reconnect = AutomaticConnection(this) { times += currentTime; times.size == 5 }
+        val reconnect = AutomaticConnection(this, maxAttempts = 5) { times += currentTime; times.size == 5 }
         reconnect.start(device)
         advanceUntilIdle()
         assertEquals(listOf(0L, 3000L, 9000L, 21000L, 45000L), times)
@@ -41,4 +41,18 @@ class AutomaticConnectionTest {
         advanceUntilIdle()
         assertEquals(listOf("fixture", "new"), ids)
     }
+    @Test fun unreachableTargetStopsAfterThreeAttempts() = runTest {
+        val times = mutableListOf<Long>()
+        var exhausted = false
+        val reconnect = AutomaticConnection(this, onExhausted = { exhausted = true }) {
+            times += currentTime; false
+        }
+        reconnect.start(device)
+        advanceUntilIdle()
+        assertEquals(listOf(0L, 3000L, 9000L), times)
+        assertTrue(exhausted)
+        advanceTimeBy(120_000)
+        assertEquals(3, times.size)
+    }
+
 }

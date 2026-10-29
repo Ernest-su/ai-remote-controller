@@ -13,6 +13,7 @@ from instrumentation_result import require_passed
 
 ROOT = Path(__file__).resolve().parent.parent
 SUITES = {
+    "device-recovery-ui": ("ernest.airc.ConnectionRecoveryIntegrationTest,ernest.airc.DeviceRecoveryUiTest", 5),
     "remote-composer-ui": ("ernest.airc.RemoteLayoutUiTest,ernest.airc.RemoteExecutionUiTest#unconfiguredStatusPreservesComposerButDisablesSubmitUntilConfigured,ernest.airc.RemoteExecutionUiTest#remoteInputSendsOnlyTextAndPreservesDraftAcrossNavigationAndRotation,ernest.airc.RemoteNavigationUiTest#textDraftSurvivesFeatureSwitchAndOfflineRemoteActionsStayDisabled,ernest.airc.RemoteNavigationUiTest#remoteTypePickerRestoresAndKeepsStandardRemoteDraft", 8),
     "voice-input-ui": ("ernest.airc.VoiceInputUiTest,ernest.airc.RemoteCommandInputUiTest", 5),
     "file-editing-ui": ("ernest.airc.FileEditingUiTest,ernest.airc.FileTaskTabsUiTest", 6),
@@ -74,7 +75,7 @@ def main():
     parser.add_argument("--preview-quality", choices=["流畅", "均衡", "清晰"], help="Initial quality for live floating-remote validation")
     parser.add_argument("--suite", choices=[*SUITES, "all"], default="all")
     args = parser.parse_args()
-    phone_only=args.suite in ("remote-composer-ui", "voice-input-ui", "screen-power-ui", "file-editing-ui", "apk-file-selection-ui", "project-information-ui", "storage-task-tabs-ui", "upload-local-picker-ui", "file-task-navigation-ui", "batch-download-mode-ui", "file-multiselect-ui", "url-conflict-ui", "launcher-shortcut-ui", "scheduled-features-ui", "tv-input-ui", "remote-menu-ui", "remote-volume-ui", "file-page-ui", "library-layout-ui", "mobile-convenience-ui", "app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-surface-ui", "mirror-toolbar-ui", "mirror-ui", "gamepad-ui", "models", "profile-isolation", "controller-ui")
+    phone_only=args.suite in ("device-recovery-ui", "remote-composer-ui", "voice-input-ui", "screen-power-ui", "file-editing-ui", "apk-file-selection-ui", "project-information-ui", "storage-task-tabs-ui", "upload-local-picker-ui", "file-task-navigation-ui", "batch-download-mode-ui", "file-multiselect-ui", "url-conflict-ui", "launcher-shortcut-ui", "scheduled-features-ui", "tv-input-ui", "remote-menu-ui", "remote-volume-ui", "file-page-ui", "library-layout-ui", "mobile-convenience-ui", "app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-surface-ui", "mirror-toolbar-ui", "mirror-ui", "gamepad-ui", "models", "profile-isolation", "controller-ui")
     if not phone_only and (not args.target or not args.host):
         parser.error("This suite requires --target and --host")
     if not phone_only and args.phone == args.target:
@@ -115,7 +116,7 @@ def main():
         if not asset.is_file() or hashlib.sha256(asset.read_bytes()).digest() != hashlib.sha256(embedded).digest():
             parser.error("Runtime asset differs from the app APK; rebuild before testing")
 
-    selected = [value for name,value in SUITES.items() if name not in ("file-editing-ui", "apk-file-selection-ui", "project-information-ui", "remote-volume-target", "app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-toolbar-ui", "mirror-floating-target", "gamepad-lifecycle", "models", "model-sync", "profile-isolation", "controller-ui")] if args.suite == "all" else [SUITES[args.suite]]
+    selected = [value for name,value in SUITES.items() if name not in ("device-recovery-ui", "file-editing-ui", "apk-file-selection-ui", "project-information-ui", "remote-volume-target", "app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-toolbar-ui", "mirror-floating-target", "gamepad-lifecycle", "models", "model-sync", "profile-isolation", "controller-ui")] if args.suite == "all" else [SUITES[args.suite]]
     directory = f"/data/local/tmp/airc-phone-acceptance-{uuid.uuid4()}"
     binary = f"{directory}/airc-runtime"
     touch_selected = not phone_only and (args.suite in ("all", "touchpad", "ascrcpy", "gamepad-lifecycle", "mirror-floating-target") or args.with_touch_receiver)

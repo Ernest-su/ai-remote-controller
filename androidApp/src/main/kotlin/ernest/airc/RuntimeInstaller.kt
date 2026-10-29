@@ -7,6 +7,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -54,7 +55,7 @@ class RuntimeInstaller(
                 operation.ensureActive()
                 // Once replacement starts, finish readiness or rollback before honoring cancellation.
                 val result = withContext(NonCancellable) {
-                    deploy(client, runtimePort, privilege)
+                    withTimeout(75_000) { deploy(client, runtimePort, privilege) }
                 }
                 check(result.lineSequence().any { it == "airc-committed" }) {
                     if (result.contains("airc-preflight-failed")) result
@@ -62,7 +63,7 @@ class RuntimeInstaller(
                     else "更新提交或恢复失败，请查询目标服务状态：$result"
                 }
             } finally {
-                withContext(NonCancellable) { runCatching { client.shell(privilege.command("rm -f $BINARY.next")) } }
+                withContext(NonCancellable) { runCatching { withTimeout(10_000) { client.shell(privilege.command("rm -f $BINARY.next")) } } }
             }
         }
         release
@@ -96,7 +97,7 @@ class RuntimeInstaller(
         try {
             currentCoroutineContext().ensureActive()
             val result = withContext(NonCancellable) {
-                deploy(client, port, privilege)
+                withTimeout(75_000) { deploy(client, port, privilege) }
             }
             check(result.lineSequence().any { it == "airc-committed" }) {
                 if (result.contains("airc-preflight-failed")) result else "重启失败，已尝试恢复原服务：$result"
@@ -104,7 +105,7 @@ class RuntimeInstaller(
             val reply = result.lineSequence().first { it.contains("\"ready\":true") }
             json.parseToJsonElement(reply).jsonObject.getValue("port").jsonPrimitive.int
         } finally {
-            withContext(NonCancellable) { runCatching { client.shell(privilege.command("rm -f $BINARY.next")) } }
+            withContext(NonCancellable) { runCatching { withTimeout(10_000) { client.shell(privilege.command("rm -f $BINARY.next")) } } }
         }
     }
     suspend fun stop(client: AdbClient, preferRoot: Boolean = false): String = withContext(Dispatchers.IO) {

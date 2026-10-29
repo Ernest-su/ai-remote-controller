@@ -2,6 +2,7 @@ package ernest.airc
 
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.security.MessageDigest
 import java.util.UUID
 
@@ -28,7 +29,7 @@ object RuntimeDeploymentRunner {
             }
         } finally {
             withContext(NonCancellable) {
-                runCatching { shell(privilege.command("rm -f $quoted")) }
+                runCatching { withTimeout(10_000) { shell(privilege.command("rm -f $quoted")) } }
             }
         }
     }
