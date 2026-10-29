@@ -9,6 +9,9 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -27,7 +30,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @Composable
-internal fun VoiceControls(controller: AndroidVoiceController, connected: Boolean) {
+internal fun VoiceControls(controller: AndroidVoiceController, connected: Boolean, modifier: Modifier = Modifier, showError: Boolean = true) {
     val state by controller.state.collectAsState()
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -35,10 +38,12 @@ internal fun VoiceControls(controller: AndroidVoiceController, connected: Boolea
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (!granted) controller.permissionDenied()
     }
-    fun begin() {
-        if (!connected || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) || !window.isWindowFocused) return
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) controller.start()
-        else permission.launch(Manifest.permission.RECORD_AUDIO)
+    var keyboardPress by remember { mutableStateOf<Long?>(null) }
+    fun begin(): Long? {
+        if (!connected || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) || !window.isWindowFocused) return null
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) return controller.start()
+        permission.launch(Manifest.permission.RECORD_AUDIO)
+        return null
     }
     DisposableEffect(controller, lifecycle) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) controller.stop() }
@@ -48,7 +53,7 @@ internal fun VoiceControls(controller: AndroidVoiceController, connected: Boolea
     LaunchedEffect(window.isWindowFocused, connected) { if (!window.isWindowFocused || !connected) controller.stop() }
     val active = state.preparing || state.recording
     val color = if (!connected) RemoteColors.Disabled else if (active) RemoteColors.Action else RemoteColors.Text
-    Column(Modifier.fillMaxWidth().testTag("voice-controls")) {
+    Column(modifier.fillMaxWidth().testTag("voice-controls")) {
         Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).background(if (active) RemoteColors.ActionContainer else RemoteColors.Surface, MaterialTheme.shapes.small)
             .semantics {
                 role = Role.Button
@@ -59,17 +64,18 @@ internal fun VoiceControls(controller: AndroidVoiceController, connected: Boolea
                     if (connected) { if (active) controller.stop() else begin() }; connected
                 }
             }
-            .onFocusChanged { if (!it.isFocused) controller.stop() }
+            .onFocusChanged { if (!it.isFocused) { keyboardPress?.let(controller::stop); keyboardPress = null } }
             .onKeyEvent { event ->
                 if (connected && event.key in listOf(Key.Enter, Key.Spacebar, Key.DirectionCenter)) {
-                    if (event.type == KeyEventType.KeyDown) begin() else if (event.type == KeyEventType.KeyUp) controller.stop()
+                    if (event.type == KeyEventType.KeyDown && keyboardPress == null) keyboardPress = begin()
+                    else if (event.type == KeyEventType.KeyUp) { keyboardPress?.let(controller::stop); keyboardPress = null }
                     true
                 } else false
             }.focusable(connected)
             .pointerInput(connected, controller) {
                 if (connected) detectTapGestures(onPress = {
-                    begin()
-                    try { tryAwaitRelease() } finally { controller.stop() }
+                    val token = begin()
+                    try { tryAwaitRelease() } finally { if (token != null) controller.stop(token) }
                 })
             }.padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -78,9 +84,58 @@ internal fun VoiceControls(controller: AndroidVoiceController, connected: Boolea
                 style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             if (active) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = RemoteColors.Action)
         }
-        if (state.message.startsWith("语音失败") || state.message.startsWith("需要") || state.message.startsWith("请输入") || state.message.startsWith("附加键值")) {
-            Text(state.message, color = RemoteColors.Warning, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp).testTag("voice-error"))
+        if (showError) VoiceError(state.message)
+    }
+}
+
+@Composable
+private fun VoiceError(message: String) {
+    if (message.startsWith("语音失败") || message.startsWith("需要") || message.startsWith("请输入") || message.startsWith("附加键值")) {
+        Text(message, color = RemoteColors.Warning, style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 4.dp).testTag("voice-error").semantics { liveRegion = LiveRegionMode.Polite })
+    }
+}
+
+/** One input area; switching modes never discards the text draft or resumes recording. */
+@Composable
+internal fun RemoteCommandInput(controller: AndroidVoiceController, connected: Boolean, modelConfigured: Boolean,
+    submitting: Boolean, draft: String, edit: (String) -> Unit, submit: () -> Unit, modifier: Modifier = Modifier) {
+    var voiceMode by rememberSaveable { mutableStateOf(false) }
+    val state by controller.state.collectAsState()
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    Column(modifier.testTag("remote-text-controls")) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            IconButton({
+                controller.stop()
+                focus.clearFocus()
+                keyboard?.hide()
+                voiceMode = !voiceMode
+            }, Modifier.size(48.dp).testTag("remote-input-mode")) {
+                Icon(painterResource(if (voiceMode) R.drawable.ic_keyboard else R.drawable.ic_microphone),
+                    if (voiceMode) "切换为文字输入" else "切换为语音输入", Modifier.size(24.dp))
+            }
+            if (voiceMode) {
+                VoiceControls(controller, connected, Modifier.weight(1f), showError = false)
+            } else {
+                OutlinedTextField(draft, edit, Modifier.weight(1f).testTag("remote-command-input"),
+                    placeholder = { Text("输入指令", style = MaterialTheme.typography.bodyMedium) },
+                    minLines = 1, maxLines = 3, textStyle = MaterialTheme.typography.bodyMedium,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { submit() }))
+                FilledIconButton(submit, enabled = connected && modelConfigured && !submitting && draft.isNotBlank(),
+                    modifier = Modifier.size(48.dp).testTag("remote-send-command"),
+                    colors = if (LocalMirrorOverlay.current) IconButtonDefaults.filledIconButtonColors(
+                        containerColor = RemoteColors.Surface, contentColor = RemoteColors.Text,
+                        disabledContainerColor = RemoteColors.Surface, disabledContentColor = RemoteColors.Disabled,
+                    ) else IconButtonDefaults.filledIconButtonColors()) {
+                    Icon(painterResource(R.drawable.ic_send), "发送文字指令", Modifier.size(24.dp))
+                }
+            }
         }
+        if (voiceMode) VoiceError(state.message)
+        else if (!modelConfigured) Text("文字指令需先配置模型", color = RemoteColors.Secondary,
+            style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("remote-model-required"))
     }
 }
 

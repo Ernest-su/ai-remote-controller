@@ -156,6 +156,10 @@ object RemoteDimensions {
     val Width = 390.dp
     val OuterPadding = 14.dp
     val InnerPadding = 24.dp
+    val CompactInnerPadding = 12.dp
+    val CompactControlsHeight = 540.dp
+    val CompactFontHeightGrowth = 60.dp
+    val VolumeStepButtonsMinWidth = 316.dp
     val VerticalPadding = 22.dp
     val Dpad = 220.dp
     val Confirm = 82.dp

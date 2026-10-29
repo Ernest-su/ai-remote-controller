@@ -129,9 +129,8 @@ class RemoteLayoutUiTest {
         compose.onNodeWithTag("remote-volume-slider").assertIsDisplayed().assertIsNotEnabled()
         val volumeNodes = listOf(
             compose.onNodeWithContentDescription("静音"),
-            compose.onNodeWithContentDescription("音量 −"),
             compose.onNodeWithTag("remote-volume-slider"),
-            compose.onNodeWithContentDescription("音量 +"),
+            compose.onNodeWithContentDescription("电源"),
         ).map { it.fetchSemanticsNode().boundsInRoot }
         volumeNodes.zipWithNext().forEach { (left, right) ->
             assertTrue("Volume controls must be ordered without overlap: $volumeNodes", left.right <= right.left + 1f)

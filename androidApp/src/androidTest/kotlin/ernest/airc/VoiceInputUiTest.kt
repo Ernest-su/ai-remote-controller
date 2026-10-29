@@ -51,7 +51,7 @@ class VoiceInputUiTest {
                 "/ws" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {})
                 "/voice" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                     override fun onMessage(webSocket: WebSocket, text: String) {
-                        if (text == "stop") { stops.incrementAndGet(); webSocket.send("{\"stopped\":true}") }
+                        if (text == "stop") { stops.incrementAndGet(); Thread.sleep(150); webSocket.send("{\"stopped\":true}") }
                         else webSocket.send("{\"ready\":true}")
                     }
                     override fun onMessage(webSocket: WebSocket, bytes: ByteString) { assertTrue(bytes.size in 2..640 && bytes.size % 2 == 0); frames.incrementAndGet() }
@@ -90,13 +90,26 @@ class VoiceInputUiTest {
             catch (error: Throwable) { throw AssertionError("Voice state: ${controller.state.value}; requests=${server.requestCount}; lifecycle=${compose.activity.lifecycle.currentState}", error) }
             button.performTouchInput { up() }
             compose.waitUntil(5000) { stops.get() == initialStops + 1 && !controller.state.value.recording }
-            val count = frames.get()
             compose.waitForIdle()
             assertFalse(controller.state.value.preparing)
+            var oldPress = 0L
+            compose.runOnIdle { oldPress = checkNotNull(controller.start()) }
+            val beforeRepress = frames.get()
+            compose.waitUntil(8000) { frames.get() > beforeRepress + 3 }
+            val beforeReplacement = frames.get()
+            compose.runOnIdle {
+                controller.stop(oldPress)
+                assertNotNull(controller.start()) // Queue behind the 150ms remote cleanup.
+                controller.stop(oldPress) // A delayed UP from the old gesture cannot cancel this one.
+            }
+            compose.waitUntil(8000) { frames.get() > beforeReplacement + 4 && controller.state.value.recording }
+            compose.runOnIdle { controller.stop() }
+            compose.waitUntil(5000) { stops.get() == initialStops + 3 && !controller.state.value.recording }
+            val count = frames.get()
             button.performTouchInput { down(center) }
             compose.waitUntil(8000) { frames.get() > count + 3 }
             compose.runOnIdle { visible = false }
-            compose.waitUntil(5000) { stops.get() == initialStops + 2 && !controller.state.value.recording }
+            compose.waitUntil(5000) { stops.get() == initialStops + 4 && !controller.state.value.recording }
             compose.runOnIdle { visible = true }
             compose.waitForIdle()
             assertFalse(controller.state.value.recording)

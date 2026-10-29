@@ -20,6 +20,7 @@ class RuntimeVoiceStream(private val session: RuntimeSession, private val curren
     private val client = OkHttpClient.Builder().connectTimeout(5, TimeUnit.SECONDS).readTimeout(0, TimeUnit.SECONDS).build()
     private val ready = CompletableDeferred<Unit>()
     private val stopped = CompletableDeferred<Unit>()
+    @Volatile private var opened = false
     @Volatile private var initialized = false
     @Volatile private var failure: Throwable? = null
     private var socket: WebSocket? = null
@@ -30,6 +31,7 @@ class RuntimeVoiceStream(private val session: RuntimeSession, private val curren
         socket = client.newWebSocket(Request.Builder().url(RuntimeConnection.url(session.host, session.port, "/voice")).build(), object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 if (current() != session) { webSocket.cancel(); ready.completeExceptionally(IllegalStateException("目标连接已改变")); return }
+                opened = true
                 webSocket.send(buildJsonObject { put("packageName", settings.packageName); put("keyCode", key) }.toString())
             }
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -47,7 +49,7 @@ class RuntimeVoiceStream(private val session: RuntimeSession, private val curren
                 webSocket.close(code, reason)
             }
         })
-        withTimeout(6000) { ready.await() }
+        withTimeout(10_000) { ready.await() }
         checkCurrent()
         initialized = true
     }
@@ -62,9 +64,9 @@ class RuntimeVoiceStream(private val session: RuntimeSession, private val curren
     }
     suspend fun stop() {
         val destination = socket ?: return
-        if (failure == null && ready.isCompleted) {
+        if (failure == null && opened) {
             destination.send("stop")
-            withTimeout(1500) { stopped.await() }
+            withTimeout(4000) { stopped.await() }
         }
     }
     override fun close() {

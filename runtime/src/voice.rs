@@ -68,7 +68,6 @@ async fn connection(mut socket: WebSocket) {
     let _ = tokio::time::timeout(Duration::from_secs(1), socket.close()).await;
 }
 async fn session(socket: &mut WebSocket) -> Result<()> {
-    let _active = ACTIVE.try_lock().context("Microphone is already in use")?;
     let first = tokio::time::timeout(Duration::from_secs(5), socket.recv())
         .await?
         .context("Voice connection closed")??;
@@ -77,6 +76,13 @@ async fn session(socket: &mut WebSocket) -> Result<()> {
     };
     let settings: Settings = serde_json::from_str(&text)?;
     settings.validate()?;
+    // A previous connection may be releasing its bridge after a quick cancellation.
+    // Wait for that cleanup, while still accepting cancellation of this new gesture.
+    let _active = tokio::select! {
+        result = tokio::time::timeout(Duration::from_secs(4), ACTIVE.lock()) =>
+            result.context("Microphone is already in use")?,
+        _ = socket.recv() => return Ok(()),
+    };
     let dex = crate::platform_bridge::input_bridge_path()?;
     // Dropping the task must close stdin, not SIGKILL the bridge before its key-UP/finally.
     // Its independent watchdog bounds cleanup even if the runtime exits unexpectedly.
@@ -96,7 +102,17 @@ async fn session(socket: &mut WebSocket) -> Result<()> {
     let mut output = BufReader::new(child.stdout.take().context("Voice output pipe missing")?);
     let result: Result<()> = async {
         let mut line = String::new();
-        tokio::time::timeout(Duration::from_secs(5), output.read_line(&mut line)).await??;
+        tokio::select! {
+            result = tokio::time::timeout(Duration::from_secs(5), output.read_line(&mut line)) => { result??; },
+            next = socket.recv() => {
+                match next {
+                    Some(Ok(Message::Text(text))) if text == "stop" => return Ok(()),
+                    Some(Ok(Message::Close(_))) | None => return Ok(()),
+                    _ => bail!("Voice setup cancelled before readiness"),
+                }
+            }
+        }
+
         let ready: serde_json::Value =
             serde_json::from_str(&line).context("Virtual microphone did not initialize")?;
         if ready["ready"] != true {

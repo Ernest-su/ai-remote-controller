@@ -33,12 +33,13 @@ internal class AndroidVoiceController(private val context: Context, private val 
         preferences.edit().putString("package", value.packageName).putString("key", value.keyCode).apply()
     }
     fun permissionDenied() { mutable.update { it.copy(message = "需要麦克风权限；授权后请重新按住说话") } }
-    fun start() {
-        if (job?.isCompleted == false) return
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { permissionDenied(); return }
-        val session = runtime.session.value ?: return
+    fun start(): Long? {
+        val previous = job
+        if (previous?.isActive == true) return null
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { permissionDenied(); return null }
+        val session = runtime.session.value ?: return null
         val settings = state.value.settings
-        try { settings.validate() } catch (error: Exception) { mutable.update { it.copy(message = error.message.orEmpty()) }; return }
+        try { settings.validate() } catch (error: Exception) { mutable.update { it.copy(message = error.message.orEmpty()) }; return null }
         val token = generation.incrementAndGet()
         mutable.update { it.copy(preparing = true, message = "正在连接麦克风…") }
         job = scope.launch(Dispatchers.IO) {
@@ -46,6 +47,7 @@ internal class AndroidVoiceController(private val context: Context, private val 
             val stream = RuntimeVoiceStream(session) { runtime.session.value }
             try {
                 val until = SystemClock.elapsedRealtime() + 60_000
+                previous?.join()
                 currentCoroutineContext().ensureActive()
                 // Validate local capture before sending the optional key to the target.
                 recorder = capture()
@@ -56,7 +58,7 @@ internal class AndroidVoiceController(private val context: Context, private val 
                 var drained = 0
                 while (drained < 16000 && recorder.read(pcm) > 0) drained += pcm.size
                 currentCoroutineContext().ensureActive()
-                mutable.update { it.copy(preparing = false, recording = true, message = "正在发送语音，松开结束") }
+                mutable.update { if (generation.get() == token) it.copy(preparing = false, recording = true, message = "正在发送语音，松开结束") else it }
                 var lastAudio = SystemClock.elapsedRealtime()
                 while (currentCoroutineContext().isActive && SystemClock.elapsedRealtime() < until) {
                     check(runtime.session.value == session) { "目标连接已改变" }
@@ -66,15 +68,15 @@ internal class AndroidVoiceController(private val context: Context, private val 
                     else { check(SystemClock.elapsedRealtime() - lastAudio < 1000) { "手机麦克风没有返回音频" }; delay(5) }
                 }
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (error: Exception) { mutable.update { it.copy(message = "语音失败：${error.message ?: "请重试"}") } }
+            catch (error: Exception) { mutable.update { if (generation.get() == token) it.copy(message = "语音失败：${voiceErrorMessage(error)}") else it } }
             finally {
                 try { recorder?.close() } catch (_: Exception) {}
                 withContext(NonCancellable) {
                     try { stream.stop() }
-                    catch (error: Exception) { mutable.update { it.copy(message = "语音失败：未收到结束确认，${error.message.orEmpty()}") } }
+                    catch (error: Exception) { mutable.update { if (generation.get() == token) it.copy(message = "语音失败：未收到结束确认，${voiceErrorMessage(error)}") else it } }
                     finally { stream.close() }
                 }
-                mutable.update { it.copy(preparing = false, recording = false, message = if (it.message.startsWith("语音失败")) it.message else "语音已结束") }
+                mutable.update { if (generation.get() == token) it.copy(preparing = false, recording = false, message = if (it.message.startsWith("语音失败")) it.message else "语音已结束") else it }
             }
         }.also { recordingJob ->
             recordingJob.invokeOnCompletion {
@@ -83,8 +85,13 @@ internal class AndroidVoiceController(private val context: Context, private val 
                 }
             }
         }
+        return token
     }
-    fun stop() { job?.cancel() }
+    fun stop(token: Long? = null) { if (token == null || generation.get() == token) job?.cancel() }
+    private fun voiceErrorMessage(error: Exception) = when {
+        error.message?.contains("Microphone is already in use") == true -> "麦克风正在被其他会话使用，请结束后重试"
+        else -> error.message ?: "请重试"
+    }
 }
 
 internal interface VoiceCapture : AutoCloseable {

@@ -112,7 +112,7 @@ class RemoteNavigationUiTest {
     @Test fun allFeaturesOpenAndReturnToTheGrid() {
         compose.onNodeWithTag("remote-status").assertIsDisplayed()
         compose.onNodeWithTag("remote-media-controls").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("播放 / 暂停").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("播放 / 暂停").assertIsNotEnabled()
         compose.onNodeWithTag("open-menu").performClick()
         compose.onNodeWithTag("feature-media").assertDoesNotExist()
         val destinations = listOf(
@@ -206,7 +206,7 @@ class RemoteNavigationUiTest {
     }
 
     @Test fun textDraftSurvivesFeatureSwitchAndOfflineRemoteActionsStayDisabled() {
-        compose.onNodeWithTag("remote-send-command").assertDoesNotExist()
+        compose.onNodeWithTag("remote-send-command").assertIsNotEnabled()
         compose.onNodeWithTag("remote-model-required").assertIsDisplayed().assertHasNoClickAction()
         compose.onNodeWithTag("open-menu").performClick()
         compose.onNodeWithTag("feature-text").performClick()

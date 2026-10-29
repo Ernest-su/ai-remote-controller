@@ -72,9 +72,9 @@ class RemoteExecutionUiTest {
             DeviceStore(InstrumentationRegistry.getInstrumentation().targetContext).remove("ui-preview-fixture")
         }
     }
-    @Test fun unconfiguredStatusHidesComposerUntilTargetConfigurationSucceeds() = withPreview(modelConfigured = false) { model, requests ->
-        compose.onNodeWithTag("remote-command-input").assertDoesNotExist()
-        compose.onNodeWithTag("remote-send-command").assertDoesNotExist()
+    @Test fun unconfiguredStatusPreservesComposerButDisablesSubmitUntilConfigured() = withPreview(modelConfigured = false) { model, requests ->
+        compose.onNodeWithTag("remote-command-input").assertIsDisplayed()
+        compose.onNodeWithTag("remote-send-command").assertIsNotEnabled()
         compose.onNodeWithTag("remote-model-required").assertIsDisplayed().assertHasNoClickAction()
         compose.runOnUiThread { model.configure("https://fixture.invalid/v1", "fixture-key", "fixture-model") }
         compose.waitUntil(10_000) { model.state.value.modelConfigured && !model.state.value.busy }

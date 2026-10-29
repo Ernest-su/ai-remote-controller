@@ -150,11 +150,26 @@ def main():
         assert target_recording_events() == previous_events, 'Cancelled setup triggered a delayed voice key'
         print('PASS: cancel before first PCM does not trigger the voice key', flush=True)
 
+        # Cancel while app_process is still warming up, then immediately start another gesture.
+        for _ in range(3):
+            early = await websockets.connect(f'ws://127.0.0.1:{port}/voice', proxy=None)
+            await early.send(json.dumps(dict(packageName=args.package, keyCode=args.key)))
+            early.transport.abort()
+            next_gesture = await connect()
+            await next_gesture.send('stop')
+            assert json.loads(await next_gesture.recv()).get('stopped')
+            await next_gesture.close()
+        await cleaned()
+        print('PASS: rapid setup cancellation/reopen waits for old cleanup without a busy error', flush=True)
+
+
         socket = await connect()
         try:
-            async with websockets.connect(f'ws://127.0.0.1:{port}/voice', proxy=None) as other:
-                assert 'already in use' in json.loads(await other.recv())['error']
-            await pcm(socket, 2, inspect=True)
+            async def other_cannot_interrupt():
+                async with websockets.connect(f'ws://127.0.0.1:{port}/voice', proxy=None) as other:
+                    await other.send(json.dumps(dict(packageName=args.package, keyCode=args.key)))
+                    assert 'already in use' in json.loads(await asyncio.wait_for(other.recv(), 6))['error']
+            await asyncio.gather(pcm(socket, 5, inspect=True), other_cannot_interrupt())
             await socket.send('stop')
             assert json.loads(await socket.recv()).get('stopped')
         finally:

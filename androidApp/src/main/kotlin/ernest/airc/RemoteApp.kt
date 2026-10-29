@@ -308,39 +308,38 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
             modifier = Modifier.widthIn(max = RemoteDimensions.Width).fillMaxWidth().fillMaxHeight()) {
             Column(Modifier.fillMaxSize()) {
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                    val panelHeight = maxOf(maxHeight, RemoteDimensions.MinimumControlsHeight * fontScale)
+                    val panelHeight = maxOf(maxHeight, RemoteDimensions.CompactControlsHeight + RemoteDimensions.CompactFontHeightGrowth * (fontScale - 1f))
+                    val volumeStepButtons = maxWidth >= RemoteDimensions.VolumeStepButtonsMinWidth
                     Column(Modifier.verticalScroll(rememberScrollState())) {
                         Column(
                             Modifier.height(panelHeight).fillMaxWidth().padding(
-                                start = RemoteDimensions.InnerPadding, end = RemoteDimensions.InnerPadding,
+                                start = 0.dp, end = 0.dp,
                                 top = RemoteDimensions.VerticalPadding, bottom = 8.dp,
                             ),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                val screenOn by model.screenPower.state.collectAsState()
-                                val screenBusy by model.screenPower.busy.collectAsState()
+                            val volume by model.remoteVolume.state.collectAsState()
+                            val volumeSetting by model.remoteVolume.setting.collectAsState()
+                            val screenOn by model.screenPower.state.collectAsState()
+                            val screenBusy by model.screenPower.busy.collectAsState()
+                            Row(Modifier.fillMaxWidth().testTag("remote-power-volume"), verticalAlignment = Alignment.Bottom) {
                                 IconButton(model.screenPower::toggle, enabled = state.connected && screenOn != null && !screenBusy,
                                     modifier = Modifier.size(48.dp).mirrorControlBacking()) {
                                     Icon(painterResource(if (screenOn == false) R.drawable.ic_screen_on else R.drawable.ic_screen_off),
                                         if (screenOn == false) "打开屏幕" else "关闭屏幕", Modifier.size(24.dp))
                                 }
+                                RemoteIconButton({ model.key("mute") }, enabled = state.connected, debugName = "mute") { Icon(painterResource(R.drawable.ic_mute), "静音") }
+                                if (volumeStepButtons) RemoteIconButton({ model.key("volume_down") }, enabled = state.connected, debugName = "volume_down") { Icon(painterResource(R.drawable.ic_volume_down), "音量 −") }
+                                RemoteVolumeSlider(volume, state.connected, model.remoteVolume::setFraction, Modifier.weight(1f), setting = volumeSetting)
+                                if (volumeStepButtons) RemoteIconButton({ model.key("volume_up") }, enabled = state.connected, debugName = "volume_up") { Icon(painterResource(R.drawable.ic_volume_up), "音量 +") }
                                 RemoteIconButton({ model.key("power") }, enabled = state.connected, debugName = "power",
                                     modifier = Modifier.size(48.dp).then(if (LocalMirrorOverlay.current) Modifier else Modifier.background(RemoteColors.Surface, CircleShape))) {
                                     Icon(painterResource(R.drawable.ic_power), "电源", Modifier.size(24.dp),
                                         tint = if (state.connected) RemoteColors.Warning else RemoteColors.Disabled)
                                 }
                             }
-                            val volume by model.remoteVolume.state.collectAsState()
-                            val volumeSetting by model.remoteVolume.setting.collectAsState()
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-                                RemoteIconButton({ model.key("mute") }, enabled = state.connected, debugName = "mute") { Icon(painterResource(R.drawable.ic_mute), "静音") }
-                                RemoteIconButton({ model.key("volume_down") }, enabled = state.connected, debugName = "volume_down") { Icon(painterResource(R.drawable.ic_volume_down), "音量 −") }
-                                RemoteVolumeSlider(volume, state.connected, model.remoteVolume::setFraction, Modifier.weight(1f), setting = volumeSetting)
-                                RemoteIconButton({ model.key("volume_up") }, enabled = state.connected, debugName = "volume_up") { Icon(painterResource(R.drawable.ic_volume_up), "音量 +") }
-                            }
-                            Column(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = RemoteDimensions.CompactInnerPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
                                     Surface(shape = MaterialTheme.shapes.small, color = RemoteColors.Surface,
                                         modifier = Modifier.fillMaxWidth().testTag("remote-status")) {
@@ -359,9 +358,9 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
                                 }
                                 if (!feedbackVisible) {
                                     Row(Modifier.fillMaxWidth().testTag("remote-media-controls"), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                        RemoteKey(R.drawable.ic_previous, "上一曲", state.connected, size = 52.dp, key = "media_previous") { model.key("media_previous") }
-                                        RemoteKey(R.drawable.ic_play_pause, "播放 / 暂停", state.connected, size = 52.dp, key = "play_pause") { model.key("play_pause") }
-                                        RemoteKey(R.drawable.ic_next, "下一曲", state.connected, size = 52.dp, key = "media_next") { model.key("media_next") }
+                                        RemoteKey(R.drawable.ic_previous, "上一曲", state.connected, size = 52.dp, showLabel = false, key = "media_previous") { model.key("media_previous") }
+                                        RemoteKey(R.drawable.ic_play_pause, "播放 / 暂停", state.connected, size = 52.dp, showLabel = false, key = "play_pause") { model.key("play_pause") }
+                                        RemoteKey(R.drawable.ic_next, "下一曲", state.connected, size = 52.dp, showLabel = false, key = "media_next") { model.key("media_next") }
                                     }
                                 }
                             }
@@ -382,10 +381,10 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
                                     Text("OK", fontSize = 20.sp, color = if (LocalMirrorOverlay.current && !state.connected) RemoteColors.Disabled else RemoteColors.OnAction)
                                 }
                             }
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                RemoteKey(R.drawable.ic_back, "返回", state.connected, size = 58.dp, key = "back") { model.key("back") }
-                                RemoteKey(R.drawable.ic_home, "主页", state.connected, size = 58.dp, key = "home") { model.key("home") }
-                                RemoteKey(R.drawable.ic_device_menu, "设备菜单", state.connected, size = 58.dp, key = "menu") { model.key("menu") }
+                            Row(Modifier.fillMaxWidth().padding(horizontal = RemoteDimensions.CompactInnerPadding).testTag("remote-navigation-controls"), horizontalArrangement = Arrangement.SpaceEvenly) {
+                                RemoteKey(R.drawable.ic_back, "返回", state.connected, size = 58.dp, showLabel = false, key = "back") { model.key("back") }
+                                RemoteKey(R.drawable.ic_home, "主页", state.connected, size = 58.dp, showLabel = false, key = "home") { model.key("home") }
+                                RemoteKey(R.drawable.ic_device_menu, "设备菜单", state.connected, size = 58.dp, showLabel = false, key = "menu") { model.key("menu") }
                             }
                         }
                         if (state.remoteLayout.shortcuts.isNotEmpty()) Column(Modifier.fillMaxWidth().padding(RemoteDimensions.InnerPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -393,32 +392,10 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
                         }
                     }
                 }
-                Box(Modifier.fillMaxWidth().padding(horizontal = RemoteDimensions.InnerPadding).padding(bottom = 8.dp)) {
-                    VoiceControls(model.voice, state.connected)
-                }
-                Row(Modifier.fillMaxWidth().mirrorControlBacking(MaterialTheme.shapes.small).padding(start = RemoteDimensions.InnerPadding, end = RemoteDimensions.InnerPadding, bottom = if (imeVisible) 8.dp else RemoteDimensions.VerticalPadding).testTag("remote-text-controls"), verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    RemoteModelAvailability(state.modelConfigured) {
-                        OutlinedTextField(
-                            value = draft, onValueChange = { draft = it },
-                            modifier = Modifier.weight(1f).testTag("remote-command-input"),
-                            placeholder = { Text("输入文字指令", style = MaterialTheme.typography.bodyMedium) },
-                            minLines = 1, maxLines = 3,
-                            textStyle = MaterialTheme.typography.bodyMedium,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                            keyboardActions = KeyboardActions(onSend = { submit() }),
-                        )
-                        FilledIconButton(onClick = ::submit,
-                            enabled = state.connected && state.modelConfigured && !state.submitting && draft.isNotBlank(),
-                            modifier = Modifier.size(48.dp).testTag("remote-send-command"),
-                            colors = if (LocalMirrorOverlay.current) IconButtonDefaults.filledIconButtonColors(
-                                containerColor = RemoteColors.Surface, contentColor = RemoteColors.Text,
-                                disabledContainerColor = RemoteColors.Surface, disabledContentColor = RemoteColors.Disabled,
-                            ) else IconButtonDefaults.filledIconButtonColors()) {
-                            Icon(painterResource(R.drawable.ic_send), "发送文字指令", Modifier.size(24.dp))
-                        }
-                    }
-                }
+                RemoteCommandInput(model.voice, state.connected, state.modelConfigured, state.submitting, draft, { draft = it }, ::submit,
+                    Modifier.fillMaxWidth().mirrorControlBacking(MaterialTheme.shapes.small).padding(
+                        start = RemoteDimensions.CompactInnerPadding, end = RemoteDimensions.CompactInnerPadding,
+                        bottom = if (imeVisible) 8.dp else RemoteDimensions.VerticalPadding))
             }
         }
     }
@@ -426,17 +403,17 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
 }
 
 @Composable
-internal fun RemoteKey(icon: Int, label: String, enabled: Boolean, tint: Color = RemoteColors.Text, size: androidx.compose.ui.unit.Dp = 48.dp, key: String = label, action: () -> Unit) {
+internal fun RemoteKey(icon: Int, label: String, enabled: Boolean, tint: Color = RemoteColors.Text, size: androidx.compose.ui.unit.Dp = 48.dp, showLabel: Boolean = true, key: String = label, action: () -> Unit) {
     Column(
-        Modifier.widthIn(min = 64.dp).remoteKeyInput(key, enabled, action)
-            .semantics(mergeDescendants = true) {}.padding(4.dp),
+        Modifier.widthIn(min = if (showLabel) 64.dp else size).remoteKeyInput(key, enabled, action)
+            .semantics(mergeDescendants = true) { if (!showLabel) contentDescription = label }.padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(Modifier.size(size).then(if (LocalMirrorOverlay.current) Modifier.mirrorControlBacking()
             else Modifier.background(RemoteColors.Surface, CircleShape)), contentAlignment = Alignment.Center) {
             Icon(painterResource(icon), null, Modifier.size(24.dp), tint = if (enabled) tint else RemoteColors.Disabled)
         }
-        Text(label, modifier = Modifier.mirrorControlBacking(MaterialTheme.shapes.small)
+        if (showLabel) Text(label, modifier = Modifier.mirrorControlBacking(MaterialTheme.shapes.small)
             .then(if (LocalMirrorOverlay.current) Modifier.padding(horizontal = 4.dp) else Modifier),
             style = MaterialTheme.typography.bodySmall, color = if (enabled) RemoteColors.Text else RemoteColors.Disabled)
     }

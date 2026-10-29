@@ -56,6 +56,29 @@ class VoiceSettingsTest {
             assertFalse(audio.isCompleted)
         } finally { stream.close(); server.shutdown() }
     }
+    @Test fun cancelledHandshakeStillSendsStopAndWaitsForRemoteCleanup() = runBlocking {
+        val server = MockWebServer()
+        val received = CompletableDeferred<Unit>()
+        val stopReceived = CompletableDeferred<WebSocket>()
+        server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                if (text == "stop") stopReceived.complete(webSocket) else received.complete(Unit)
+            }
+        }))
+        server.start()
+        val session = RuntimeSession("fixture", "127.0.0.1", server.port, 1)
+        val stream = RuntimeVoiceStream(session) { session }
+        try {
+            val opening = launch { stream.open(VoiceSettings()) }
+            withTimeout(2000) { received.await() }
+            opening.cancelAndJoin()
+            val cleanup = async { stream.stop() }
+            val remote = withTimeout(2000) { stopReceived.await() }
+            assertFalse(cleanup.isCompleted)
+            remote.send("{\"stopped\":true}")
+            withTimeout(2000) { cleanup.await() }
+        } finally { stream.close(); server.shutdown() }
+    }
     @Test fun routingFailureIsReportedBeforeRecordingIsReady() = runBlocking {
         val server = MockWebServer()
         server.enqueue(MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
