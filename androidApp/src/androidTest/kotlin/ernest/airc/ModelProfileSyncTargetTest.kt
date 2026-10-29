@@ -51,6 +51,11 @@ class ModelProfileSyncTargetTest {
             assertTrue(model.profiles.state.value.message.contains("更新"))
             assertTrue(runBlocking { probe.status(host!!,port!!) }.modelConfigured)
             assertEquals("fixture-target-model",EncryptedModelProfileStore(context).read().profiles.single().model)
+            compose.onNodeWithText("清除目标设备模型配置").performScrollTo().performClick()
+            compose.waitUntil(10000) { !model.profiles.state.value.syncing && !model.state.value.modelConfigured }
+            assertFalse(runBlocking { probe.status(host!!, port!!) }.modelConfigured)
+            assertEquals("fixture-target-model", EncryptedModelProfileStore(context).read().profiles.single().model)
+            compose.onNodeWithText("更新到目标设备").assertIsEnabled()
         } finally {
             if(initialized) {
                 compose.runOnUiThread { model.disconnect() }

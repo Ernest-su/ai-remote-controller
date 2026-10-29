@@ -19,6 +19,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 
 /** App-private Keystore and local API/runtime fixtures; no production credential or remote target. */
 @RunWith(AndroidJUnit4::class)
@@ -35,6 +36,7 @@ class ModelProfilesUiTest {
 
     @Test fun encryptedProfilesCacheSwitchVisibilityAndManualSync() {
         val calls = CopyOnWriteArrayList<RuntimeRequest>()
+        val clears = AtomicInteger()
         val server = MockWebServer()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
@@ -44,8 +46,10 @@ class ModelProfilesUiTest {
                     override fun onMessage(webSocket: WebSocket, text: String) {
                         val request = Json.decodeFromString<RuntimeRequest>(text)
                         calls.add(request)
+                        val accepted = request.type != "clear_model" || clears.incrementAndGet() > 1
                         webSocket.send(buildJsonObject {
-                            put("id", request.id); put("protocol", 1); put("ok", true); put("result", "")
+                            put("id", request.id); put("protocol", 1); put("ok", accepted); put("result", "")
+                            if (!accepted) put("error", "fixture clear failed")
                         }.toString())
                     }
                 })
@@ -77,8 +81,9 @@ class ModelProfilesUiTest {
             assertFalse(renderedKeyContains("fixture-api-key"))
             assertEquals("Model-B", model.profiles.state.value.draft.model)
             assertFalse(calls.any { it.type == "configure" })
-            compose.onNodeWithText("更新到目标设备").performScrollTo().performClick()
-            compose.waitUntil(10_000) { calls.count { it.type == "configure" } == 1 && !model.profiles.state.value.syncing }
+            compose.onNodeWithText("更新到目标设备").performScrollTo().assertIsEnabled().performClick()
+            try { compose.waitUntil(10_000) { calls.count { it.type == "configure" } == 1 && !model.profiles.state.value.syncing } }
+            catch (error: Throwable) { throw AssertionError("connected=${model.state.value.connected}, busy=${model.state.value.busy}, syncing=${model.profiles.state.value.syncing}, message=${model.profiles.state.value.message}, requestTypes=${calls.map { it.type }}", error) }
             val request = calls.single { it.type == "configure" }
             assertEquals("\"Model-B\"", request.arguments["model"].toString())
             val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -98,6 +103,18 @@ class ModelProfilesUiTest {
             compose.onNodeWithTag("delete-model-profile-$url").performScrollTo().performClick()
             compose.waitUntil(10_000) { model.profiles.state.value.profiles.size == 1 }
             assertEquals(1, calls.count { it.type == "configure" })
+            compose.onNodeWithText("新增配置").performScrollTo().performClick()
+            assertTrue(model.profiles.state.value.draft.apiKey.isEmpty())
+            val saved = EncryptedModelProfileStore(context).read().profiles
+            compose.onNodeWithText("更新到目标设备").assertDoesNotExist()
+            compose.onNodeWithTag("clear-target-model").performScrollTo().assertIsEnabled().performClick()
+            compose.waitUntil(10000) { clears.get() == 1 && !model.profiles.state.value.syncing }
+            assertTrue(model.state.value.modelConfigured)
+            compose.onNodeWithText("清除目标设备模型配置").assertIsDisplayed().assertIsEnabled().performClick()
+            compose.waitUntil(10000) { clears.get() == 2 && !model.profiles.state.value.syncing }
+            assertFalse(model.state.value.modelConfigured)
+            compose.onNodeWithText("更新到目标设备").assertIsDisplayed().assertIsNotEnabled()
+            assertEquals(saved, EncryptedModelProfileStore(context).read().profiles)
         } finally {
             compose.runOnUiThread { model.disconnect() }
             compose.waitUntil(10_000) { !model.state.value.connected }

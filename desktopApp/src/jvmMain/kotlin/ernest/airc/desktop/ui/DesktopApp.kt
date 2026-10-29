@@ -98,7 +98,7 @@ fun DesktopApp(controller: DesktopController, navigation: DesktopNavigation = re
                             RemotePage.APPS -> DesktopApplications(state, controller) { name -> appDetailsPackage = name; navigation.navigate(RemotePage.APP_DETAILS) }
                             RemotePage.APP_DETAILS -> DesktopApplicationDetails(appDetailsPackage, state, controller) { navigation.navigate(RemotePage.APPS) }
                             RemotePage.TEXT -> DesktopTextCommands(state, controller)
-                            RemotePage.MODEL -> ModelProfileEditor(controller.profiles, state.connected && !state.busy, state.modelConfigured, controller::syncProfile)
+                            RemotePage.MODEL -> ModelProfileEditor(controller.profiles, state.connected && !state.busy, state.modelConfigured, controller::syncProfile, controller::clearTargetModel)
                             RemotePage.SERVICE -> DesktopServices(state, controller)
                             RemotePage.PERMISSIONS -> DesktopPermissions(state, controller)
                             RemotePage.DEVICE_INFO -> DesktopDeviceInfo(state, controller)

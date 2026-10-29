@@ -660,6 +660,16 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun clearTargetModel() {
+        if (!state.value.connected || state.value.busy) return
+        val clear = runCatching { runtime.commandWriter() }.getOrNull() ?: return
+        val target = state.value.selected
+        profiles.clearTarget(true) {
+            clear("clear_model", buildJsonObject {})
+            mutable.update { if (it.selected == target && it.connected && !it.busy) it.copy(modelConfigured = false) else it }
+        }
+    }
+
     fun configure(baseUrl: String, key: String, model: String) = execute {
         val result = runtime.request("configure", arguments = buildJsonObject {
             put("baseUrl", baseUrl.trim()); put("apiKey", key); put("model", model.trim())

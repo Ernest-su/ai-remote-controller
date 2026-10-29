@@ -234,6 +234,15 @@ class DesktopController(
             if (session == generation) mutable.update { it.copy(modelConfigured = true) }
         }
     }
+    fun clearTargetModel() {
+        if (!state.value.connected || state.value.busy) return
+        val clear = runCatching { runtime.commandWriter() }.getOrNull() ?: return
+        val session = generation
+        profiles.clearTarget(true) {
+            clear("clear_model", buildJsonObject {})
+            if (session == generation) mutable.update { it.copy(modelConfigured = false) }
+        }
+    }
     fun service(action: String) = operation {
         require(action in listOf("status", "restart", "stop"))
         val serial = state.value.serial ?: error("请先通过 ADB 设备连接")

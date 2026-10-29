@@ -127,4 +127,15 @@ class ModelProfileController(
             finally { mutable.update { it.copy(syncing = false) } }
         }
     }
+    fun clearTarget(connected: Boolean, clear: suspend () -> Unit) {
+        if (!connected || state.value.syncing) return
+        mutable.update { it.copy(syncing = true, message = "正在清除目标设备模型配置…") }
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            try { clear(); mutable.update { it.copy(message = "已清除目标设备模型配置，App 配置保留") } }
+            catch (error: CancellationException) { throw error }
+            catch (_: Exception) { mutable.update { it.copy(message = "清除目标设备模型配置失败，请连接后重试") } }
+            finally { mutable.update { it.copy(syncing = false) } }
+        }
+    }
+
 }

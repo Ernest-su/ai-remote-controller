@@ -38,6 +38,15 @@ impl ModelConfig {
         }
         Ok(serde_json::from_slice(&fs::read(file)?)?)
     }
+    pub fn clear(dir: &Path) -> Result<()> {
+        match fs::remove_file(dir.join("model.json")) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error.into()),
+        }
+        fs::File::open(dir)?.sync_all()?;
+        Ok(())
+    }
     pub fn save(&self, dir: &Path) -> Result<()> {
         self.validate()?;
         private_write(&dir.join("model.json"), &serde_json::to_vec(self)?)

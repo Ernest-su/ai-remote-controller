@@ -137,6 +137,15 @@ async fn dispatch(
         "approve_app_control" => crate::app_actions::control::approve(&request.arguments).await,
         "approve_app" => crate::app_actions::approve(&request.arguments).await,
         "approve" => crate::file_actions::approve(&request.arguments).await,
+        "clear_model" => {
+            if request.arguments != json!({}) { bail!("clear_model requires empty arguments"); }
+            let mut history = history.lock().await;
+            let mut config = state.config.write().await;
+            ModelConfig::clear(&state.directory)?;
+            *config = ModelConfig::default();
+            history.clear();
+            Ok("已清除目标设备模型配置".into())
+        }
         "configure" => {
             let mut history = history.lock().await;
             let config: ModelConfig = serde_json::from_value(request.arguments.clone())?;

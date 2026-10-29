@@ -16,7 +16,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun ModelProfileEditor(controller: ModelProfileActions, connected: Boolean, configured: Boolean, onSync: () -> Unit) {
+fun ModelProfileEditor(controller: ModelProfileActions, connected: Boolean, configured: Boolean, onSync: () -> Unit, onClear: () -> Unit) {
     val profiles by controller.state.collectAsState()
     var visible by remember { mutableStateOf(false) }
     var choosing by remember { mutableStateOf(false) }
@@ -52,8 +52,16 @@ fun ModelProfileEditor(controller: ModelProfileActions, connected: Boolean, conf
         Panel {
             SectionTitle("目标设备模型")
             Text(if (!connected) "连接目标设备后可查看配置状态并手动更新；本地配置仍可编辑。" else if (configured) "目标已配置模型服务" else "目标尚未配置模型服务", color = RemoteColors.Secondary)
-            ActionButton(if (profiles.syncing) "正在更新…" else "更新到目标设备",
-                connected && !profiles.syncing && profiles.draft.baseUrl.isNotBlank() && profiles.draft.apiKey.isNotBlank() && profiles.draft.model.isNotBlank(), onSync)
+            if (configured) {
+                OutlinedButton(onClear, enabled = connected && !profiles.syncing,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("clear-target-model"),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = RemoteColors.Warning)) {
+                    Text(if (profiles.syncing) "正在处理…" else "清除目标设备模型配置")
+                }
+            } else {
+                ActionButton(if (profiles.syncing) "正在处理…" else "更新到目标设备",
+                    connected && !profiles.syncing && profiles.draft.baseUrl.isNotBlank() && profiles.draft.apiKey.isNotBlank() && profiles.draft.model.isNotBlank(), onSync)
+            }
         }
     }
     if (choosing) AlertDialog(onDismissRequest = { choosing = false }, title = { Text("选择模型") },
