@@ -14,7 +14,7 @@ from instrumentation_result import require_passed
 ROOT = Path(__file__).resolve().parent.parent
 SUITES = {
     "remote-composer-ui": ("ernest.airc.RemoteLayoutUiTest,ernest.airc.RemoteExecutionUiTest#unconfiguredStatusPreservesComposerButDisablesSubmitUntilConfigured,ernest.airc.RemoteExecutionUiTest#remoteInputSendsOnlyTextAndPreservesDraftAcrossNavigationAndRotation,ernest.airc.RemoteNavigationUiTest#textDraftSurvivesFeatureSwitchAndOfflineRemoteActionsStayDisabled,ernest.airc.RemoteNavigationUiTest#remoteTypePickerRestoresAndKeepsStandardRemoteDraft", 8),
-    "voice-input-ui": ("ernest.airc.VoiceInputUiTest,ernest.airc.RemoteCommandInputUiTest", 4),
+    "voice-input-ui": ("ernest.airc.VoiceInputUiTest,ernest.airc.RemoteCommandInputUiTest", 5),
     "file-editing-ui": ("ernest.airc.FileEditingUiTest,ernest.airc.FileTaskTabsUiTest", 6),
     "apk-file-selection-ui": ("ernest.airc.ApkFileSelectionUiTest", 2),
     "project-information-ui": ("ernest.airc.ProjectInformationUiTest", 2),

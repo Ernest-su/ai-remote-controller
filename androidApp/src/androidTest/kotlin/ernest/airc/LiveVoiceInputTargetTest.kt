@@ -37,7 +37,7 @@ class LiveVoiceInputTargetTest {
             Thread.sleep(1800) // Host driver can inspect the real assistant/submix while held.
             assertTrue(controller.state.value.toString(), controller.state.value.recording)
             button.performTouchInput { up() }
-            compose.waitUntil(5000) { !controller.state.value.recording && !controller.state.value.preparing }
+            compose.waitUntil(5000) { !controller.state.value.recording && !controller.state.value.preparing && !controller.state.value.draining }
             assertFalse(controller.state.value.toString(), controller.state.value.message.startsWith("语音失败"))
             compose.onNodeWithContentDescription("切换为文字输入").performClick()
             compose.onNodeWithTag("remote-command-input").assertTextContains("保留草稿")

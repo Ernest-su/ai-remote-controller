@@ -38,9 +38,10 @@ internal fun VoiceControls(controller: AndroidVoiceController, connected: Boolea
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (!granted) controller.permissionDenied()
     }
+    val draining by rememberUpdatedState(state.draining)
     var keyboardPress by remember { mutableStateOf<Long?>(null) }
     fun begin(): Long? {
-        if (!connected || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) || !window.isWindowFocused) return null
+        if (!connected || draining || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) || !window.isWindowFocused) return null
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) return controller.start()
         permission.launch(Manifest.permission.RECORD_AUDIO)
         return null
@@ -51,36 +52,38 @@ internal fun VoiceControls(controller: AndroidVoiceController, connected: Boolea
         onDispose { lifecycle.removeObserver(observer); controller.stop() }
     }
     LaunchedEffect(window.isWindowFocused, connected) { if (!window.isWindowFocused || !connected) controller.stop() }
-    val active = state.preparing || state.recording
+    val active = state.preparing || state.recording || state.draining
     val color = if (!connected) RemoteColors.Disabled else if (active) RemoteColors.Action else RemoteColors.Text
     Column(modifier.fillMaxWidth().testTag("voice-controls")) {
         Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).background(if (active) RemoteColors.ActionContainer else RemoteColors.Surface, MaterialTheme.shapes.small)
             .semantics {
                 role = Role.Button
                 contentDescription = "按住说话"
-                stateDescription = if (state.preparing) "正在连接" else if (state.recording) "正在录音，松开结束" else "未录音"
-                if (!connected) disabled()
+                stateDescription = if (state.draining) "正在发送剩余语音" else if (state.preparing) "正在连接" else if (state.recording) "正在录音，松开结束" else "未录音"
+                if (!connected || state.draining) disabled()
                 onClick(label = if (active) "结束说话" else "开始说话") {
-                    if (connected) { if (active) controller.stop() else begin() }; connected
+                    if (connected && !state.draining) { if (active) controller.finish() else begin(); true } else false
                 }
             }
             .onFocusChanged { if (!it.isFocused) { keyboardPress?.let(controller::stop); keyboardPress = null } }
             .onKeyEvent { event ->
                 if (connected && event.key in listOf(Key.Enter, Key.Spacebar, Key.DirectionCenter)) {
                     if (event.type == KeyEventType.KeyDown && keyboardPress == null) keyboardPress = begin()
-                    else if (event.type == KeyEventType.KeyUp) { keyboardPress?.let(controller::stop); keyboardPress = null }
+                    else if (event.type == KeyEventType.KeyUp) { keyboardPress?.let(controller::finish); keyboardPress = null }
                     true
                 } else false
             }.focusable(connected)
             .pointerInput(connected, controller) {
                 if (connected) detectTapGestures(onPress = {
                     val token = begin()
-                    try { tryAwaitRelease() } finally { if (token != null) controller.stop(token) }
+                    var released = false
+                    try { released = tryAwaitRelease() }
+                    finally { if (token != null) { if (released) controller.finish(token) else controller.stop(token) } }
                 })
             }.padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(painterResource(R.drawable.ic_microphone), null, Modifier.size(24.dp), tint = color)
-            Text(if (state.preparing) "正在连接…" else if (state.recording) "松开结束" else "按住说话", color = color,
+            Text(if (state.draining) "正在发送…" else if (state.preparing) "准备中，正在缓存…" else if (state.recording) "松开结束" else "按住说话", color = color,
                 style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             if (active) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = RemoteColors.Action)
         }

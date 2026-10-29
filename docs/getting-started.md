@@ -26,7 +26,7 @@ debug APK 输出为 `androidApp/build/outputs/apk/debug/androidApp-debug.apk`，
 
 生产签名、六项 GitHub Secrets 和草稿 Release 的使用方法见[签名与发布](development/releasing.md)。只有公开的 Release 才能进入 App 在线更新入口。
 
-语音遥控与文字共用标准遥控器底部输入区，点击左侧麦克风图标后「按住说话」，点击键盘图标切回文字且保留草稿。先在设置中填写接收应用与附加键值；康佳默认 `com.konka.bestlauncher` / `1017`。首次授权麦克风后重新按住，松开结束，无需模型。目标需 Android 14+ 及系统音频路由能力，详见[语音遥控](guide/remote.md#voice-input)。
+语音遥控与文字共用标准遥控器底部输入区，点击左侧麦克风图标后「按住说话」，点击键盘图标切回文字且保留草稿。先在设置中填写接收应用与附加键值；康佳默认 `com.konka.bestlauncher` / `1017`。首次授权麦克风后重新按住，按下即录音并缓存，等目标实际开始录音后顺序送出；松手停止采音，送完剩余音频后结束，无需模型。目标需 Android 14+ 及系统音频路由能力，详见[语音遥控](guide/remote.md#voice-input)。
 
 ## 首次连接
 

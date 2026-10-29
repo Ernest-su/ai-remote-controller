@@ -50,11 +50,22 @@ class VoiceInputUiTest {
                 "/status" -> MockResponse().setBody("""{"version":"fixture","protocol":1,"deviceId":"voice-fixture","tools":[],"modelConfigured":false}""")
                 "/ws" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {})
                 "/voice" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+                    private var received = 0L
                     override fun onMessage(webSocket: WebSocket, text: String) {
-                        if (text == "stop") { stops.incrementAndGet(); Thread.sleep(150); webSocket.send("{\"stopped\":true}") }
-                        else webSocket.send("{\"ready\":true}")
+                        when (text) {
+                            "start" -> webSocket.send("{\"ready\":true,\"sampleRate\":16000,\"channels\":1}")
+                            "end", "cancel" -> {
+                                stops.incrementAndGet(); Thread.sleep(150)
+                                webSocket.send("{\"stopped\":true,\"cancelled\":${text == "cancel"},\"receivedBytes\":$received,\"injectedBytes\":$received}")
+                            }
+                            else -> webSocket.send("{\"prepared\":true,\"windowBytes\":128000}")
+                        }
                     }
-                    override fun onMessage(webSocket: WebSocket, bytes: ByteString) { assertTrue(bytes.size in 2..640 && bytes.size % 2 == 0); frames.incrementAndGet() }
+                    override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                        assertTrue(bytes.size in 2..640 && bytes.size % 2 == 0); frames.incrementAndGet()
+                        received += bytes.size
+                        webSocket.send("{\"consumedBytes\":$received}")
+                    }
                 })
                 else -> MockResponse().setResponseCode(404)
             }
@@ -80,7 +91,7 @@ class VoiceInputUiTest {
             compose.setContent { RemoteTheme { if (visible) VoiceControls(controller, true) } }
             // A quick tap cancelled before the IO coroutine starts must not leave a pending state.
             compose.runOnIdle { controller.start(); controller.stop() }
-            compose.waitUntil(5000) { !controller.state.value.preparing && !controller.state.value.recording }
+            compose.waitUntil(5000) { !controller.state.value.preparing && !controller.state.value.recording && !controller.state.value.draining }
             val initialFrames = frames.get()
             val initialStops = stops.get()
             val button = compose.onNodeWithContentDescription("按住说话")
@@ -89,7 +100,7 @@ class VoiceInputUiTest {
             try { compose.waitUntil(8000) { frames.get() >= initialFrames + 3 } }
             catch (error: Throwable) { throw AssertionError("Voice state: ${controller.state.value}; requests=${server.requestCount}; lifecycle=${compose.activity.lifecycle.currentState}", error) }
             button.performTouchInput { up() }
-            compose.waitUntil(5000) { stops.get() == initialStops + 1 && !controller.state.value.recording }
+            compose.waitUntil(5000) { stops.get() == initialStops + 1 && !controller.state.value.recording && !controller.state.value.draining }
             compose.waitForIdle()
             assertFalse(controller.state.value.preparing)
             var oldPress = 0L
@@ -104,12 +115,12 @@ class VoiceInputUiTest {
             }
             compose.waitUntil(8000) { frames.get() > beforeReplacement + 4 && controller.state.value.recording }
             compose.runOnIdle { controller.stop() }
-            compose.waitUntil(5000) { stops.get() == initialStops + 3 && !controller.state.value.recording }
+            compose.waitUntil(5000) { stops.get() == initialStops + 3 && !controller.state.value.recording && !controller.state.value.draining }
             val count = frames.get()
             button.performTouchInput { down(center) }
             compose.waitUntil(8000) { frames.get() > count + 3 }
             compose.runOnIdle { visible = false }
-            compose.waitUntil(5000) { stops.get() == initialStops + 4 && !controller.state.value.recording }
+            compose.waitUntil(5000) { stops.get() == initialStops + 4 && !controller.state.value.recording && !controller.state.value.draining }
             compose.runOnIdle { visible = true }
             compose.waitForIdle()
             assertFalse(controller.state.value.recording)
@@ -117,4 +128,76 @@ class VoiceInputUiTest {
             controller.stop(); scope.cancel(); runtime.close(); server.shutdown()
         }
     }
+    @Test fun releaseBeforeReceiverReadyRetainsTheEntireUtteranceAndDrainsBeforeEnding() {
+        InstrumentationRegistry.getInstrumentation().uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.RECORD_AUDIO)
+        val server = MockWebServer()
+        val produced = java.io.ByteArrayOutputStream()
+        val received = java.io.ByteArrayOutputStream()
+        val gate = java.util.concurrent.CountDownLatch(1)
+        val captureClosed = java.util.concurrent.atomic.AtomicBoolean()
+        val captureFrames = AtomicInteger()
+        val ended = java.util.concurrent.atomic.AtomicBoolean()
+        server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
+                "/status" -> MockResponse().setBody("""{"version":"fixture","protocol":1,"deviceId":"voice-buffer-fixture","tools":[]}""")
+                "/ws" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {})
+                "/voice" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
+                    private var bytes = 0L
+                    override fun onMessage(webSocket: WebSocket, text: String) {
+                        when (text) {
+                            "start" -> {
+                                check(gate.await(8, java.util.concurrent.TimeUnit.SECONDS))
+                                webSocket.send("{\"ready\":true,\"sampleRate\":16000,\"channels\":1}")
+                            }
+                            "end" -> {
+                                ended.set(true)
+                                webSocket.send("{\"stopped\":true,\"cancelled\":false,\"receivedBytes\":$bytes,\"injectedBytes\":$bytes}")
+                            }
+                            "cancel" -> webSocket.send("{\"stopped\":true,\"cancelled\":true}")
+                            else -> webSocket.send("{\"prepared\":true,\"windowBytes\":128000}")
+                        }
+                    }
+                    override fun onMessage(webSocket: WebSocket, pcm: ByteString) {
+                        synchronized(received) { received.write(pcm.toByteArray()) }; bytes += pcm.size
+                        webSocket.send("{\"consumedBytes\":$bytes}")
+                    }
+                })
+                else -> MockResponse().setResponseCode(404)
+            }
+        }
+        server.start()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        val runtime = RuntimeConnection()
+        val controller = AndroidVoiceController(context, scope, runtime) { object : VoiceCapture {
+            private var next = 0L
+            override fun start() { next = android.os.SystemClock.elapsedRealtime() }
+            override fun read(buffer: ByteArray): Int {
+                if (android.os.SystemClock.elapsedRealtime() < next) return 0
+                next += 20
+                val frame = captureFrames.getAndIncrement()
+                for (i in buffer.indices) buffer[i] = ((frame * buffer.size + i) % 251).toByte()
+                synchronized(produced) { produced.write(buffer) }
+                return buffer.size
+            }
+            override fun close() { captureClosed.set(true) }
+        } }
+        try {
+            runBlocking { runtime.connect("127.0.0.1", server.port) }
+            compose.setContent { RemoteTheme { VoiceControls(controller, true) } }
+            compose.waitUntil(5000) { compose.activity.hasWindowFocus() }
+            val button = compose.onNodeWithContentDescription("按住说话")
+            button.performTouchInput { down(center) }
+            compose.waitUntil(5000) { captureFrames.get() >= 6 }
+            button.performTouchInput { up() }
+            compose.waitUntil(5000) { captureClosed.get() }
+            assertTrue(controller.state.value.draining)
+            assertFalse(ended.get())
+            assertEquals(0, synchronized(received) { received.size() })
+            gate.countDown()
+            compose.waitUntil(8000) { ended.get() && !controller.state.value.draining }
+            assertArrayEquals(synchronized(produced) { produced.toByteArray() }, synchronized(received) { received.toByteArray() })
+            assertFalse(controller.state.value.message, controller.state.value.message.startsWith("语音失败"))
+        } finally { gate.countDown(); controller.stop(); scope.cancel(); runtime.close(); server.shutdown() }
+    }
+
 }

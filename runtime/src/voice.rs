@@ -1,10 +1,9 @@
 //! A single connection-owned, bounded virtual microphone stream; no audio is persisted.
 use anyhow::{bail, Context, Result};
 use axum::{
-    extract::ws::{Message, WebSocket, WebSocketUpgrade},
+    extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade},
     response::IntoResponse,
 };
-use futures_util::SinkExt;
 use serde::Deserialize;
 use serde_json::json;
 use std::{
@@ -40,13 +39,23 @@ impl Settings {
         Ok(())
     }
 }
-// Refill only up to 200ms, so a pause cannot accumulate permission for a later burst.
-fn pcm_credit(previous: f64, elapsed: Duration, bytes: usize) -> Result<f64> {
-    let credit = (previous + elapsed.as_secs_f64() * 32000.0).min(6400.0) - bytes as f64;
-    if credit < 0.0 {
-        bail!("Voice stream exceeds real-time rate");
+const WINDOW_BYTES: u64 = 128000; // Four seconds; independent of the PCM playback clock.
+const MAX_AUDIO_BYTES: u64 = 16000 * 2 * 60;
+#[derive(Default)]
+struct Outcome {
+    received: u64,
+    injected: u64,
+    cancelled: bool,
+}
+fn accept_pcm(received: u64, injected: u64, bytes: usize) -> Result<u64> {
+    if bytes == 0 || bytes > 3200 || !bytes.is_multiple_of(2) {
+        bail!("Invalid PCM frame");
     }
-    Ok(credit)
+    let next = received + bytes as u64;
+    if next > MAX_AUDIO_BYTES || next - injected > WINDOW_BYTES {
+        bail!("Voice receive buffer limit exceeded");
+    }
+    Ok(next)
 }
 pub(crate) async fn websocket(upgrade: WebSocketUpgrade) -> impl IntoResponse {
     upgrade
@@ -54,20 +63,41 @@ pub(crate) async fn websocket(upgrade: WebSocketUpgrade) -> impl IntoResponse {
         .max_frame_size(4096)
         .on_upgrade(connection)
 }
+async fn send(socket: &mut WebSocket, value: serde_json::Value) -> Result<()> {
+    tokio::time::timeout(
+        Duration::from_secs(1),
+        socket.send(Message::Text(value.to_string().into())),
+    )
+    .await??;
+    Ok(())
+}
 async fn connection(mut socket: WebSocket) {
-    let result = session(&mut socket).await;
-    let message = match result {
-        Ok(()) => json!({"stopped":true}),
+    let message = match session(&mut socket).await {
+        Ok(done) => {
+            json!({"stopped":true,"cancelled":done.cancelled,"receivedBytes":done.received,"injectedBytes":done.injected})
+        }
         Err(error) => json!({"error":format!("{error:#}")}),
     };
+    let _ = send(&mut socket, message).await;
     let _ = tokio::time::timeout(
         Duration::from_secs(1),
-        socket.send(Message::Text(message.to_string().into())),
+        socket.send(Message::Close(Some(CloseFrame {
+            code: 1000,
+            reason: "voice finished".into(),
+        }))),
     )
     .await;
-    let _ = tokio::time::timeout(Duration::from_secs(1), socket.close()).await;
 }
-async fn session(socket: &mut WebSocket) -> Result<()> {
+async fn packet(input: &mut tokio::process::ChildStdin, kind: u16, pcm: &[u8]) -> Result<()> {
+    tokio::time::timeout(Duration::from_secs(1), async {
+        input.write_all(&kind.to_be_bytes()).await?;
+        input.write_all(pcm).await?;
+        input.flush().await
+    })
+    .await??;
+    Ok(())
+}
+async fn session(socket: &mut WebSocket) -> Result<Outcome> {
     let first = tokio::time::timeout(Duration::from_secs(5), socket.recv())
         .await?
         .context("Voice connection closed")??;
@@ -76,16 +106,12 @@ async fn session(socket: &mut WebSocket) -> Result<()> {
     };
     let settings: Settings = serde_json::from_str(&text)?;
     settings.validate()?;
-    // A previous connection may be releasing its bridge after a quick cancellation.
-    // Wait for that cleanup, while still accepting cancellation of this new gesture.
     let _active = tokio::select! {
-        result = tokio::time::timeout(Duration::from_secs(4), ACTIVE.lock()) =>
-            result.context("Microphone is already in use")?,
-        _ = socket.recv() => return Ok(()),
+        result = tokio::time::timeout(Duration::from_secs(4), ACTIVE.lock()) => result.context("Microphone is already in use")?,
+        _ = socket.recv() => return Ok(Outcome { cancelled:true, ..Outcome::default() }),
     };
     let dex = crate::platform_bridge::input_bridge_path()?;
-    // Dropping the task must close stdin, not SIGKILL the bridge before its key-UP/finally.
-    // Its independent watchdog bounds cleanup even if the runtime exits unexpectedly.
+    // EOF cancels the bridge; never SIGKILL it before its key-UP/finally on task drop.
     let mut child = Command::new("app_process")
         .args([
             "/system/bin",
@@ -99,79 +125,74 @@ async fn session(socket: &mut WebSocket) -> Result<()> {
         .stderr(Stdio::null())
         .spawn()?;
     let mut input = child.stdin.take().context("Voice input pipe missing")?;
-    let mut output = BufReader::new(child.stdout.take().context("Voice output pipe missing")?);
-    let result: Result<()> = async {
-        let mut line = String::new();
-        tokio::select! {
-            result = tokio::time::timeout(Duration::from_secs(5), output.read_line(&mut line)) => { result??; },
-            next = socket.recv() => {
-                match next {
-                    Some(Ok(Message::Text(text))) if text == "stop" => return Ok(()),
-                    Some(Ok(Message::Close(_))) | None => return Ok(()),
-                    _ => bail!("Voice setup cancelled before readiness"),
-                }
-            }
-        }
-
-        let ready: serde_json::Value =
-            serde_json::from_str(&line).context("Virtual microphone did not initialize")?;
-        if ready["ready"] != true {
-            bail!(
-                "{}",
-                ready["error"]
-                    .as_str()
-                    .unwrap_or("Virtual microphone unavailable")
-            );
-        }
-        tokio::time::timeout(
-            Duration::from_secs(1),
-            socket.send(Message::Text(ready.to_string().into())),
-        )
-        .await??;
-        let started = Instant::now();
-        let mut credit = 6400.0;
-        let mut last_frame = Instant::now();
+    let mut output =
+        BufReader::new(child.stdout.take().context("Voice output pipe missing")?).lines();
+    let result: Result<Outcome> = async {
+        let began = Instant::now();
+        let mut last_network = began;
+        let mut prepared = false;
+        let mut starting: Option<Instant> = None;
+        let mut ready = false;
+        let mut ending: Option<Instant> = None;
+        let mut received = 0;
+        let mut injected = 0;
+        let mut timer = tokio::time::interval(Duration::from_millis(100));
         loop {
-            let next = tokio::time::timeout(Duration::from_millis(1500), socket.recv())
-                .await?
-                .context("Voice connection closed")??;
-            if started.elapsed() >= Duration::from_secs(60) {
-                bail!("Voice session reached 60 seconds");
-            }
-            match next {
-                Message::Binary(pcm) => {
-                    if pcm.is_empty() || pcm.len() > 3200 || pcm.len() % 2 != 0 {
-                        bail!("Invalid PCM frame");
+            tokio::select! {
+                _ = timer.tick() => {
+                    if began.elapsed() > Duration::from_secs(75) { bail!("Voice session reached its time limit"); }
+                    if !prepared && began.elapsed() > Duration::from_secs(5) { bail!("Virtual microphone initialization timed out"); }
+                    if prepared && starting.is_none() && last_network.elapsed() > Duration::from_secs(5) { bail!("Voice start timed out"); }
+                    if !ready && starting.is_some_and(|at| at.elapsed() > Duration::from_secs(6)) { bail!("Target recorder did not become ready"); }
+                    if ready && ending.is_none() && last_network.elapsed() > Duration::from_millis(1500) { bail!("Voice stream idle"); }
+                    if ending.is_some_and(|at| at.elapsed() > Duration::from_secs(6)) { bail!("Voice drain timed out"); }
+                },
+                line = output.next_line() => {
+                    let line = line?.context("Virtual microphone exited before completion")?;
+                    if line.len() > 4096 { bail!("Invalid microphone reply"); }
+                    let event: serde_json::Value = serde_json::from_str(&line)?;
+                    if let Some(error) = event["error"].as_str() { bail!("{error}"); }
+                    if event["prepared"] == true && !prepared {
+                        prepared = true; last_network = Instant::now();
+                        send(socket, json!({"prepared":true,"windowBytes":WINDOW_BYTES})).await?;
+                    } else if event["ready"] == true && starting.is_some() && !ready {
+                        ready = true; last_network = Instant::now();
+                        send(socket, event).await?;
+                    } else if let Some(next) = event["consumedBytes"].as_u64() {
+                        if next < injected || next > received { bail!("Invalid microphone consumption counter"); }
+                        injected = next;
+                        send(socket, event).await?;
+                    } else if event["drained"] == true && ending.is_some() && event["injectedBytes"].as_u64() == Some(received) && injected == received {
+                        return Ok(Outcome { received, injected, cancelled:false });
+                    } else { bail!("Unexpected microphone reply: {event}"); }
+                },
+                message = socket.recv() => {
+                    match message.context("Voice connection closed")?? {
+                        Message::Text(text) if text == "cancel" => return Ok(Outcome { received, injected, cancelled:true }),
+                        Message::Close(_) => return Ok(Outcome { received, injected, cancelled:true }),
+                        Message::Text(text) if text == "start" && prepared && starting.is_none() => {
+                            packet(&mut input, 0, &[]).await?;
+                            starting = Some(Instant::now());
+                        },
+                        Message::Text(text) if text == "end" && ready && ending.is_none() => {
+                            packet(&mut input, u16::MAX, &[]).await?;
+                            ending = Some(Instant::now());
+                        },
+                        Message::Binary(pcm) if ready && ending.is_none() => {
+                            let next = accept_pcm(received, injected, pcm.len())?;
+                            packet(&mut input, pcm.len() as u16, &pcm).await?;
+                            received = next; last_network = Instant::now();
+                        },
+                        Message::Ping(data) => { tokio::time::timeout(Duration::from_secs(1), socket.send(Message::Pong(data))).await??; },
+                        Message::Pong(_) => {},
+                        _ => bail!("Unsupported voice message or phase"),
                     }
-                    credit = pcm_credit(credit, last_frame.elapsed(), pcm.len())?;
-                    last_frame = Instant::now();
-                    tokio::time::timeout(Duration::from_secs(1), async {
-                        input.write_all(&(pcm.len() as u16).to_be_bytes()).await?;
-                        input.write_all(&pcm).await?;
-                        input.flush().await
-                    })
-                    .await??;
-                }
-                Message::Text(text) if text == "stop" => break,
-                Message::Close(_) => break,
-                Message::Ping(data) => {
-                    tokio::time::timeout(Duration::from_secs(1), socket.send(Message::Pong(data)))
-                        .await??;
-                }
-                Message::Pong(_) => {}
-                _ => bail!("Unsupported voice message"),
-            }
-            if last_frame.elapsed() > Duration::from_millis(1500) {
-                bail!("Voice stream idle");
+                },
             }
         }
-        Ok(())
-    }
-    .await;
-    // EOF performs key UP and unregisters the policy even for invalid frames or a broken socket.
-    drop(input);
-    let exited = tokio::time::timeout(Duration::from_secs(3), child.wait()).await;
-    match exited {
+    }.await;
+    drop(input); // EOF cancels queued PCM, except after an explicitly acknowledged drain.
+    match tokio::time::timeout(Duration::from_secs(3), child.wait()).await {
         Ok(status) => {
             if !status?.success() && result.is_ok() {
                 bail!("Virtual microphone stopped with an error");
@@ -189,15 +210,18 @@ async fn session(socket: &mut WebSocket) -> Result<()> {
 mod tests {
     use super::*;
     #[test]
-    fn pcm_limit_refills_at_live_rate_but_never_accumulates_a_recording() {
-        let remaining = pcm_credit(6400.0, Duration::ZERO, 6400).unwrap();
-        assert!(pcm_credit(remaining, Duration::ZERO, 2).is_err());
-        assert_eq!(
-            pcm_credit(remaining, Duration::from_millis(20), 640).unwrap(),
-            0.0
-        );
-        assert!(pcm_credit(0.0, Duration::from_secs(1), 6402).is_err());
-        assert_eq!(pcm_credit(0.0, Duration::from_secs(1), 6400).unwrap(), 0.0);
+    fn receive_window_accepts_startup_bursts_and_requires_consumption_for_more() {
+        let mut received = 0;
+        for _ in 0..40 {
+            received = accept_pcm(received, 0, 3200).unwrap();
+        }
+        assert_eq!(received, WINDOW_BYTES);
+        assert!(accept_pcm(received, 0, 2).is_err());
+        assert_eq!(accept_pcm(received, 640, 640).unwrap(), received + 640);
+        assert!(accept_pcm(MAX_AUDIO_BYTES, MAX_AUDIO_BYTES, 2).is_err());
+        for bytes in [0, 3, 3202] {
+            assert!(accept_pcm(0, 0, bytes).is_err());
+        }
     }
     #[test]
     fn settings_are_strict_and_do_not_accept_shell_arguments() {

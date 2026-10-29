@@ -9,6 +9,8 @@ import asyncio
 import hashlib
 import json
 import math
+import os
+import tempfile
 import re
 from pathlib import Path
 import shlex
@@ -66,12 +68,79 @@ def main():
             await asyncio.sleep(.1)
         raise AssertionError('Temporary audio policy was not cleaned')
 
-    async def connect(key=None):
+    async def prepare(key=None):
         socket = await websockets.connect(f'ws://127.0.0.1:{port}/voice', proxy=None)
         await socket.send(json.dumps(dict(packageName=args.package, keyCode=args.key if key is None else key)))
         reply = json.loads(await asyncio.wait_for(socket.recv(), 8))
-        assert reply.get('ready'), reply
+        assert reply.get('prepared') and reply['windowBytes'] == 128000, reply
         return socket
+
+    async def connect(key=None):
+        socket = await prepare(key)
+        await socket.send('start')
+        reply = json.loads(await asyncio.wait_for(socket.recv(), 8))
+        assert reply.get('ready') and reply.get('receiverSession') is not None, reply
+        return socket
+
+    async def outcome(socket, timeout=8):
+        async def read():
+            while True:
+                reply = json.loads(await socket.recv())
+                if 'consumedBytes' not in reply:
+                    return reply
+        return await asyncio.wait_for(read(), timeout)
+
+    async def end(socket):
+        await socket.send('end')
+        reply = await outcome(socket)
+        assert reply.get('stopped') and not reply['cancelled'], reply
+        assert reply['receivedBytes'] == reply['injectedBytes'], reply
+        return reply
+
+    async def probe_markers():
+        # UID 1000 matches the Konka system assistant; all samples are synthetic submix data.
+        root = Path(__file__).resolve().parents[1]
+        sdk = Path(os.environ['ANDROID_HOME'])
+        probe_name = marker.replace('-', '_') + '_receiver'
+        proc = None
+        socket = None
+        try:
+            with tempfile.TemporaryDirectory(prefix='airc-voice-probe-') as folder:
+                folder = Path(folder)
+                classes = folder / 'classes'; classes.mkdir()
+                jar = sdk / 'platforms/android-36/android.jar'
+                subprocess.run(['javac', '--release', '8', '-classpath', str(jar), '-d', str(classes), str(root / 'scripts/fixtures/VoiceReceiverProbe.java')], check=True, capture_output=True)
+                subprocess.run([str(sdk / 'build-tools/36.0.0/d8'), '--min-api', '26', '--lib', str(jar), '--output', str(folder), *map(str, classes.rglob('*.class'))], check=True, capture_output=True)
+                adb('push', folder / 'classes.dex', directory + '/probe.dex')
+            socket = await prepare(0)
+            command = f'CLASSPATH={directory}/probe.dex app_process /system/bin --nice-name={probe_name} ernest.airc.probe.VoiceReceiverProbe 600'
+            proc = subprocess.Popen(['adb', '-s', args.serial, 'shell', 'su 1000 sh -c ' + shlex.quote(command)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            await socket.send('start')
+            began = time.monotonic()
+            reply = await outcome(socket)
+            assert reply.get('ready'), reply
+            assert time.monotonic() - began >= .4, 'Readiness did not wait for delayed receiver'
+            pcm_bytes = b''.join(struct.pack('<h', int(6000 * math.sin(2 * math.pi * (2333 if i < 3200 else 1103 if i < 12800 else 1879) * i / 16000))) for i in range(16042))
+            playback_began = time.monotonic()
+            for offset in range(0, len(pcm_bytes), 3200):
+                await socket.send(pcm_bytes[offset:offset + 3200])
+            done = await end(socket)
+            assert done['injectedBytes'] == len(pcm_bytes)
+            assert time.monotonic() - playback_began >= 1.1, 'PCM burst was injected faster than its sampling rate'
+            output, _ = await asyncio.to_thread(proc.communicate, timeout=6)
+            print(output, flush=True)
+            assert proc.returncode == 0, 'Synthetic receiver failed'
+            measurements = json.loads(output.strip().splitlines()[0])
+            assert measurements['firstMarker'] == 0 and measurements['lastMarker'] == 2, measurements
+            print('PASS: delayed receiver readiness, 1s startup burst, normal-rate drain, partial final frame, first/body/last PCM markers', flush=True)
+        finally:
+            if socket is not None:
+                await socket.close()
+            if proc is not None and proc.poll() is None:
+                proc.kill(); proc.communicate()
+                for pid in adb('shell', 'pidof', probe_name).split():
+                    if pid.isdigit(): adb('shell', 'su', '0', 'kill', pid)
+        await cleaned()
 
     async def pcm(socket, seconds, inspect=False):
         until = time.monotonic() + seconds
@@ -142,9 +211,9 @@ def main():
             events = audio.split('Events log: recording activity received by AudioService', 1)[1].split('AudioDeviceBroker:', 1)[0]
             return [line for line in events.splitlines() if args.package in line]
         previous_events = target_recording_events()
-        socket = await connect()
-        await socket.send('stop')
-        assert json.loads(await socket.recv()).get('stopped')
+        socket = await prepare()
+        await socket.send('cancel')
+        assert (await outcome(socket)).get('stopped')
         await socket.close()
         await cleaned()
         assert target_recording_events() == previous_events, 'Cancelled setup triggered a delayed voice key'
@@ -155,9 +224,9 @@ def main():
             early = await websockets.connect(f'ws://127.0.0.1:{port}/voice', proxy=None)
             await early.send(json.dumps(dict(packageName=args.package, keyCode=args.key)))
             early.transport.abort()
-            next_gesture = await connect()
-            await next_gesture.send('stop')
-            assert json.loads(await next_gesture.recv()).get('stopped')
+            next_gesture = await prepare()
+            await next_gesture.send('cancel')
+            assert (await outcome(next_gesture)).get('stopped')
             await next_gesture.close()
         await cleaned()
         print('PASS: rapid setup cancellation/reopen waits for old cleanup without a busy error', flush=True)
@@ -170,8 +239,7 @@ def main():
                     await other.send(json.dumps(dict(packageName=args.package, keyCode=args.key)))
                     assert 'already in use' in json.loads(await asyncio.wait_for(other.recv(), 6))['error']
             await asyncio.gather(pcm(socket, 5, inspect=True), other_cannot_interrupt())
-            await socket.send('stop')
-            assert json.loads(await socket.recv()).get('stopped')
+            await end(socket)
         finally:
             await socket.close()
         await cleaned()
@@ -183,15 +251,30 @@ def main():
         await cleaned()
         print('PASS: abrupt disconnect releases key and unregisters audio policy', flush=True)
 
-        for kind in ['idle', 'odd-frame', 'rate-limit']:
-            socket = await connect(0)
+        socket = await connect()
+        try:
+            for _ in range(10):
+                await socket.send(bytes(3200))
+            cancelled_at = time.monotonic()
+            await socket.send('cancel')
+            reply = await outcome(socket)
+            assert reply.get('cancelled') and reply['injectedBytes'] < reply['receivedBytes'], reply
+            assert time.monotonic() - cancelled_at < 1.5, 'Cancellation waited for buffered audio to play'
+        finally:
+            await socket.close()
+        await cleaned()
+        print('PASS: explicit cancellation discards pending PCM instead of draining it', flush=True)
+
+
+        for kind in ['idle', 'odd-frame', 'buffer-overflow']:
+            socket = await connect()
             try:
                 if kind == 'odd-frame':
                     await socket.send(b'odd')
-                elif kind == 'rate-limit':
-                    for _ in range(10):
+                elif kind == 'buffer-overflow':
+                    for _ in range(100):
                         await socket.send(bytes(3200))
-                reply = json.loads(await asyncio.wait_for(socket.recv(), 6))
+                reply = await outcome(socket, 8)
                 assert 'error' in reply, reply
             finally:
                 await socket.close()
@@ -203,6 +286,16 @@ def main():
             assert 'error' in json.loads(await socket.recv())
         await cleaned()
         print('PASS: invalid settings rejected before audio routing/key injection', flush=True)
+
+        await probe_markers()
+
+        # Route prepared without an active recorder must never be advertised as ready.
+        socket = await prepare(0)
+        await socket.send('start')
+        assert 'error' in await outcome(socket, 8)
+        await socket.close()
+        await cleaned()
+        print('PASS: inactive receiver times out instead of dropping the beginning of speech', flush=True)
 
         if args.phone:
             await asyncio.to_thread(verify_phone)
