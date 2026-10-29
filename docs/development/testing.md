@@ -71,7 +71,7 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite profil
 | `remote-haptics-input-ui` | 标准遥控器下键快速短按、真实按下/松开与滑出取消；请求仅发往控制端本地模拟服务，不操作外部目标。真实振动器的停止与厂商日志需在指定手机补查 |
 | `screen-power-ui` | 本地协议 fixture 验证屏幕键在电源键左侧、关屏/开屏切换、旋转保留与离线禁用；不证明物理显示电源效果 |
 | `remote-haptics-ui` | 遥控震动开关的切换、旋转与重新加载持久化；实际震感需有振动器的设备核对 |
-| `lan-connection-ui` | 仅访问控制端回环地址，验证服务连接失败后尝试 ADB 5555、失败展开并填入目标地址、草稿重建恢复 |
+| `lan-connection-ui` | 仅访问控制端回环地址，验证服务连接失败后尝试 ADB 5555、失败展开并填入目标地址、草稿重建恢复；设备行 fixture 检查型号、IP 回退、已保存显示名及 320dp / 1.5 倍字号亮暗布局，不连接外部设备 |
 | `appearance` | 三种外观模式、本地持久化、重建、设置返回、草稿、系统栏与未知值回退 |
 | `gamepad-ui` | NES/双摇杆类型选择、方向与跳跃多指组合、类型旋转保留、标题启停/重连图标、重连可停止且游戏按键禁用、固定无滚动视口、多指操作与取消释放、横屏方向及离页恢复；只验证控制端界面 |
 | `controller-ui` | 页面导航、提交与执行反馈、键盘间距、离线、大字体、旋转与输入工具 |
@@ -157,6 +157,16 @@ uv run --with websockets python runtime/remote_key_hold_target_test.py --serial 
 标准遥控器的真实电视音量验证使用 `python3 scripts/test-phone-target.py --phone <控制端ADB> --target <电视ADB> --host <电视IP> --suite remote-volume-target`。该专项在电视创建 UUID 配套 runtime，核对初始读数、左右触摸拖动后的实际系统音量、音量加减后的滑块跟随、外部修改与旋转恢复，并保存截图；退出恢复原媒体音量、静音状态及控制端历史，清理自建服务和测试包。控制端使用模拟器时明确报告。
 
 ### 电视输入与快捷操作
+
+物理屏幕电源的厂商专项直接调用短时 Java 桥接，验证两轮关屏/开屏的退出码、SurfaceFlinger 物理显示模式及非法参数的非零退出码，并在结束后恢复原显示模式、清理 UUID 临时目录；它会实际切换所选设备屏幕，不安装测试应用，不改动已有 runtime 服务：
+
+```sh
+python3 scripts/build-platform-bridge.py build/screen-power-bridge
+python3 scripts/test-screen-power.py --serial <明确选择的目标ADB> --dex build/screen-power-bridge/classes.dex
+# 目标 runtime 为 root 时，追加 --root，以相同身份验证
+```
+
+专项要求 SurfaceFlinger 可读且物理显示初始模式统一为 On 或 Off，其他情况拒绝执行。厂商 `android_servers` 退出析构问题须在对应设备验证，普通 UI fixture 不证明物理显示控制效果。
 
 手机快捷功能回归：先构建 App 与测试 APK，执行 `python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite mobile-convenience-ui`。覆盖独立电视输入的离线禁用与旋转草稿、系统分享不自动执行、内容 URI 元数据与拒绝文件 URI、收藏切换与恢复、音量键页面范围、组合分步编辑与排序、等待秒数编辑、旋转恢复、列表直接执行、暂停/继续不重放、最后一次详情及旋转恢复、未保存修改及删除确认。`--suite library-layout-ui` 检查 320dp / 1.5 倍字号下的收藏筛选与星标、步骤类型图标和菜单、按键选择和等待输入，并保存亮暗主题截图；桌面 `ApplicationLibraryUiTest` 覆盖收藏优先、筛选、上限与离线管理，`LibraryEditingTest` 覆盖排序及秒数解析边界。`QuickRoutineControllerTest` 覆盖组合顺序、暂停与剩余等待、按键释放校验、按电视保存执行记录、失败/取消中断与重连隔离；`ClipboardPasteMessageTest` 覆盖 UTF-8 包格式与长度边界。
 

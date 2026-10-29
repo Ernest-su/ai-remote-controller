@@ -14,6 +14,15 @@ import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+data class DiscoveredAdbDevice(
+    val host: String,
+    val model: String? = null,
+    val product: String? = null,
+    val device: String? = null,
+) {
+    val name: String get() = model ?: product ?: device ?: "Android 设备 · $host"
+}
+
 /** Read-only ADB handshake: never sends AUTH, OPEN, pairing or shell requests. */
 object AdbSubnetProbe {
     fun hosts(address: String, prefix: Int): List<String> {
@@ -30,7 +39,7 @@ object AdbSubnetProbe {
             .map { n -> listOf(24, 16, 8, 0).joinToString(".") { shift -> ((n shr shift) and 255).toString() } }
     }
 
-    fun responds(host: String, port: Int = 5555, timeoutMs: Int = 450): Boolean = runCatching {
+    fun probe(host: String, port: Int = 5555, timeoutMs: Int = 450): DiscoveredAdbDevice? = runCatching {
         Socket().use { socket ->
             socket.connect(InetSocketAddress(host, port), timeoutMs)
             socket.soTimeout = timeoutMs
@@ -45,26 +54,35 @@ object AdbSubnetProbe {
             val response = buffer.int
             val arg0 = buffer.int; val arg1 = buffer.int
             val size = buffer.int; val checksum = buffer.int; val magic = buffer.int
-            if (magic != response.inv() || size !in 0..4096) return@use false
+            if (magic != response.inv() || size !in 0..4096) return@use null
             val data = ByteArray(size).also { input.readFully(it) }
-            if (data.sumOf { it.toInt() and 255 } != checksum) return@use false
+            if (data.sumOf { it.toInt() and 255 } != checksum) return@use null
             when (response) {
-                command -> arg0 >= 0x01000000 && arg1 > 0 && data.toString(Charsets.UTF_8).startsWith("device::")
-                0x48545541 -> arg0 == 1 && size == 20 // AUTH token; authorization is a separate user action.
-                else -> false
+                command -> {
+                    val banner = data.toString(Charsets.UTF_8).substringBefore('\u0000')
+                    if (arg0 < 0x01000000 || arg1 <= 0 || !banner.startsWith("device::")) return@use null
+                    val properties = banner.removePrefix("device::").split(';')
+                        .filter { '=' in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
+                    fun property(key: String): String? = properties[key]?.filter {
+                        !it.isISOControl() && Character.getType(it) != Character.FORMAT.toInt()
+                    }?.trim()?.take(80)?.takeIf { it.isNotBlank() && !it.equals("unknown", ignoreCase = true) }
+                    DiscoveredAdbDevice(host, property("ro.product.model"), property("ro.product.name"), property("ro.product.device"))
+                }
+                0x48545541 -> if (arg0 == 1 && size == 20) DiscoveredAdbDevice(host) else null // No automatic authorization.
+                else -> null
             }
         }
-    }.getOrDefault(false)
+    }.getOrNull()
 
-    suspend fun scan(hosts: List<String>, onFound: (String) -> Unit) = withContext(Dispatchers.IO) {
+    suspend fun scan(hosts: List<String>, onFound: (DiscoveredAdbDevice) -> Unit) = withContext(Dispatchers.IO) {
         val permits = Semaphore(24)
         coroutineScope {
             hosts.map { host -> async {
                 permits.withPermit {
                     currentCoroutineContext().ensureActive()
-                    val found = responds(host)
+                    val found = probe(host)
                     currentCoroutineContext().ensureActive()
-                    if (found) onFound(host)
+                    if (found != null) onFound(found)
                 }
             } }.awaitAll()
         }

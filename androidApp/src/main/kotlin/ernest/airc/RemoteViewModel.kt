@@ -33,7 +33,7 @@ data class RemoteUiState(
     val mediaStatus: String = "未连接设备",
     val history: List<RememberedDevice> = emptyList(),
     val discovered: List<DiscoveredService> = emptyList(),
-    val adbDevices: List<String> = emptyList(),
+    val adbDevices: List<DiscoveredAdbDevice> = emptyList(),
     val adbScanning: Boolean = false,
     val adbScanStatus: String = "打开设备页后扫描同网段 ADB",
     internal val manualConnectionTarget: ManualConnectionTarget? = null,
@@ -255,8 +255,8 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
             }
             mutable.update { it.copy(adbDevices = emptyList(), adbScanning = true, adbScanStatus = "正在扫描 ${range.label} · ADB 5555") }
             try {
-                AdbSubnetProbe.scan(range.hosts) { host ->
-                    mutable.update { if (generation == adbScanGeneration) it.copy(adbDevices = (it.adbDevices + host).distinct().sorted()) else it }
+                AdbSubnetProbe.scan(range.hosts) { device ->
+                    mutable.update { if (generation == adbScanGeneration) it.copy(adbDevices = (it.adbDevices + device).distinctBy { found -> found.host }.sortedBy { found -> found.host }) else it }
                 }
                 mutable.update { it.copy(adbScanStatus = "扫描完成 · ${range.label} · ${it.adbDevices.size} 台 ADB 设备") }
             } catch (e: CancellationException) { throw e }

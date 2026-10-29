@@ -74,7 +74,13 @@ internal fun Devices(state: RemoteUiState, model: RemoteViewModel, onPreview: ()
                     Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
                 entries.forEachIndexed { index, entry ->
                     if (index > 0) HorizontalDivider(color = RemoteColors.Divider, thickness = 0.5.dp)
-                    UnifiedDeviceRow(entry, state, model)
+                    UnifiedDeviceRow(entry, state, onConnect = {
+                        when {
+                            entry.service != null -> model.discovered(entry.service, entry.history.firstOrNull { it.adbPort != null }?.adbPort ?: if (entry.adbHost != null) 5555 else null)
+                            entry.history.isNotEmpty() -> model.reconnect(entry.history.first())
+                            entry.adbHost != null -> model.tcp(requireNotNull(entry.adbHost), 5555, 9876)
+                        }
+                    }, onRename = model::rename, onForget = model::forget)
                 }
             }
         }
@@ -130,7 +136,13 @@ internal fun Devices(state: RemoteUiState, model: RemoteViewModel, onPreview: ()
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun UnifiedDeviceRow(entry: DeviceListEntry, state: RemoteUiState, model: RemoteViewModel) {
+internal fun UnifiedDeviceRow(
+    entry: DeviceListEntry,
+    state: RemoteUiState,
+    onConnect: () -> Unit,
+    onRename: (String, String) -> Unit,
+    onForget: (String) -> Unit,
+) {
     var showManagement by remember { mutableStateOf(false) }
     val connected = state.connected && entry.history.any { it.id == state.selected }
     Column(Modifier.fillMaxWidth().testTag("device-row-${entry.key}")) {
@@ -146,21 +158,15 @@ private fun UnifiedDeviceRow(entry: DeviceListEntry, state: RemoteUiState, model
                 }
                 if (connected) Text("当前连接", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Action)
             }
-            TextButton(onClick = {
-                when {
-                    entry.service != null -> model.discovered(entry.service, entry.history.firstOrNull { it.adbPort != null }?.adbPort ?: if (entry.adbHost != null) 5555 else null)
-                    entry.history.isNotEmpty() -> model.reconnect(entry.history.first())
-                    entry.adbHost != null -> model.tcp(entry.adbHost, 5555, 9876)
-                }
-            }, enabled = !state.busy && !connected, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (connected) "已连接" else "连接") }
+            TextButton(onClick = onConnect, enabled = !state.busy && !connected, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (connected) "已连接" else "连接") }
             if (entry.history.isNotEmpty()) IconButton({ showManagement = !showManagement }, Modifier.size(48.dp)) {
                 Icon(painterResource(R.drawable.ic_more), "管理 ${entry.name}")
             }
         }
         if (showManagement) Column(Modifier.padding(horizontal = 16.dp)) {
             entry.history.forEach { device ->
-                DeviceNameEditor(device.id, device.visibleName, !state.busy) { model.rename(device.id, it) }
-                TextButton({ model.forget(device.id) }, enabled = !state.busy) { Text("忘记已保存记录", color = RemoteColors.Secondary) }
+                DeviceNameEditor(device.id, device.visibleName, !state.busy) { onRename(device.id, it) }
+                TextButton({ onForget(device.id) }, enabled = !state.busy) { Text("忘记已保存记录", color = RemoteColors.Secondary) }
             }
         }
     }

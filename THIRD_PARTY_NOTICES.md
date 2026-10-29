@@ -22,12 +22,16 @@ ADB transport, surface handling and lifecycle integration.
 
 ## Dependencies and references
 
-AndroidX, Compose, Kotlin, OkHttp, ZXing, the ADB dependency, and Rust crates are
+AndroidX, Compose, Kotlin, OkHttp, ZXing, the ADB dependency, Conscrypt, and Rust crates are
 separate dependencies with their own licenses. Exact direct versions are in
 Gradle build files and `runtime/Cargo.toml`; Rust resolution is in
 `runtime/Cargo.lock`. Their upstream notices and license terms continue to apply.
 This file identifies included third-party source/server and does not purport to
 be a complete inventory of every transitive dependency.
+
+The Android ADB dependency uses [Conscrypt 2.8.0](https://github.com/google/conscrypt/releases/tag/2.8.0)
+(Apache License 2.0). The `ascrcpy` module constrains this transitive dependency to
+replace the older 4 KB aligned native binaries with 16 KB aligned builds.
 
 The visual guidelines reference Tencent WeUI. AIRC uses its own native Compose
 implementation; the reference does not imply endorsement by Tencent.

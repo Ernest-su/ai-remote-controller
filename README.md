@@ -24,6 +24,8 @@ Windows 原生构建及 Python 解释器设置见[构建文档](docs/development
 
 APK 输出：`androidApp/build/outputs/apk/debug/androidApp-debug.apk`。安装到控制手机，在目标设备启用 ADB，点击右上角连接状态，进入“设备”页连接并部署。详细前提和步骤见[快速开始](docs/getting-started.md)。
 
+电脑上执行 `./android-install-apk.sh` 会先构建 debug APK，再安装到选定的 ADB 设备；多设备时提示选择，也可用 `--serial DEVICE_SERIAL`、`--connect IP:PORT` 指定设备，或用 `--apk PATH` 指定 APK。`--apk` 跳过构建，直接安装指定文件。更新安装保留应用数据，不自动启动应用。
+
 单独调试设备端：执行 `./android-build-run.sh` 自动构建目标 ABI、ADB 推送并后台启动 runtime，参数见[构建文档](docs/development/build.md)。
 
 ## 桌面测试工具

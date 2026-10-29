@@ -18,7 +18,7 @@ class DeviceDiscoveryTargetTest {
         compose.runOnUiThread { model = ViewModelProvider(compose.activity)[RemoteViewModel::class.java] }
         compose.onNodeWithTag("device-status").performClick()
         compose.waitUntil(30_000) {
-            !model.state.value.adbScanning && host in model.state.value.adbDevices &&
+            !model.state.value.adbScanning && model.state.value.adbDevices.any { it.host == host } &&
                 model.state.value.discovered.any { it.host == host }
         }
         compose.onAllNodesWithTag("device-row-$host").assertCountEquals(1)

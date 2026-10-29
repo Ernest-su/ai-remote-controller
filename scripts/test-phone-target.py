@@ -34,7 +34,7 @@ SUITES = {
     "mobile-convenience-ui": ("ernest.airc.MobileConvenienceUiTest", 4),
     "remote-haptics-input-ui": ("ernest.airc.RemoteHapticsInputUiTest", 7),
     "remote-haptics-ui": ("ernest.airc.RemoteHapticsUiTest", 1),
-    "lan-connection-ui": ("ernest.airc.LanConnectionUiTest", 4),
+    "lan-connection-ui": ("ernest.airc.LanConnectionUiTest,ernest.airc.DeviceNamesUiTest", 5),
     "appearance": ("ernest.airc.AppearanceUiTest", 2),
     "app-details-ui": ("ernest.airc.AppDetailsUiTest,ernest.airc.AppDetailsLayoutUiTest", 2),
     "management-ui": ("ernest.airc.ManagementUiTest", 15),

@@ -27,12 +27,33 @@ SDK 路径换为本机安装目录。Windows 默认调用 `python`，Linux/macOS
 
 `local.properties` 可设置 Android SDK 路径，但不要提交个人配置。Gradle 的 preBuild 会执行 `scripts/build-runtime.py`，构建 ARM64、ARMv7、x86_64 程序及清单，打包进 APK。构建同时生成 `tvInputMethod` 配套电视输入法，将同构建类型的已签名 APK 嵌入 `assets/airc-input-method.apk`；debug 使用开发证书，release 与控制端共用生产签名配置。电视安装由“电视输入 → 输入法提交 → 安装并启用”明确触发，按 APK 摘要校验与更新。
 
+runtime 构建使用 Gradle 增量检查：Rust 源码、Android 桥接源码、Cargo.toml / Cargo.lock、build.rs 和相关 Python 构建脚本未变化，且输出资产未变化时，`:androidApp:bundleRuntime` 显示 `UP-TO-DATE`，跳过二进制构建。输入或产物变化后重新执行，Cargo 继续复用可用的编译缓存；首次构建或切换到独立容器缓存时可能需要完整编译。
+
 | 产物 | 路径 |
 | --- | --- |
 | release APK（需生产签名配置） | `androidApp/build/outputs/apk/release/androidApp-release.apk` |
 | debug APK | `androidApp/build/outputs/apk/debug/androidApp-debug.apk` |
 | instrumentation APK | `androidApp/build/outputs/apk/androidTest/debug/androidApp-debug-androidTest.apk` |
 | 生成的 runtime 资产 | `androidApp/src/main/assets/runtime/` |
+
+## 16 KB 页大小与原生依赖
+
+Android APK 的原生库须同时满足 ELF 段对齐与 APK 内未压缩库的 ZIP 对齐，参见 [Android 官方指南](https://developer.android.com/guide/practices/page-sizes)。项目使用 AGP 9.0.1 处理 APK 对齐，runtime 使用 NDK r28 与 `-Wl,-z,max-page-size=16384`；`ascrcpy` 的依赖约束将 ADB 间接依赖的 Conscrypt 升级至 2.8.0，避免旧版 `libconscrypt_jni.so` 的 4 KB ELF 对齐。
+
+构建 APK 后使用 SDK 的 `zipalign -c -P 16 -v 4 androidApp/build/outputs/apk/debug/androidApp-debug.apk` 验证 ZIP 对齐；解压 APK 后使用 NDK 的 `llvm-objdump -p` 检查各原生库及 `assets/runtime/airc-runtime-*` 的 `LOAD` 段对齐。ZIP 检查通过不能代替 ELF 检查；实际运行兼容性仍需在 `adb shell getconf PAGE_SIZE` 返回 `16384` 的模拟器或设备验证。
+
+## 构建并安装 APK {#build-install-apk}
+
+控制手机先启用并授权 ADB，电脑需要 `adb`。脚本默认先执行 `./gradlew :androidApp:assembleDebug --no-daemon`，成功后安装 debug APK；即使已有 APK 也会先运行构建，构建失败时停止安装。`--apk PATH` 跳过构建并直接安装指定文件。不自动启动应用；使用 `adb install -r` 更新并保留应用数据，安装失败时直接报告错误，不自动卸载。
+
+```sh
+./android-install-apk.sh
+./android-install-apk.sh --serial DEVICE_SERIAL
+./android-install-apk.sh --connect 192.168.1.100:5555
+./android-install-apk.sh --apk /path/to/app.apk --serial DEVICE_SERIAL
+```
+
+默认 APK 为脚本所在仓库的 `androidApp/build/outputs/apk/debug/androidApp-debug.apk`，`--apk` 的相对路径按当前工作目录解析。设备选择与 `android-build-run.sh` 一致：单个在线设备自动选择，多个在线设备提示编号，没有在线设备时提示输入 ADB 连接地址（不是配对端口）。非交互环境在零个或多个在线设备时必须指定目标。支持 `ADB_SERIAL` / `ANDROID_SERIAL` 环境变量；`--serial` 覆盖环境变量，`--connect` 与已选序列号不一致时拒绝执行。
 
 ## 单独构建 runtime
 

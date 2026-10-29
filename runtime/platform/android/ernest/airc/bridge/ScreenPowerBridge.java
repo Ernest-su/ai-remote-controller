@@ -2,6 +2,7 @@ package ernest.airc.bridge;
 
 import android.os.Build;
 import android.os.IBinder;
+import android.system.Os;
 import java.lang.reflect.Method;
 
 /** Controls physical display power without putting Android to sleep. */
@@ -18,6 +19,7 @@ public final class ScreenPowerBridge {
         return type;
     }
     public static void main(String[] args) {
+        int status = 0;
         try {
             if (args.length != 1 || !(args[0].equals("on") || args[0].equals("off")))
                 throw new IllegalArgumentException("expected on or off");
@@ -40,6 +42,19 @@ public final class ScreenPowerBridge {
         } catch (Throwable error) {
             while (error.getCause() != null) error = error.getCause();
             System.err.println(error.getClass().getSimpleName() + ": " + error.getMessage());
+            status = 1;
+        }
+        // Loading android_servers can register vendor native destructors that crash during
+        // normal app_process shutdown. This one-shot bridge has no shutdown work: all Binder
+        // calls have returned. Flush the result and replace this process with a minimal shell
+        // exit, bypassing loaded native destructors while preserving the actual status.
+        System.out.flush();
+        System.err.flush();
+        try {
+            Os.execv("/system/bin/sh", new String[] {"sh", "-c", status == 0 ? "exit 0" : "exit 1"});
+        } catch (Exception error) {
+            System.err.println("Could not finish screen power bridge: " + error);
+            System.err.flush();
             System.exit(1);
         }
     }

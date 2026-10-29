@@ -20,7 +20,7 @@ class AdbSubnetProbeTest {
         assertEquals(listOf("10.0.0.2"), AdbSubnetProbe.hosts("10.0.0.1", 30))
         assertTrue(AdbSubnetProbe.hosts("10.0.0.1", 32).isEmpty())
     }
-    private fun probe(response: ByteArray): Boolean = ServerSocket(0).use { server ->
+    private fun probe(response: ByteArray): DiscoveredAdbDevice? = ServerSocket(0).use { server ->
         val request = CompletableFuture.runAsync {
             server.accept().use { socket ->
                 socket.soTimeout = 1000
@@ -31,9 +31,11 @@ class AdbSubnetProbeTest {
                 val size = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN).getInt(12)
                 input.readFully(ByteArray(size))
                 socket.getOutputStream().write(response)
+                socket.shutdownOutput()
+                assertEquals(-1, input.read()) // Probe closes without sending AUTH, OPEN or shell.
             }
         }
-        val found = AdbSubnetProbe.responds("127.0.0.1", server.localPort, 1000)
+        val found = AdbSubnetProbe.probe("127.0.0.1", server.localPort, 1000)
         request.get(2, TimeUnit.SECONDS)
         found
     }
@@ -43,14 +45,32 @@ class AdbSubnetProbeTest {
             .putInt(body.sumOf { it.toInt() and 255 }).putInt(command.inv()).put(body).array()
 
     @Test fun acceptsAdbConnectionAndAuthorizationToken() {
-        assertTrue(probe(packet(0x4e584e43, 0x01000000, 4096, "device::ro.product.model=TV\u0000".toByteArray())))
-        assertTrue(probe(packet(0x48545541, 1, 0, ByteArray(20) { it.toByte() })))
+        assertNotNull(probe(packet(0x4e584e43, 0x01000000, 4096, "device::ro.product.model=TV\u0000".toByteArray())))
+        assertNotNull(probe(packet(0x48545541, 1, 0, ByteArray(20) { it.toByte() })))
+    }
+    @Test fun readsModelProductAndDeviceFromConnectionBanner() {
+        val found = probe(packet(0x4e584e43, 0x01000001, 4096,
+            "device::ro.product.name=tv_product;ro.product.model=Living Room TV;ro.product.device=tv_code;features=shell_v2;\u0000".toByteArray()))!!
+        assertEquals("127.0.0.1", found.host)
+        assertEquals("Living Room TV", found.name)
+        assertEquals("tv_product", found.product)
+        assertEquals("tv_code", found.device)
+    }
+    @Test fun fallsBackFromBlankModelAndBoundsUntrustedNames() {
+        fun banner(properties: String) = probe(packet(0x4e584e43, 0x01000000, 4096, "device::$properties\u0000".toByteArray()))!!
+        assertEquals("product", banner("ro.product.model=  ;ro.product.name=product;ro.product.device=code").name)
+        assertEquals("code", banner("ro.product.model=unknown;ro.product.device=code").name)
+        assertEquals("Android 设备 · 127.0.0.1", banner("features=shell_v2").name)
+        assertEquals("LivingRoom", banner("ro.product.model=Living\n\u202eRoom").name)
+        assertEquals(80, banner("ro.product.model=${"x".repeat(100)}").name.length)
+        assertEquals("Android 设备 · 127.0.0.1",
+            probe(packet(0x48545541, 1, 0, ByteArray(20)))!!.name)
     }
     @Test fun rejectsOpenNonAdbPortCorruptChecksumAndWrongBanner() {
-        assertFalse(probe("HTTP/1.1 200 OK\r\n\r\n".toByteArray()))
+        assertNull(probe("HTTP/1.1 200 OK\r\n\r\n".toByteArray()))
         val packet = packet(0x4e584e43, 0x01000000, 4096, "device::\u0000".toByteArray())
         packet[16] = (packet[16].toInt() xor 1).toByte()
-        assertFalse(probe(packet))
-        assertFalse(probe(packet(0x4e584e43, 0x01000000, 4096, "host::\u0000".toByteArray())))
+        assertNull(probe(packet))
+        assertNull(probe(packet(0x4e584e43, 0x01000000, 4096, "host::\u0000".toByteArray())))
     }
 }
