@@ -63,6 +63,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     private val connector = AdbConnector(application)
     private val installer = RuntimeInstaller(application)
     private val runtime = RuntimeConnection { application.resources.configuration.locales[0].toLanguageTag() }
+    internal val voice = AndroidVoiceController(application, viewModelScope, runtime)
     val tvInput = TvInputController(viewModelScope, getApplication(), runtime, { state.value.selected }) {
         val record = state.value.history.find { it.id == state.value.selected } ?: error("请先选择电视")
         val host = record.host ?: error("没有保存电视地址")
@@ -722,6 +723,7 @@ class RemoteViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     override fun onCleared() {
+        voice.stop()
         automaticConnection.stop()
         ascrcpyPreview.stop()
         discovery.close(); batchTransfers.close(); transfers.close(); filePreviews.close(); textFiles.close(); runtime.close(); profiles.close(); adb?.close()

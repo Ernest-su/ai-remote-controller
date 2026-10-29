@@ -205,6 +205,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                         RemotePage.SETTINGS -> AppearanceSettings(themeMode, onThemeChange) {
                             OutlinedButton({ layoutEditor = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("自定义此电视的遥控按键") }
                             RemoteComfortSettings(state, model)
+                            VoiceSettingsPanel(model.voice)
                             FloatingRemoteSettings(state.floatingRemoteTransparency, model::setFloatingRemoteTransparency)
                             Panel {
                                 Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("remote-key-haptics")
@@ -391,6 +392,9 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
                             CustomRemoteKeys(state, model)
                         }
                     }
+                }
+                Box(Modifier.fillMaxWidth().padding(horizontal = RemoteDimensions.InnerPadding).padding(bottom = 8.dp)) {
+                    VoiceControls(model.voice, state.connected)
                 }
                 Row(Modifier.fillMaxWidth().mirrorControlBacking(MaterialTheme.shapes.small).padding(start = RemoteDimensions.InnerPadding, end = RemoteDimensions.InnerPadding, bottom = if (imeVisible) 8.dp else RemoteDimensions.VerticalPadding).testTag("remote-text-controls"), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {

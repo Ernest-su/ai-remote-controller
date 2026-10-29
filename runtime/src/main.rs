@@ -21,6 +21,7 @@ mod system_state;
 mod tools;
 mod transfers;
 mod virtual_gamepad;
+mod voice;
 
 use anyhow::{bail, Context, Result};
 use axum::{
@@ -420,6 +421,7 @@ async fn serve(directory: PathBuf, port: u16, enable_mdns: bool) -> Result<()> {
         )
         .route("/transfers/{id}", axum::routing::delete(transfers::cancel))
         .route("/ws", get(websocket))
+        .route("/voice", get(voice::websocket))
         .with_state(state);
     let listener = listener.tap_io(|stream| {
         if let Err(error) = stream.set_nodelay(true) {

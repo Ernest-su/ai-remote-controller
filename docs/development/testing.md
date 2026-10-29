@@ -283,3 +283,11 @@ AAC 被控端播放验证使用独立模拟器：先构建 `:mediaFixture:assemb
 回复或提交说明写明命令、环境、实际执行或缓存复用、失败/跳过及未执行范围。相同输入的 Gradle 缓存可用于纯代码检查；依赖外部设备状态的专项不能拿缓存代替当前执行。
 
 JVM fixture、模拟器和真实设备分别说明。UI fixture 不证明目标实际输入、文件/应用操作或游戏消费；主机工具不证明 Android 系统效果；模拟器不能替代厂商系统、摄像头和自然 WLAN 故障。保留失败证据与有效断言，不扩大通过结论。
+
+### 实时语音输入
+
+`VoiceSettingsTest` 在JVM检查设置边界、真实WebSocket二进制PCM、准备/停止确认、路由错误和连接代际隔离；Rust `voice::tests` 检查严格字段与包名/键值边界。构建App和AndroidTest后执行 `python3 scripts/test-phone-target.py --phone <模拟器> --suite voice-input-ui`，检查离线禁用、配置恢复、合成采音fixture向回环服务发送PCM、松手和离页停止、不自动恢复。该模拟器专项不证明实体麦克风采音。实体手机可用同一测试类附加 instrumentation 参数 `-e voiceCapture microphone` 验证真实 AudioRecord 到回环服务；不保存音频。
+
+厂商音频路由专项使用显式选定的目标：`uv run --with websockets python scripts/test-voice-target.py --serial <康佳ADB地址> --binary androidApp/src/main/assets/runtime/airc-runtime-armeabi-v7a --package com.konka.bestlauncher --key 1017`。脚本建立UUID独立服务，发送合成PCM，核对助手活跃录音与remote submix、互斥、正常结束、突然断线、断流、坏帧、速率限制、无效配置和策略清理，结束移除自建服务、目录与转发。会发送明确指定的语音键，不录制人声，不修改已有服务或系统音频配置；此专项不证明自然语音识别准确率。
+
+同一目标专项追加 `--phone <实体手机ADB> --host <电视IP>` 可安装配套App/测试APK并运行 `LiveVoiceInputTargetTest`，实际按住手机麦克风，经局域网发送到隔离服务，同时核对助手的活跃submix录音帧计数与松手确认。测试不保存人声，恢复原麦克风授权状态；不验证自然语音识别准确率。

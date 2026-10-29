@@ -327,3 +327,13 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 `files.rename` / `files_rename` 接收 `root`、相对 `path` 和同目录单个新名称 `name`，返回 `{root,path,destination,renamed:true}`。支持普通文件、文件夹和链接本身，不跟随父目录链接，不跨目录移动，不覆盖已有目标；优先原子不覆盖重命名；Android共享存储不支持时，使用独占创建的副本，完整复制并复查源身份后移除原项。兼容复制最多128 MiB、2000项、64层，不跨挂载点；复制未完成时原项保留，新名称下可能保留部分副本，删除原项期间出现变动时新名称下保留完整副本并明确报错。
 
 `files.prepare_overwrite` 可附带 `expectedSha256`（64位小写十六进制），用于不超过2 MiB的文本编辑保存。文件必须仍存在、内容摘要一致且读取期间身份未变化；不一致时不创建覆盖提案。后续仍需用户确认，并在上传提交时复查文件身份。
+
+## 实时虚拟麦克风 `/voice`
+
+独立 WebSocket，和 `/ws` 使用同一服务端口；单路互斥，不接受模型工具调用或持久化任务。控制端须绑定当前 runtime 连接代际，换设备、主连接断开、后台或松手即停止。
+
+第一条必须是JSON `{"packageName":"com.konka.bestlauncher","keyCode":1017}`，仅允许这两个字段；包名为点分标识符，最大255字符；keyCode 为0..65535，0表示不附加按键。被控端按应用UID与MIC录音源注册临时 RECORDERS/LOOP_BACK 混音，启动 AudioTrack 后返回 `{"ready":true,"sampleRate":16000,"channels":1}`。不支持或权限不足返回 `{"error":"..."}` 并关闭。
+
+ready后第一帧完整PCM到达才提交可选按键 DOWN，避免准备期间取消仍产生延迟按键。发送二进制PCM帧：16kHz、单声道、有符号16位小端，每帧2..3200字节且必须偶数，建议640字节/20ms。按实时速率发送，超前缓冲最多200ms；不支持批量录音上传。客户端本地WebSocket队列另限制约200ms。文本 `stop` 正常结束；被控端关闭输入管道、发送按键 UP、释放音轨并注销策略后返回 `{"stopped":true}`。异常返回error并执行相同清理，不自动重放DOWN。
+
+握手最多5秒，音频断流1500ms关闭，单次最长60秒。桥接进程另有独立2000ms断流看门狗与60秒上限，父进程退出导致EOF也会清理；音频只通过有界管道传输，不写文件。Android 14+且音频路由权限、remote submix模块为前提，策略按UID匹配，共享UID不构成应用隔离。
