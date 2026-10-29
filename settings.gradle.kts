@@ -15,3 +15,12 @@ include(":ascrcpy")
 
 // Companion IME installed on the controlled television for Unicode text submission.
 include(":tvInputMethod")
+
+// Optional local ADB source for transport experiments; no machine path is persisted.
+providers.gradleProperty("aircAdbSource").orNull?.let { source ->
+    includeBuild(source) {
+        dependencySubstitution {
+            substitute(module("com.github.Ernest-su:adb")).using(project(":adb"))
+        }
+    }
+}

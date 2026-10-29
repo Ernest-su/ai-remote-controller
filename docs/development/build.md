@@ -104,3 +104,5 @@ adb -s DEVICE_SERIAL shell /data/local/tmp/airc/airc-runtime service stop --stat
 生产签名、六项 GitHub Secrets 与自动生成草稿 Release 的步骤见[签名与发布](releasing.md)。本地可用 `scripts/release_signing.py run` 临时注入签名环境，未提供生产密钥时 release 构建会失败；debug 构建不需要生产密钥。
 
 被控端 NDK 编译器和 D8 最低 API 为24，主控 App 最低 API 仍为26。Android 7 支持按目标专项试用验证，不代表所有厂商功能已覆盖；16 KB ELF 对齐保持启用。
+
+ADB 传输实验可用 `-PaircAdbSource=/path/to/adb` 指定本地 ADB 库源码；Gradle composite build 同时替换 App 和 ascrcpy 的 ADB 依赖。普通构建仍使用发布依赖；本地路径只通过命令行提供，不写入仓库或提交二进制依赖。

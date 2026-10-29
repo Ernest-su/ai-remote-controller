@@ -4,7 +4,8 @@ import re
 
 def require_passed(output, expected_count):
     statuses = [int(code) for code in re.findall(r"^INSTRUMENTATION_STATUS_CODE:\s*(-?\d+)\s*$", output, re.MULTILINE)]
-    terminals = [code for code in statuses if code != 1]
+    # Android instrumentation status 2 carries progress/report values, not a test outcome.
+    terminals = [code for code in statuses if code not in (1, 2)]
     summaries = re.findall(r"^OK \((\d+) tests?\)\s*$", output, re.MULTILINE)
     finish = re.findall(r"^INSTRUMENTATION_CODE:\s*(-?\d+)\s*$", output, re.MULTILINE)
     if (summaries != [str(expected_count)] or finish != ["-1"]

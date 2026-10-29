@@ -296,3 +296,9 @@ JVM fixture、模拟器和真实设备分别说明。UI fixture 不证明目标�
 同一目标专项追加 `--phone <实体手机ADB> --host <电视IP>` 可安装配套App/测试APK并运行 `LiveVoiceInputTargetTest`，实际按住手机麦克风，经局域网发送到隔离服务，同时核对助手的活跃submix录音帧计数与松手确认。测试不保存人声，恢复原麦克风授权状态；不验证自然语音识别准确率。
 
 共用输入区的文字提交/禁用、草稿导航与旋转、真实键盘安全区和窄屏大字体回归使用 `python3 scripts/test-phone-target.py --phone <模拟器> --suite remote-composer-ui`。
+
+## ADB 上传对照实验
+
+先以 `-PaircAdbSource=/path/to/adb` 构建 App 与测试 APK，确认使用包含同步头部/正文合并改动的库，再在控制手机运行 `ernest.airc.RuntimeUploadTargetTest`，明确传入 `uploadHost` 和可选 `uploadRoot=true`。实验使用目标 ABI 的完整 runtime，在 UUID 独立目录比较原分包、合并分包、压缩冷/热缓存；强制无解压工具的分支也可验证。`uploadCompressionOnly=true` 可只补测压缩，不重复已完成的原始推送对照。
+
+耗时包含压缩能力探测、所需的本地压缩、网络上传、目标解压及临时压缩包清理；读回校验和程序版本检查单独执行，不计入上传耗时。每个文件都读回核对 SHA-256，检查解压后程序可运行。可用 `python3 scripts/test-runtime-upload.py --phone SERIAL --host TARGET_IP --root --output OUTPUT_DIR` 运行；多目标重复 `--host`，只补测压缩时加 `--compression-only`。实验不替换现有服务，不安装解压工具，结束清理自建文件与压缩缓存；前后核对现有服务 PID、设备标识与就绪状态。单轮结果需注明链路和权限，不能把文件变小直接当作总耗时改善。测试的进度上报不计作通过终态，仍要求完整用例数量、零失败/跳过及正常结束。

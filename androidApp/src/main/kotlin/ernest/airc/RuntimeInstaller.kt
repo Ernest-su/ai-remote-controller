@@ -16,6 +16,7 @@ import kotlinx.serialization.json.int
 /** Bundled releases are trusted through the APK; assets are checked locally before transfer; the target reports its running digest. */
 class RuntimeInstaller(
     private val context: Context,
+    private val compressedTransfer: Boolean = false,
     private val repositoryFactory: (java.io.File) -> RuntimeReleaseRepository = { RuntimeReleaseRepository(it) },
 ) {
     companion object { const val DIRECTORY = "/data/local/tmp/airc"; const val BINARY = "$DIRECTORY/airc-runtime" }
@@ -56,10 +57,15 @@ class RuntimeInstaller(
             check(client.shell(privilege.command("mkdir -p $DIRECTORY && chmod 700 $DIRECTORY && ${if (privilege.manager != RuntimePrivilege.Mode.SHELL) "chown -h 2000:2000 $DIRECTORY && " else ""}rm -f $BINARY.next && echo airc-ok")).text().contains("airc-ok")) { "无法创建部署目录" }
             report("推送设备端 ${release.version}")
             try {
-                connectionStage(ConnectionStage.PUSH)
-                openAsset().use { source ->
-                    val progress = operation[ConnectionDeadline]?.stream(source, asset.size, "推送设备端 ${release.version}") ?: source
-                    client.push(progress, "$BINARY.next", 0x1C0)
+                if (compressedTransfer) {
+                    RuntimeUploader(java.io.File(context.cacheDir, "runtime-compressed"))
+                        .upload(client, asset, ::openAsset, "$BINARY.next", privilege, report)
+                } else {
+                    connectionStage(ConnectionStage.PUSH)
+                    openAsset().use { source ->
+                        val progress = operation[ConnectionDeadline]?.stream(source, asset.size, "推送设备端 ${release.version}") ?: source
+                        client.push(progress, "$BINARY.next", 0x1C0)
+                    }
                 }
                 connectionStage(ConnectionStage.CHECK)
                 val version = client.shell(privilege.command("$BINARY.next --version")).text().trim()

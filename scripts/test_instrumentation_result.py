@@ -10,6 +10,11 @@ class InstrumentationResultTest(unittest.TestCase):
     def test_success(self):
         require_passed(result(), 1)
 
+    def test_progress_reports_do_not_replace_a_successful_terminal(self):
+        require_passed(result().replace("INSTRUMENTATION_STATUS_CODE: 0", "INSTRUMENTATION_STATUS_CODE: 2\nINSTRUMENTATION_STATUS_CODE: 0"), 1)
+        with self.assertRaises(RuntimeError):
+            require_passed(result().replace("INSTRUMENTATION_STATUS_CODE: 0", "INSTRUMENTATION_STATUS_CODE: 2"), 1)
+
     def test_skipped_or_failed_test_cannot_pass_using_ok_summary(self):
         for code in [-1, -2, -3, -4]:
             with self.subTest(code=code), self.assertRaises(RuntimeError):
