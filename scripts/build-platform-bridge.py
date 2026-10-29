@@ -16,4 +16,4 @@ classes = output / 'classes'; classes.mkdir(exist_ok=True)
 javac = str(pathlib.Path(os.environ['JAVA_HOME']) / ('bin/javac.exe' if sys.platform == 'win32' else 'bin/javac')) if os.environ.get('JAVA_HOME') else 'javac'
 sources = sorted((root / 'runtime/platform/android/ernest/airc/bridge').glob('*.java'))
 subprocess.run([javac, '--release', '8', '-classpath', str(android), '-d', str(classes), *map(str, sources)], check=True)
-subprocess.run([str(d8), '--min-api', '26', '--lib', str(android), '--output', str(output), *map(str, classes.rglob('*.class'))], check=True)
+subprocess.run([str(d8), '--min-api', '24', '--lib', str(android), '--output', str(output), *map(str, classes.rglob('*.class'))], check=True)

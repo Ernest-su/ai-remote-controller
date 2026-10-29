@@ -53,10 +53,36 @@ fn publish_noreplace(parent: &fs::File, temporary: &Path, path: &Path) -> std::i
             libc::RENAME_NOREPLACE,
         )
     };
+    if result == 0 {
+        return Ok(());
+    }
+    let error = std::io::Error::last_os_error();
+    if matches!(
+        error.raw_os_error(),
+        Some(libc::ENOSYS | libc::EINVAL | libc::EOPNOTSUPP)
+    ) {
+        return publish_link_noreplace(parent, temporary, path);
+    }
+    Err(error)
+}
+// Older Android filesystems can lack RENAME_NOREPLACE. A hard link publishes the
+// same read-only inode atomically and fails if the destination already exists.
+fn publish_link_noreplace(parent: &fs::File, temporary: &Path, path: &Path) -> std::io::Result<()> {
+    let from = std::ffi::CString::new(temporary.file_name().unwrap().as_bytes())?;
+    let to = std::ffi::CString::new(path.file_name().unwrap().as_bytes())?;
+    let result = unsafe {
+        libc::linkat(
+            parent.as_raw_fd(),
+            from.as_ptr(),
+            parent.as_raw_fd(),
+            to.as_ptr(),
+            0,
+        )
+    };
     if result != 0 {
         return Err(std::io::Error::last_os_error());
     }
-    Ok(())
+    fs::remove_file(temporary)
 }
 pub(crate) fn initialize(state: &Path) -> Result<()> {
     if DEX.is_empty() {
@@ -232,34 +258,32 @@ mod tests {
     use super::*;
     #[test]
     fn bridge_publication_is_atomic_and_never_overwrites_or_follows_a_link() {
-        let directory =
-            std::env::temp_dir().join(format!("airc-bridge-publish-{}", uuid::Uuid::new_v4()));
-        fs::create_dir(&directory).unwrap();
-        let parent = fs::File::open(&directory).unwrap();
-        let temporary = directory.join("temporary");
-        let target = directory.join("bridge.dex");
-        fs::write(&temporary, b"bridge").unwrap();
-        fs::set_permissions(&temporary, fs::Permissions::from_mode(0o400)).unwrap();
-        publish_noreplace(&parent, &temporary, &target).unwrap();
-        assert!(!temporary.exists());
-        assert_eq!(fs::read(&target).unwrap(), b"bridge");
-        fs::write(&temporary, b"replacement").unwrap();
-        assert_eq!(
-            publish_noreplace(&parent, &temporary, &target)
-                .unwrap_err()
-                .kind(),
-            std::io::ErrorKind::AlreadyExists
-        );
-        assert_eq!(fs::read(&target).unwrap(), b"bridge");
-        let link = directory.join("link.dex");
-        std::os::unix::fs::symlink(&target, &link).unwrap();
-        assert_eq!(
-            publish_noreplace(&parent, &temporary, &link)
-                .unwrap_err()
-                .kind(),
-            std::io::ErrorKind::AlreadyExists
-        );
-        assert_eq!(fs::read(&target).unwrap(), b"bridge");
-        fs::remove_dir_all(directory).unwrap();
+        for publish in [publish_noreplace, publish_link_noreplace] {
+            let directory =
+                std::env::temp_dir().join(format!("airc-bridge-publish-{}", uuid::Uuid::new_v4()));
+            fs::create_dir(&directory).unwrap();
+            let parent = fs::File::open(&directory).unwrap();
+            let temporary = directory.join("temporary");
+            let target = directory.join("bridge.dex");
+            fs::write(&temporary, b"bridge").unwrap();
+            fs::set_permissions(&temporary, fs::Permissions::from_mode(0o400)).unwrap();
+            publish(&parent, &temporary, &target).unwrap();
+            assert!(!temporary.exists());
+            assert_eq!(fs::read(&target).unwrap(), b"bridge");
+            fs::write(&temporary, b"replacement").unwrap();
+            assert_eq!(
+                publish(&parent, &temporary, &target).unwrap_err().kind(),
+                std::io::ErrorKind::AlreadyExists
+            );
+            assert_eq!(fs::read(&target).unwrap(), b"bridge");
+            let link = directory.join("link.dex");
+            std::os::unix::fs::symlink(&target, &link).unwrap();
+            assert_eq!(
+                publish(&parent, &temporary, &link).unwrap_err().kind(),
+                std::io::ErrorKind::AlreadyExists
+            );
+            assert_eq!(fs::read(&target).unwrap(), b"bridge");
+            fs::remove_dir_all(directory).unwrap();
+        }
     }
 }

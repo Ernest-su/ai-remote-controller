@@ -63,7 +63,7 @@ data class RemoteUiState(
     val deviceInfoError: String? = null,
 )
 
-class RemoteViewModel @JvmOverloads constructor(application: Application, private val connectionTimeoutMillis: Long = 90_000) : AndroidViewModel(application) {
+class RemoteViewModel @JvmOverloads constructor(application: Application, private val connectionTimeoutMillis: Long = 900_000) : AndroidViewModel(application) {
     private val store = DeviceStore(application)
     private val connector = AdbConnector(application)
     private val installer = RuntimeInstaller(application)
@@ -305,15 +305,19 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         val connectionToken = connectionGeneration
         connectionJob = viewModelScope.launch {
             mutable.update { it.copy(busy = true, status = "正在连接…", qr = null) }
-            // This watchdog is independent of non-cancellable deployment rollback.
+            val stages = ConnectionDeadline { message ->
+                if (connectionToken == connectionGeneration) mutable.update { it.copy(status = message) }
+            }
+            // Keep this independent of blocking ADB calls and protected deployment rollback.
             val deadline = viewModelScope.launch {
-                delay(if (automatic) minOf(timeoutMillis, 60_000) else timeoutMillis)
+                var failure: String? = null
+                while (failure == null) { delay(250); failure = stages.failure(timeoutMillis) }
                 if (connectionToken == connectionGeneration && state.value.busy) {
                     automaticReconnectEnabled = false
                     automaticConnection.stop()
                     retireConnection()
                     if (disconnectRuntime) runtime.disconnect()
-                    val message = "连接超时，请检查目标地址与授权，或选择其他设备重试"
+                    val message = checkNotNull(failure)
                     mutable.update { it.copy(busy = false, qr = null, status = message) }
                     feedback(FeedbackPhase.ERROR, message)
                 }
@@ -324,7 +328,13 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
                     mutable.update { it.copy(feedback = RemoteFeedback(revision = it.feedback.revision + 1L)) }
                     runtime.disconnect()
                 }
-                action()
+                withContext(stages) { action() }
+            }
+            catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                if (connectionToken != connectionGeneration) return@launch
+                val message = stages.timeoutMessage()
+                mutable.update { it.copy(status = message) }
+                feedback(FeedbackPhase.ERROR, message)
             }
             catch (e: CancellationException) { if (connectionToken == connectionGeneration) mutable.update { it.copy(status = "已取消") }; throw e }
             catch (e: Exception) {
@@ -370,7 +380,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         mutable.update { it.copy(status = "配对并发现目标连接端口…") }
         attach(connector.pair(host.trim(), pairingPort, code, connectionPort), ConnectionMethod.WIRELESS_CODE, runtimePort)
     }
-    fun qr(runtimePort: Int) = connection(timeoutMillis = 180_000) {
+    fun qr(runtimePort: Int) = connection {
         val qr = PairingQr()
         mutable.update { it.copy(qr = qr, status = "请用目标设备无线调试页面扫描二维码") }
         attach(connector.qr(qr), ConnectionMethod.WIRELESS_QR, runtimePort)
@@ -387,8 +397,10 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         if (adb !== session) adb?.close()
         adb = session
         try {
+            connectionStage(ConnectionStage.WAIT)
             deploymentLocks.getOrPut(session.host) { Mutex() }.withLock {
                 operation.ensureActive()
+                connectionStage(ConnectionStage.PREPARE)
                 val model = withContext(Dispatchers.IO) { session.client.shell("getprop ro.product.model").text().trim() }
                 val known = state.value.history.find {
                     (session.guid != null && it.wirelessGuid == session.guid) || (it.host == session.host && it.adbPort == session.port)
@@ -417,6 +429,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
 
     private suspend fun attachRuntime(host: String, port: Int, method: ConnectionMethod?, adbPort: Int?, guid: String?, model: String?, previousId: String? = null, expectedRelease: RuntimeRelease? = null) {
         currentCoroutineContext().ensureActive()
+        connectionStage(ConnectionStage.RUNTIME)
         quickRoutines.cancel(); schedules.clear(); tvInput.cancel(); appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll()
         val status = runtime.connect(host, port, expectedRelease ?: withContext(Dispatchers.IO) { installer.bundledRelease() })
         val previous = state.value.history.find { it.id == status.deviceId }
@@ -763,6 +776,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
     private suspend fun restartSelectedService() {
         val operation = currentCoroutineContext()
         val session = selectedAdb()
+        connectionStage(ConnectionStage.WAIT)
         deploymentLocks.getOrPut(session.host) { Mutex() }.withLock {
             operation.ensureActive()
             val record = state.value.history.find { it.id == state.value.selected } ?: error("请先选择目标设备")
@@ -778,6 +792,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         automaticReconnectEnabled = false
         automaticConnection.stop()
         val session = selectedAdb()
+        connectionStage(ConnectionStage.WAIT)
         deploymentLocks.getOrPut(session.host) { Mutex() }.withLock {
             val result = installer.stop(session.client, state.value.preferRoot)
             runtime.disconnect()

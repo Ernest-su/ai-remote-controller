@@ -82,7 +82,7 @@ python3 scripts/build-runtime.py
 ./android-build-run.sh --serial DEVICE_SERIAL --no-root
 ```
 
-脚本自动选择唯一在线设备，多设备时交互选择，没有设备时提示输入地址；非交互环境需明确指定设备。自动检测 Android API 26+ 和 ABI，仅构建目标 ABI，推送到 `/data/local/tmp/airc`，后台启动并等待服务就绪。构建会更新生成的 runtime 资产与清单；准备 APK/分发前仍需全 ABI 构建。
+脚本自动选择唯一在线设备，多设备时交互选择，没有设备时提示输入地址；非交互环境需明确指定设备。自动检测 Android API 24+ 和 ABI，仅构建目标 ABI，推送到 `/data/local/tmp/airc`，后台启动并等待服务就绪。构建会更新生成的 runtime 资产与清单；准备 APK/分发前仍需全 ABI 构建。
 
 脚本默认检测当前 root adbd，再尝试 `su -c id -u`；root 不可用时使用 ADB shell。`--no-root` 强制使用 shell，`--root` 显式启用自动检测。`--adb-root` 先尝试 `adb root` 并等待重新连接，仅对允许 root adbd 的系统有效；App 不主动重启 adbd。支持 `--android-dir /data/local/tmp/custom-airc`、`--port`，以及 `ADB_SERIAL`（或 `ANDROID_SERIAL`）、`ANDROID_DIR`、`PORT` 环境变量。自定义目录不由应用的默认部署流程管理。
 
@@ -102,3 +102,5 @@ adb -s DEVICE_SERIAL shell /data/local/tmp/airc/airc-runtime service stop --stat
 `android-build-run.sh` 与共享 KMP 权限检测支持 command 与 UID-shell 两种 su 风格。CLI 的 `--root`/`--no-root` 分别保持用户意图，管理旧 root 服务时仍验证 root，并在降权前确认 shell UID；不通过 adb root 改变全局 ADB 进程，除非用户显式传入该选项。
 
 生产签名、六项 GitHub Secrets 与自动生成草稿 Release 的步骤见[签名与发布](releasing.md)。本地可用 `scripts/release_signing.py run` 临时注入签名环境，未提供生产密钥时 release 构建会失败；debug 构建不需要生产密钥。
+
+被控端 NDK 编译器和 D8 最低 API 为24，主控 App 最低 API 仍为26。Android 7 支持按目标专项试用验证，不代表所有厂商功能已覆盖；16 KB ELF 对齐保持启用。

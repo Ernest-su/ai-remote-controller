@@ -13,7 +13,7 @@ usage() {
 Usage: ./android-build-run.sh [--serial SERIAL | --connect IP:PORT] [--port PORT] [--android-dir PATH] [--root | --no-root] [--adb-root]
 Build, push and start airc-runtime in the background. Auto-detect root adbd / su by default.
 --no-root runs as shell; --adb-root first attempts to restart adbd as root.
-Automatically detects arm64-v8a, armeabi-v7a or x86_64 (Android API 26+).
+Automatically detects arm64-v8a, armeabi-v7a or x86_64 (Android API 24+).
 Environment: ADB_SERIAL / ANDROID_SERIAL, ANDROID_DIR, PORT and build-runtime.py's NDK variables.
 HELP
 }
@@ -110,7 +110,7 @@ if [[ "$PRIVILEGED" == 1 && "$NEW_ROOT" == 0 ]]; then
 fi
 if [[ "$NEW_ROOT" == 1 ]]; then echo "Runtime permissions: root ($MANAGER)"; else echo "Runtime permissions: ADB shell (root unavailable or disabled)"; fi
 SDK="$("${ADB[@]}" shell getprop ro.build.version.sdk | tr -d '\r')"
-if [[ ! "$SDK" =~ ^[0-9]+$ ]] || ((SDK < 26)); then die "Android API 26+ required"; fi
+if [[ ! "$SDK" =~ ^[0-9]+$ ]] || ((SDK < 24)); then die "Android API 24+ required"; fi
 ABILIST="$("${ADB[@]}" shell getprop ro.product.cpu.abilist | tr -d '\r')"
 [[ -n "$ABILIST" ]] || ABILIST="$("${ADB[@]}" shell getprop ro.product.cpu.abi | tr -d '\r')"
 case ",$ABILIST," in

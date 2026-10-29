@@ -15,9 +15,9 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TARGETS = {
-    "arm64-v8a": ("aarch64-linux-android", "aarch64-linux-android26-clang"),
-    "armeabi-v7a": ("armv7-linux-androideabi", "armv7a-linux-androideabi26-clang"),
-    "x86_64": ("x86_64-linux-android", "x86_64-linux-android26-clang"),
+    "arm64-v8a": ("aarch64-linux-android", "aarch64-linux-android24-clang"),
+    "armeabi-v7a": ("armv7-linux-androideabi", "armv7a-linux-androideabi24-clang"),
+    "x86_64": ("x86_64-linux-android", "x86_64-linux-android24-clang"),
 }
 
 

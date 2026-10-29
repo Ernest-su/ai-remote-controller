@@ -8,7 +8,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
-import java.security.MessageDigest
 
 class RuntimeDeploymentRunnerTest {
     private val directory = "/data/local/tmp/airc"
@@ -18,9 +17,6 @@ class RuntimeDeploymentRunnerTest {
         RuntimePrivilege(RuntimePrivilege.Mode.SU, true),
         RuntimePrivilege(RuntimePrivilege.Mode.SU, false, RuntimePrivilege.SuStyle.UID_SHELL),
     )
-    private fun hash(bytes: ByteArray) = MessageDigest.getInstance("SHA-256").digest(bytes)
-        .joinToString("") { "%02x".format(it) }
-
     @Test fun legacyPacketLimitForEveryPrivilegeMode() = runBlocking {
         for (privilege in modes) {
             var uploaded = byteArrayOf()
@@ -32,7 +28,7 @@ class RuntimeDeploymentRunnerTest {
                     commands += command
                     check(("shell:$command\u0000").toByteArray().size <= 4096)
                     when (command) {
-                        privilege.command("sha256sum '${path}'") -> "${hash(uploaded)}  $path\n"
+                        privilege.command("cat '${path}'") -> uploaded.toString(Charsets.UTF_8)
                         privilege.command("sh '${path}'") -> "airc-committed\n"
                         privilege.command("rm -f '${path}'") -> ""
                         else -> error(command)
@@ -59,7 +55,7 @@ class RuntimeDeploymentRunnerTest {
     }
 
     @Test fun failuresNeverSkipCleanup() = runBlocking {
-        for (failure in listOf("push", "hash", "empty", "cancel")) {
+        for (failure in listOf("push", "script", "empty", "cancel")) {
             val commands = mutableListOf<String>()
             var bytes = byteArrayOf()
             val error = runCatching {
@@ -68,7 +64,7 @@ class RuntimeDeploymentRunnerTest {
                     shell = { command ->
                         commands += command
                         when {
-                            command.startsWith("sha256sum") -> if (failure == "hash") "" else hash(bytes)
+                            command.startsWith("cat ") -> if (failure == "script") "corrupt script" else bytes.toString(Charsets.UTF_8)
                             command.startsWith("sh ") -> if (failure == "cancel") throw CancellationException("cancel") else ""
                             else -> ""
                         }
@@ -76,7 +72,7 @@ class RuntimeDeploymentRunnerTest {
             }.exceptionOrNull()
             assertNotNull(error)
             assertTrue(commands.last().startsWith("rm -f "))
-            if (failure == "hash" || failure == "push") assertFalse(commands.any { it.startsWith("sh ") })
+            if (failure == "script" || failure == "push") assertFalse(commands.any { it.startsWith("sh ") })
             if (failure == "empty") assertTrue(error!!.message!!.contains("ADB"))
             if (failure == "cancel") assertTrue(error is CancellationException)
         }

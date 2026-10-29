@@ -41,6 +41,8 @@ python3 scripts/verify-local.py --scope runtime
 ```
 
 
+连接部署计时可运行 `:androidApp:testDebugUnitTest --tests ernest.airc.ConnectionDeadlineTest`，覆盖持续进展超过旧90秒限制、无进展超时、阶段预算重置、总时长上限及输入流计数。`AdbAttemptTest` 使用可关闭的阻塞读验证握手超时与主动取消都关闭候选 Socket，正常成功保留会话；部署脚本测试拒绝内容损坏并核对取消清理。Android 7 试用需在明确指定的 API 24 目标验证 App 推送、版本检查、服务对齐与桥接；`inputFixture` 最低 API 24，可用只读事件日志证明按键实收，不以 RPC 成功替代接收验证。
+
 ## Android 模拟器 {#emulator-controller}
 
 使用独立 AVD，先构建 App 与测试 APK：
