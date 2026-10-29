@@ -7,7 +7,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 
-private fun storageLabel(bytes: Long): String = "${bytes / (1024 * 1024)} MiB"
 
 @Composable
 internal fun DeviceInformation(state: RemoteUiState, model: RemoteViewModel) {
@@ -41,9 +40,9 @@ internal fun DeviceInformation(state: RemoteUiState, model: RemoteViewModel) {
                 InfoRow("SDK", info.sdk?.toString() ?: "未知")
                 InfoRow("ABI", info.abis?.joinToString() ?: "未知")
                 InfoRow("有效屏幕尺寸", info.screen?.let { "${it.width} × ${it.height} px" } ?: "未知")
-                InfoRow("数据存储总量", info.storage?.totalBytes?.let(::storageLabel) ?: "未知")
-                InfoRow("数据存储已用", info.storage?.usedBytes?.let(::storageLabel) ?: "未知")
-                InfoRow("数据存储可用", info.storage?.availableBytes?.let(::storageLabel) ?: "未知")
+                InfoRow("数据存储总量", info.storage?.totalBytes?.let(::managementFileSize) ?: "未知")
+                InfoRow("数据存储已用", info.storage?.usedBytes?.let(::managementFileSize) ?: "未知")
+                InfoRow("数据存储可用", info.storage?.availableBytes?.let(::managementFileSize) ?: "未知")
             } ?: Text(if (state.connected) "点击刷新查询系统与硬件信息。" else "连接设备后可刷新系统与硬件信息。", color = RemoteColors.Secondary)
         }
     }

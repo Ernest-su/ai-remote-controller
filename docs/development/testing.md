@@ -236,7 +236,7 @@ uv run --with websockets python runtime/app_control_target_test.py --serial <自
 
 该测试使用 UUID 服务目录，读取未安装 APK 的图标并核对 App 包内的原色图标，验证文本范围读取、释放及路径边界；不安装目标 APK。显式指定目标的桌面测试先构建配套 App/runtime 与 fixture，避免使用过期二进制。不会修改已有目标服务。
 
-文件页布局回归使用 `python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite file-page-ui`，检查无重复标题、320dp / 1.5 倍字号的底栏溢出菜单及亮暗截图、按操作打开弹窗、自动识别信息的显示与文件名编辑。`FileWorkflowUiTest` 验证上传表单与下载/删除状态隔离；`UrlDownloadControllerTest` 验证自动探测不启动下载、手动名称保护、快速换址及迟到响应隔离；`UrlMetadataProtocolTest` 使用主机 runtime 和本地 HTTP fixture 验证重定向、响应头识别及识别后下载，`UrlDownloadTargetTest` 在隔离 Android 目录验证相同协议。
+文件页布局回归使用 `python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite file-page-ui`，检查无重复标题、320dp / 1.5 倍字号的底栏溢出菜单及亮暗截图，以及文件传输、APK 安装与媒体副本的 KB/MB/GB 显示和删除项数、按操作打开弹窗、自动识别信息的显示与文件名编辑。`FileWorkflowUiTest` 验证上传表单与下载/删除状态隔离；`UrlDownloadControllerTest` 验证自动探测不启动下载、手动名称保护、快速换址及迟到响应隔离；`UrlMetadataProtocolTest` 使用主机 runtime 和本地 HTTP fixture 验证重定向、响应头识别及识别后下载，`UrlDownloadTargetTest` 在隔离 Android 目录验证相同协议。
 
 符号链接专项：`FileBrowserControllerTest` 检查链接目录的逻辑路径、返回与只读创建拦截；`FileLinkUiTest`（桌面与 Android，Android 归入 `file-page-ui`）验证链接目标/错误、预览与下载入口、链接删除确认和只读禁用，适配亮暗、320dp 与1.5倍字号。Rust `tools::files` 检查范围内相对/绝对/多级链接、越界、失效、循环、无权限、特殊文件、procfs链接和并发替换后的读取隔离；文件动作及传输测试检查只删除链接、下载可读而写入父目录仍拒绝链接。
 
@@ -252,7 +252,7 @@ Downloads 上传平台验证使用独立 Android 模拟器：`python3 runtime/up
 
 APK 安装文件选择使用 `python3 scripts/test-phone-target.py --phone <自有模拟器> --suite apk-file-selection-ui`，验证底部入口、APK/目录筛选、链接排除、目录导航、选择模式旋转恢复、取消/系统返回、换设备退出、离线及安装能力禁用，并使用本地安装面板fixture核对“选择→解析→准备→独立确认”的顺序；不执行真实目标安装。
 
-文本/重命名/任务标签的聚焦验证：`InstallationVerificationTest`覆盖安装完成与失败后的自动查询、有限重试与旧同版本误报拒绝；`FileTextProtocolTest`使用真实主机runtime验证编码/BOM往返、覆盖确认、外部修改冲突、断线拒绝及大文件前缀只读。`FileTextHighlightTest`覆盖长字符串、转义及未闭合文本，避免高亮导致栈溢出。`FileBrowserControllerTest`覆盖重命名回包校验与刷新，Rust `tools::file_rename` 和 `file_actions` 验证不覆盖、路径/链接边界及文本摘要前置检查。构建App/AndroidTest后执行 `python3 scripts/test-phone-target.py --phone <自有模拟器> --suite file-editing-ui`，验证重命名草稿/错误、未知文件显式文本打开、查看/编辑、保存入口、丢弃确认、大文件提示，以及有任务分类前置和选中恢复；此UI专项不实际修改外部目标文件。
+文本/重命名/任务标签的聚焦验证：`InstallationVerificationTest`覆盖安装完成与失败后的自动查询、有限重试与旧同版本误报拒绝；`FileTextProtocolTest`使用真实主机runtime验证编码/BOM往返、覆盖确认、外部修改冲突、断线拒绝及大文件前缀只读。`FileTextHighlightTest`覆盖长字符串、转义及未闭合文本，避免高亮导致栈溢出。`FileBrowserControllerTest`覆盖重命名回包校验与刷新，Rust `tools::file_rename` 和 `file_actions` 验证不覆盖、路径/链接边界及文本摘要前置检查。构建App/AndroidTest后执行 `python3 scripts/test-phone-target.py --phone <自有模拟器> --suite file-editing-ui`，验证重命名草稿/错误、未知文件显式文本打开、独立页面查看/编辑、保存入口、丢弃确认、大文件提示，以及57 KB原生编辑控件在滚动/亮暗切换时不重置文本、草稿与视口恢复，以及有任务分类前置和选中恢复；此UI专项不实际修改外部目标文件。
 
 Android真实文件协议可运行 `uv run --with websockets python runtime/file_editing_target_test.py --serial <自有模拟器> --binary androidApp/src/main/assets/runtime/airc-runtime-<匹配ABI>`，只创建UUID服务和文件，覆盖私有收件箱与Downloads的文件/目录重命名、同名保护、范围读取、覆盖前原摘要检查、显式覆盖和保存后摘要，退出清理自建目录/服务/转发；不修改已有应用、目标服务或用户文件。
 

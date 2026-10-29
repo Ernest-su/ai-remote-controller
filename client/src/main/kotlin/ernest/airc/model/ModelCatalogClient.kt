@@ -24,7 +24,7 @@ class ModelCatalogClient : ModelCatalog, AutoCloseable {
             val body = response.body ?: error("模型列表响应为空")
             val source = body.source()
             source.request(1024 * 1024 + 1L)
-            check(source.buffer.size <= 1024 * 1024) { "模型列表超过 1 MiB" }
+            check(source.buffer.size <= 1024 * 1024) { "模型列表超过 1 MB" }
             val entries = json.decodeFromString<CatalogResponse>(source.readUtf8()).data
             check(entries.size <= 2000) { "模型列表超过 2000 项" }
             check(entries.all { it.id.isNotBlank() && it.id.length <= 256 && it.id.none(Char::isISOControl) }) { "模型列表包含无效名称" }

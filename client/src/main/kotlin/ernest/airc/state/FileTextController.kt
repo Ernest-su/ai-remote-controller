@@ -109,6 +109,6 @@ internal fun decodeEditableText(bytes: ByteArray): FilePreviewText {
 }
 internal fun encodeEditableText(text: String, encoding: String, bom: ByteArray): ByteArray {
     val encoded = Charset.forName(encoding).newEncoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT).encode(CharBuffer.wrap(text))
-    check(encoded.remaining() + bom.size <= TEXT_EDIT_BYTES) { "编码后的文件超过 2 MiB 编辑上限，草稿已保留。" }
+    check(encoded.remaining() + bom.size <= TEXT_EDIT_BYTES) { "编码后的文件超过 2 MB 编辑上限，草稿已保留。" }
     return bom + ByteArray(encoded.remaining()).also { encoded.get(it) }
 }

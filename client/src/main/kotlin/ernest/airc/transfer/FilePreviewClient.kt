@@ -30,7 +30,7 @@ class FilePreviewClient(private val runtime: RuntimeConnection) : AutoCloseable 
             require(maxBytes in 1..16*1024*1024)
             checkCurrent()
             val size = descriptor.sizeBytes
-            check(prefix || size <= maxBytes) { "图片超过 16 MiB 预览上限，请下载后查看。" }
+            check(prefix || size <= maxBytes) { "图片超过 16 MB 预览上限，请下载后查看。" }
             if (size == 0L) return ByteArray(0)
             val length = minOf(size, maxBytes.toLong()).toInt()
             return execute(http.newCall(Request.Builder().url(url).header("Range", "bytes=0-${length-1}").build())) { response ->

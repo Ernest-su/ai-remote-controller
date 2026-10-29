@@ -14,7 +14,7 @@ fun BatchTransferPanel(state: BatchTransferState, available: Boolean,
     state.message?.takeIf { !state.running && !state.paused && !state.readyToSave }?.let { Text(it) }
     if(state.running || state.paused || state.readyToSave) {
         Text("${state.index} / ${state.names.size} · ${state.message.orEmpty()}")
-        Text("${state.bytes} / ${state.total} 字节",color=RemoteColors.Secondary)
+        Text(managementTransferProgress(state.bytes, state.total),color=RemoteColors.Secondary)
         if(state.running) {LinearProgressIndicator(Modifier.fillMaxWidth());OutlinedButton(pause,modifier=Modifier.heightIn(min=48.dp)){Text("暂停传输")}}
         if(state.paused && !state.running) ActionButton("继续原设备上的传输",available,resume)
         if (state.readyToSave) {

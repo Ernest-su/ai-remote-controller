@@ -17,6 +17,7 @@ fun visibleTargetFiles(entries: List<TargetFileEntry>, query: String, kind: Stri
     return filtered.sortedWith(compareBy<TargetFileEntry> { if (it.kind == "directory") 0 else 1 }.then(secondary))
 }
 
+/** UI sizes use 1024-based KB/MB/GB, independently of protocol byte counts. */
 fun managementFileSize(bytes: Long?): String {
     if (bytes == null) return "大小未知"
     if (bytes < 1024) return "$bytes B"
@@ -29,6 +30,10 @@ fun managementFileSize(bytes: Long?): String {
     val tenths = kotlin.math.round(value * 10).toLong()
     return "${tenths / 10}${if (tenths % 10 == 0L) "" else ".${tenths % 10}"} $unit"
 }
+
+fun managementTransferProgress(bytes: Long, total: Long?, unit: String = "bytes"): String =
+    if (unit == "items") "$bytes${total?.let { " / $it" }.orEmpty()} 项"
+    else managementFileSize(bytes) + total?.let { " / ${managementFileSize(it)}" }.orEmpty()
 
 fun fileAncestorPaths(path: String): List<String> = listOf("") + path.split('/').filter { it.isNotEmpty() }
     .runningFold("") { parent, name -> if (parent.isEmpty()) name else "$parent/$name" }.drop(1)

@@ -2,6 +2,7 @@ package ernest.airc
 
 import android.graphics.Bitmap
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -53,13 +54,57 @@ class FilePageLayoutUiTest {
             compose.onNodeWithTag("files-tools-dialog-close").performClick()
             compose.runOnIdle { page = "url" }
             compose.onNodeWithTag("url-download-name").performScrollTo().assertTextContains("电视应用.apk")
-            compose.onNodeWithText("120.5 KiB").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("120.6 KB").performScrollTo().assertIsDisplayed()
             capture("url", mode)
             compose.onNodeWithTag("url-download-name").performScrollTo().performTextReplacement("我的电视.apk")
             compose.onNodeWithTag("url-download-name").assertTextContains("我的电视.apk")
             compose.runOnIdle { download = download.copy(name = "电视应用.apk") }
         }
     }
+    @Test fun filePanelsUseReadableSizesAndKeepDeletionCountsInBothThemes() {
+        var dark by mutableStateOf(false)
+        var page by mutableStateOf("transfer")
+        val completed = 512L * 1024
+        val total = 2L * 1024 * 1024
+        val apk = TargetApkInfo("downloads", "fixture.apk", "fixture.app", 1,
+            sizeBytes = 32L * 1024 * 1024, sha256 = "a".repeat(64), signatures = emptyList(), signatureVerified = false)
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 1.5f)) {
+                RemoteTheme(darkTheme = dark) {
+                    Column(Modifier.width(320.dp).height(640.dp).testTag("file-layout").background(RemoteColors.Background)
+                        .verticalScroll(rememberScrollState()).padding(16.dp)) {
+                        when (page) {
+                            "transfer" -> FileTransferPanel(FileTransferState(running = true, phase = "uploading", bytes = completed, total = total),
+                                "downloads", "", true, {}, {}, {}, {}, tasksOnly = true)
+                            "apk" -> ApkInspectionPanel(ApkInspectionState(info = apk))
+                            "install" -> AppInstallationPanel(AppInstallationState(busy = true, phase = "preparing", bytes = completed, total = total),
+                                null, true, {}, {}, {}, tasksOnly = true)
+                            "batch" -> BatchTransferPanel(BatchTransferState(running = true, names = listOf("fixture.bin"), bytes = completed, total = total),
+                                true, {}, {}, {}, {})
+                            "media" -> FileMediaPanel(FileMediaState(busy = true, preparingCopy = true, bytes = completed, total = total,
+                                retainedCopies = listOf(MediaPublication("fixture", "downloads", "movie.mp4", 1536L * 1024 * 1024, "a".repeat(64)))),
+                                true, {}, {}, {}, tasksOnly = true)
+                            "delete" -> FileTransferPanel(FileTransferState(operation = "delete", phase = "deleting", unit = "items", bytes = 3, total = 10),
+                                "downloads", "", true, {}, {}, {}, {}, tasksOnly = true)
+                        }
+                    }
+                }
+            }
+        }
+        for (mode in listOf(false, true)) {
+            compose.runOnIdle { dark = mode }
+            for ((screen, text) in listOf("transfer" to "512 KB / 2 MB", "apk" to "32 MB",
+                "install" to "已处理 512 KB / 2 MB", "batch" to "512 KB / 2 MB",
+                "media" to "准备并校验播放副本：512 KB / 2 MB", "delete" to "3 / 10 项")) {
+                compose.runOnIdle { page = screen }
+                compose.onNodeWithText(text).performScrollTo().assertIsDisplayed()
+                compose.onAllNodes(hasText("字节", substring = true)).assertCountEquals(0)
+                if (screen == "media") compose.onNodeWithText("1.5 GB").performScrollTo().assertIsDisplayed()
+                capture("sizes-$screen", mode)
+            }
+        }
+    }
+
     private fun capture(name: String, dark: Boolean, tag: String = "file-layout") {
         val output = File(requireNotNull(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null)), "file-page-$name-${if (dark) "dark" else "light"}.png")
         output.outputStream().use { compose.onNodeWithTag(tag).captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }

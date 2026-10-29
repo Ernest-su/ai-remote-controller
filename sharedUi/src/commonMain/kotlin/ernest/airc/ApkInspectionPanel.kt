@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.dp
 fun ApkInspectionPanel(state: ApkInspectionState, onCancel: (() -> Unit)? = null) {
     if (state.busy) {
         LinearProgressIndicator(Modifier.fillMaxWidth()); Text("正在读取 APK 信息与摘要")
-        state.total?.let { Text("${state.bytes} / $it 字节", color = RemoteColors.Secondary) }
+        state.total?.let { Text(managementTransferProgress(state.bytes, it), color = RemoteColors.Secondary) }
         onCancel?.let { OutlinedButton(it, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("取消 APK 解析") } }
     }
     if (state.phase == "cancelled") Text("APK 解析已取消，原文件保留。", color = RemoteColors.Secondary)
@@ -21,7 +21,7 @@ fun ApkInspectionPanel(state: ApkInspectionState, onCancel: (() -> Unit)? = null
         InfoRow("目标文件", "${fileRootTitle(info.root)}/${info.path}")
         InfoRow("包名", info.packageName)
         InfoRow("版本", "${info.versionName ?: "未读取名称"} (${info.versionCode})")
-        InfoRow("大小", "${info.sizeBytes} 字节")
+        InfoRow("大小", managementFileSize(info.sizeBytes))
         InfoRow("SHA-256", info.sha256)
         info.split?.let { InfoRow("拆分包", it) }
         if (info.signatures.isEmpty()) Text("没有读取到已识别的签名记录。", color = RemoteColors.Secondary)

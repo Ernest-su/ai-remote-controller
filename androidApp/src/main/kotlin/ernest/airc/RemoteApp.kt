@@ -31,11 +31,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.lifecycle.repeatOnLifecycle
 
 @Composable
 internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.SYSTEM, onThemeChange: (ThemeMode) -> Unit = {}) {
     val state by model.state.collectAsState()
+    val textDocumentOpen by remember(model) { model.textFiles.state.map { it.open }.distinctUntilChanged() }.collectAsState(false)
+    var textBackRequest by rememberSaveable { mutableIntStateOf(0) }
     val gamepad by model.virtualGamepad.state.collectAsState()
     val gamepadEnabled = gamepadAvailable(state.connected, state.tools)
     val shared by model.incomingShare.collectAsState()
@@ -104,7 +108,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
         }
     }
     if (sharedDownload) ManagementDialog("下载到电视", "shared-download-dialog", { sharedDownload = false }) { DownloadPanel(state, model) }
-    fun back() { navigate(page.androidBackDestination(deviceOrigin)) }
+    fun back() { if (page == RemotePage.FILES && textDocumentOpen) textBackRequest++ else navigate(page.androidBackDestination(deviceOrigin)) }
     BackHandler(enabled = page != RemotePage.REMOTE) { back() }
 
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -143,7 +147,8 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
         onDispose { lifecycle.removeObserver(observer); haptics.setActive(false) }
     }
     CompositionLocalProvider(LocalRemoteHaptics provides if (state.keyHapticsEnabled) haptics else LocalRemoteHaptics.current) {
-    Column(Modifier.fillMaxSize().background(RemoteColors.Background).safeDrawingPadding()) {
+    Column(Modifier.fillMaxSize().background(RemoteColors.Background).safeDrawingPadding()
+        .then(if (page == RemotePage.FILES && textDocumentOpen) Modifier.imePadding() else Modifier)) {
         if (!mirrorFullscreen) Surface(color = RemoteColors.Header) {
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
@@ -154,7 +159,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                         if (page == RemotePage.REMOTE) "打开功能菜单" else "返回", Modifier.size(24.dp))
                 }
                 Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                    Text(page.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f, fill = false).padding(start = 4.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(if (page == RemotePage.FILES && textDocumentOpen) "文本查看与编辑" else page.title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f, fill = false).padding(start = 4.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (page == RemotePage.GAMEPAD) {
                         GamepadSessionButton(gamepad, gamepadEnabled,
                             { model.virtualGamepad.start(gamepadEnabled, allowSynthetic = true) }, { model.virtualGamepad.stop() })
@@ -180,7 +185,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            Box(Modifier.widthIn(max = if (mirrorFullscreen) androidx.compose.ui.unit.Dp.Infinity else if (page == RemotePage.GAMEPAD) RemoteDimensions.GamepadContentWidth else 560.dp).fillMaxWidth()) {
+            Box(Modifier.widthIn(max = if (mirrorFullscreen || page == RemotePage.FILES && textDocumentOpen) androidx.compose.ui.unit.Dp.Infinity else if (page == RemotePage.GAMEPAD) RemoteDimensions.GamepadContentWidth else 560.dp).fillMaxWidth()) {
                 pages.SaveableStateProvider(page.name) {
                     when (page) {
                         RemotePage.REMOTE_TYPES -> RemoteTypePicker(RemotePage.valueOf(selectedTypeName), ::navigate)
@@ -222,7 +227,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                             val scheduleState by model.schedules.state.collectAsState()
                             SchedulePanel(state.connected, scheduleState, state.apps, model::listApps, model.schedules::refresh, model.schedules::save, model.schedules::delete, model.schedules::enable, state.history.find { it.id == state.selected }?.visibleName ?: "当前被控设备")
                         }
-                        RemotePage.FILES -> FileBrowserScreen(state, model)
+                        RemotePage.FILES -> FileBrowserScreen(state, model, textBackRequest)
                     }
                 }
             }

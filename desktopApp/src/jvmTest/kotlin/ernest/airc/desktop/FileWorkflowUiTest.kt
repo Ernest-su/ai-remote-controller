@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.*
@@ -15,6 +16,27 @@ import org.junit.Test
 
 class FileWorkflowUiTest {
     @get:Rule val compose = createComposeRule()
+    @Test fun textEditorUsesAPageAndKeepsSaveAndDiscardExplicit() {
+        var document by mutableStateOf(FileTextState(open = true, path = "code.txt", sizeBytes = 11,
+            text = "const x = 1", draft = "const x = 1", writable = true))
+        var saves = 0
+        compose.setContent { RemoteTheme { Box(Modifier.width(390.dp).height(640.dp)) {
+            FileTextEditor(document, FileTransferState(), true, { document = document.copy(draft = it) },
+                { saves++ }, {}, {}, { document = FileTextState() }, {}, {})
+        } } }
+        compose.onAllNodes(isDialog()).assertCountEquals(0)
+        compose.onNodeWithTag("file-text-edit").performClick()
+        compose.onNodeWithTag("file-text-input").assertHeightIsAtLeast(320.dp).performTextReplacement("const x = 2")
+        assertEquals(0, saves)
+        compose.onNodeWithTag("file-text-save").performClick()
+        assertEquals(1, saves)
+        compose.onNodeWithTag("file-text-editor-close").performClick()
+        compose.onNodeWithText("继续编辑").performClick()
+        compose.onNodeWithTag("file-text-input").assertTextContains("const x = 2")
+        compose.onNodeWithTag("file-text-editor-close").performClick()
+        compose.onNodeWithText("放弃并关闭").performClick()
+        compose.onNodeWithTag("file-text-editor").assertDoesNotExist()
+    }
     @Test fun narrowPageHasNoDuplicateTitleAndOverflowOpensOnlyChosenOperation() {
         compose.setContent { RemoteTheme { Box(Modifier.width(320.dp).height(640.dp)) {
             FileBrowserPanel(FileBrowserState(loaded = true), true, {}, {}, {}, {}, {}, onCreateDirectory = {}, transfer = { section -> Text("当前操作:$section") })
@@ -46,7 +68,7 @@ class FileWorkflowUiTest {
         } } }
         compose.onNodeWithTag("url-download-name").assertTextContains("电视.apk").performTextReplacement("我的文件.apk")
         assertEquals("我的文件.apk", name)
-        compose.onNodeWithText("120.5 KiB").assertExists()
+        compose.onNodeWithText("120.6 KB").assertExists()
     }
     @Test fun downloadedFileOffersSaveWithoutUploadFields() {
         var saved = false

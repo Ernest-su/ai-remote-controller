@@ -4,6 +4,7 @@ import ernest.airc.*
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import kotlinx.coroutines.*
 import kotlinx.coroutines.swing.Swing
 import javax.swing.JFileChooser
@@ -14,7 +15,7 @@ import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 
 @Composable
-fun DesktopFileBrowser(state: DesktopState, controller: DesktopController) {
+fun DesktopFileBrowser(state: DesktopState, controller: DesktopController, textBackRequest: Int = 0) {
     val download by controller.urlDownloads.state.collectAsState()
     val downloadDirectory by controller.downloadDirectories.state.collectAsState()
     val storage by controller.storageAnalysis.state.collectAsState()
@@ -41,9 +42,16 @@ fun DesktopFileBrowser(state: DesktopState, controller: DesktopController) {
     val cache=remember { File(DesktopController.defaultStateDirectory().toFile(),"downloads") }
     val uploadLocked = transfer.running || transfer.proposal != null || transfer.readyToSave || batch.running || batch.paused || batch.readyToSave || batch.saving
     fun path(name: String)=listOf(files.path,name).filter{it.isNotEmpty()}.joinToString("/")
-    FileTextEditor(textFile, textTransfer, available, controller.textFiles::edit, { controller.textFiles.save(available) },
-        controller.textFiles::continueLoading, controller.textFiles::retry, controller.textFiles::closeDocument,
-        controller.textFiles.transfers::cancel, controller.textFiles.transfers::confirm)
+    val childPages = rememberSaveableStateHolder()
+    if (textFile.open) {
+        childPages.SaveableStateProvider("text:${textFile.root}/${textFile.path}") {
+            FileTextEditor(textFile, textTransfer, available, controller.textFiles::edit, { controller.textFiles.save(available) },
+                controller.textFiles::continueLoading, controller.textFiles::retry, controller.textFiles::closeDocument,
+                controller.textFiles.transfers::cancel, controller.textFiles.transfers::confirm, showHeader = false, backRequest = textBackRequest)
+        }
+        return
+    }
+    childPages.SaveableStateProvider("browser") {
     FileBrowserPanel(files, available, { controller.files.refresh(available) }, { controller.files.parent(available) },
         { controller.files.more(available) }, { controller.files.enter(it, available) }, { controller.files.inspect(it, available) },
         taskGroups=fileTaskGroups(batch, transfer, download, storage, apk, installation, media),
@@ -246,4 +254,5 @@ fun DesktopFileBrowser(state: DesktopState, controller: DesktopController) {
             if (section == "download") FileOperationFeedback(section,uploadMessage,batchMessage,downloadMessage)
             }
         })
+    }
 }

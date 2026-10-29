@@ -180,7 +180,7 @@ fun FileBrowserPanel(state: FileBrowserState, available: Boolean, onRefresh: () 
                 InfoRow("类型", if (file.symlink || file.kind == "symlink") "符号链接" else if (file.kind == "directory") "目录" else "文件")
                 file.linkTarget?.let { InfoRow("链接目标", it) }
                 file.linkError?.let { ManagementMessage(fileLinkError(it), error = true) }
-                file.sizeBytes?.let { InfoRow("大小", "${managementFileSize(it)}（$it 字节）") }
+                file.sizeBytes?.let { InfoRow("大小", managementFileSize(it)) }
             }
             state.error?.let { ManagementMessage(it, error = true) }
             if (selected == null && !state.loading) ActionButton("重新读取属性", enabled) { state.entries.firstOrNull { it.name == name }?.let(onInspect) }
@@ -427,14 +427,4 @@ private fun FileManagementRow(
             }
         }
     }
-}
-
-internal fun managementFileSize(bytes: Long): String {
-    if (bytes < 1024) return "$bytes B"
-    val units = listOf("KiB", "MiB", "GiB", "TiB")
-    var size = bytes.toDouble() / 1024
-    var unit = 0
-    while (size >= 1024 && unit < units.lastIndex) { size /= 1024; unit++ }
-    val tenths = (size * 10).toLong()
-    return "${tenths / 10}.${tenths % 10} ${units[unit]}"
 }

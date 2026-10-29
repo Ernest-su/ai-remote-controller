@@ -17,6 +17,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 class DesktopNavigation {
     var page by mutableStateOf(RemotePage.REMOTE)
@@ -35,6 +37,8 @@ private val features = listOf(
 fun DesktopApp(controller: DesktopController, navigation: DesktopNavigation = remember { DesktopNavigation() },
     themeMode: ThemeMode = ThemeMode.SYSTEM, onThemeChange: (ThemeMode) -> Unit = {}) {
     val state by controller.state.collectAsState()
+    val textDocumentOpen by remember(controller) { controller.textFiles.state.map { it.open }.distinctUntilChanged() }.collectAsState(false)
+    var textBackRequest by rememberSaveable { mutableIntStateOf(0) }
     val gamepad by controller.virtualGamepad.state.collectAsState()
     val gamepadEnabled = gamepadAvailable(state.connected, state.tools)
     var appDetailsPackage by rememberSaveable { mutableStateOf("") }
@@ -62,16 +66,16 @@ fun DesktopApp(controller: DesktopController, navigation: DesktopNavigation = re
     }
     RemoteTheme(darkTheme = themeMode.isDark(isSystemInDarkTheme())) {
         Box(Modifier.fillMaxSize().background(RemoteColors.Background), contentAlignment = Alignment.TopCenter) {
-            Column(Modifier.widthIn(max = 390.dp).fillMaxWidth().fillMaxHeight().testTag("desktop-app")) {
+            Column(Modifier.widthIn(max = if (navigation.page == RemotePage.FILES && textDocumentOpen) androidx.compose.ui.unit.Dp.Infinity else 390.dp).fillMaxWidth().fillMaxHeight().testTag("desktop-app")) {
                 Surface(color = RemoteColors.Header) {
                     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        IconButton({ if (navigation.page == RemotePage.REMOTE) navigation.navigate(RemotePage.MENU) else navigation.back() },
+                        IconButton({ if (navigation.page == RemotePage.REMOTE) navigation.navigate(RemotePage.MENU) else if (navigation.page == RemotePage.FILES && textDocumentOpen) textBackRequest++ else navigation.back() },
                             modifier = Modifier.size(48.dp).testTag(if (navigation.page == RemotePage.REMOTE) "open-menu" else "navigate-back")) {
                             Icon(painterResource("drawable/${if (navigation.page == RemotePage.REMOTE) "ic_menu" else "ic_back"}.xml"),
                                 if (navigation.page == RemotePage.REMOTE) "打开功能菜单" else "返回", Modifier.size(24.dp))
                         }
                         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                            Text(navigation.page.title, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleLarge, maxLines = 1)
+                            Text(if (navigation.page == RemotePage.FILES && textDocumentOpen) "文本查看与编辑" else navigation.page.title, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleLarge, maxLines = 1)
                             if (navigation.page == RemotePage.GAMEPAD) {
                                 GamepadSessionButton(gamepad, gamepadEnabled,
                                     { controller.virtualGamepad.start(gamepadEnabled, allowSynthetic = true) }, { controller.virtualGamepad.stop() })
@@ -115,7 +119,7 @@ fun DesktopApp(controller: DesktopController, navigation: DesktopNavigation = re
                                 val scheduleState by controller.schedules.state.collectAsState()
                                 SchedulePanel(state.connected, scheduleState, state.apps, controller::listApps, controller.schedules::refresh, controller.schedules::save, controller.schedules::delete, controller.schedules::enable, state.name)
                             }
-                            RemotePage.FILES -> DesktopFileBrowser(state, controller)
+                            RemotePage.FILES -> DesktopFileBrowser(state, controller, textBackRequest)
                         }
                     }
                     if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))

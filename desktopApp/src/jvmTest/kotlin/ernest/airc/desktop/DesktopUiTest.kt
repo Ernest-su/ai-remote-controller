@@ -110,7 +110,7 @@ class DesktopUiTest {
 
     @Test fun apkReplacementConfirmationShowsVersionAndCrossUserImpactAndAllowsRejection() {
         var accepted: Boolean? = null
-        val apk = TargetApkInfo("inbox", "fixture.apk", "com.test.app", 2, "new", sizeBytes = 10, sha256 = "a".repeat(64), signatures = emptyList(), signatureVerified = false)
+        val apk = TargetApkInfo("inbox", "fixture.apk", "com.test.app", 2, "new", sizeBytes = 32L * 1024 * 1024, sha256 = "a".repeat(64), signatures = emptyList(), signatureVerified = false)
         val old = TargetAppInfo("com.test.app", 0, 10123, 1, "old", "/data/app/old", "fixture-time", false)
         val proposal = AppInstallProposal("fixture", "app_install", apk, old, 0, true, true, true)
         compose.setContent { RemoteTheme { AppInstallationPanel(AppInstallationState(busy = true, proposal = proposal, phase = "awaiting_approval"), null, true, {}, { accepted = it }, {}) } }
@@ -165,7 +165,7 @@ class DesktopUiTest {
     @Test fun apkInspectionShowsByteProgressAndOffersCancellation() {
         var cancelled = false
         compose.setContent { RemoteTheme { Column { ApkInspectionPanel(ApkInspectionState(busy = true, phase = "inspecting", bytes = 5, total = 10), { cancelled = true }) } } }
-        compose.onNodeWithText("5 / 10 字节").assertExists()
+        compose.onNodeWithText("5 B / 10 B").assertExists()
         compose.onNodeWithText("取消 APK 解析").performClick()
         assertTrue(cancelled)
     }
@@ -244,7 +244,7 @@ class DesktopUiTest {
             FileTransferState(sourceName="large.bin",running=true,phase="uploading",bytes=17000000,total=34000000,root="inbox",path="large.bin"),
             "inbox","",true,{}, {}, {cancelled=true}, {}) } } }
         compose.onNodeWithText("正在推送").assertExists()
-        compose.onNodeWithText("17000000 / 34000000 字节").assertExists()
+        compose.onNodeWithText("16.2 MB / 32.4 MB").assertExists()
         compose.onNodeWithText("选择本地文件").assertIsNotEnabled()
         compose.onNodeWithText("取消上传").performClick()
         assertTrue(cancelled)

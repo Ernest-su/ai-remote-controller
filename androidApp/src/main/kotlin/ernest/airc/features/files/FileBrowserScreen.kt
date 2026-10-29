@@ -8,11 +8,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.*
 
 @Composable
-internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
+internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel, textBackRequest: Int = 0) {
     val download by model.urlDownloads.state.collectAsState()
     val storage by model.storageAnalysis.state.collectAsState()
     val files by model.files.state.collectAsState()
@@ -97,9 +98,16 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
             }
         }
     }
-    FileTextEditor(textFile, textTransfer, available, model.textFiles::edit, { model.textFiles.save(available) },
-        model.textFiles::continueLoading, model.textFiles::retry, model.textFiles::closeDocument,
-        model.textFiles.transfers::cancel, model.textFiles.transfers::confirm)
+    val childPages = rememberSaveableStateHolder()
+    if (textFile.open) {
+        childPages.SaveableStateProvider("text:${textFile.root}/${textFile.path}") {
+            FileTextEditor(textFile, textTransfer, available, model.textFiles::edit, { model.textFiles.save(available) },
+                model.textFiles::continueLoading, model.textFiles::retry, model.textFiles::closeDocument,
+                model.textFiles.transfers::cancel, model.textFiles.transfers::confirm, showHeader = false, backRequest = textBackRequest)
+        }
+        return
+    }
+    childPages.SaveableStateProvider("browser") {
     FileBrowserPanel(files, available, { model.files.refresh(available) }, { model.files.parent(available) },
         { model.files.more(available) }, { model.files.enter(it, available) }, { model.files.inspect(it, available) },
         selectionBackHandler={ active, cancel -> androidx.activity.compose.BackHandler(active, onBack = cancel) },
@@ -224,4 +232,5 @@ internal fun FileBrowserScreen(state: RemoteUiState, model: RemoteViewModel) {
             if (section == "download") FileOperationFeedback(section,uploadMessage,batchMessage,downloadMessage)
             }
         })
+    }
 }

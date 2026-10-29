@@ -7,6 +7,7 @@ kotlin {
     androidLibrary { namespace = "ernest.airc.ui"; compileSdk = 36; minSdk = 26 }
     jvm()
     jvmToolchain(17)
+    sourceSets.androidMain.dependencies { implementation("androidx.activity:activity-compose:1.10.1") }
     sourceSets.commonMain.dependencies {
         implementation(project(":shared"))
         implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")

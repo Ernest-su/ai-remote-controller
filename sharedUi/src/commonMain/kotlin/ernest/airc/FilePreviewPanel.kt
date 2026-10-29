@@ -50,7 +50,7 @@ fun FileImagePreview(bitmap: ImageBitmap) {
 
 @Composable
 fun FileTextPreview(text: String, encoding: String, truncated: Boolean) {
-    Text("$encoding${if(truncated) " · 仅显示前 256 KiB，完整内容请下载查看" else ""}", style=MaterialTheme.typography.bodySmall, color=RemoteColors.Secondary)
+    Text("$encoding${if(truncated) " · 仅显示前 256 KB，完整内容请下载查看" else ""}", style=MaterialTheme.typography.bodySmall, color=RemoteColors.Secondary)
     SelectionContainer {
         Text(text.ifEmpty { "（空文件）" }, Modifier.fillMaxWidth().heightIn(max=RemoteDimensions.FilePreviewHeight).verticalScroll(rememberScrollState()).testTag("file-text-preview"), style=MaterialTheme.typography.bodyMedium)
     }

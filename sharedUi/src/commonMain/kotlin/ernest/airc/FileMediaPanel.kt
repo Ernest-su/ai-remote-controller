@@ -13,13 +13,13 @@ import androidx.compose.ui.unit.dp
 fun FileMediaPanel(state: FileMediaState, available: Boolean, onChoose:(String)->Unit, onOpen:()->Unit, onRelease:()->Unit, onMode:((Boolean)->Unit)?=null,onCancel:()->Unit={},onRecover:(()->Unit)?=null,onReleaseCopy:(String)->Unit={},tasksOnly:Boolean=false) {
     if(onRecover==null && state.players==null && !state.busy && state.error==null && state.message==null)return
     var confirmCopy by remember(state.players?.root, state.players?.path, state.selectedPackage, state.localCopy) {mutableStateOf(false)}
-    if(confirmCopy) AlertDialog(onDismissRequest={confirmCopy=false},title={Text("创建本地播放副本")},text={Column(Modifier.verticalScroll(rememberScrollState())) { Text("将在目标 Downloads 的独立目录创建可供其他应用读取的副本，占用 ${state.players?.sizeBytes?.let{"$it 字节"} ?: "额外空间"}。原文件保留；完成复制与摘要校验后打开播放器。可取消准备，或播放后释放副本。") }},confirmButton={TextButton({confirmCopy=false;onOpen()}, enabled=available&&!state.busy&&state.selectedPackage!=null, modifier=Modifier.heightIn(min=48.dp)){Text("创建并打开")}},dismissButton={TextButton({confirmCopy=false}, modifier=Modifier.heightIn(min=48.dp)){Text("取消")}})
+    if(confirmCopy) AlertDialog(onDismissRequest={confirmCopy=false},title={Text("创建本地播放副本")},text={Column(Modifier.verticalScroll(rememberScrollState())) { Text("将在目标 Downloads 的独立目录创建可供其他应用读取的副本，占用 ${state.players?.sizeBytes?.let(::managementFileSize) ?: "额外空间"}。原文件保留；完成复制与摘要校验后打开播放器。可取消准备，或播放后释放副本。") }},confirmButton={TextButton({confirmCopy=false;onOpen()}, enabled=available&&!state.busy&&state.selectedPackage!=null, modifier=Modifier.heightIn(min=48.dp)){Text("创建并打开")}},dismissButton={TextButton({confirmCopy=false}, modifier=Modifier.heightIn(min=48.dp)){Text("取消")}})
     HorizontalDivider(color=RemoteColors.Divider)
     Text("目标媒体播放器",style=MaterialTheme.typography.titleMedium)
     if (!tasksOnly) onRecover?.let {query -> OutlinedButton(query,enabled=available&&!state.busy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp), shape = MaterialTheme.shapes.small){Text("查看保留的播放副本")} }
     state.retainedCopies.forEach {copy ->
         Text("Downloads/${copy.path}")
-        Text("${copy.sizeBytes} 字节",color=RemoteColors.Secondary)
+        Text(managementFileSize(copy.sizeBytes),color=RemoteColors.Secondary)
         OutlinedButton({onReleaseCopy(copy.id)},enabled=available&&!state.busy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp), shape = MaterialTheme.shapes.small){Text("释放此副本")}
     }
     if (!tasksOnly) state.players?.let { players ->
@@ -37,7 +37,7 @@ fun FileMediaPanel(state: FileMediaState, available: Boolean, onChoose:(String)-
         ActionButton(if(state.localCopy) "创建副本并用目标播放器打开" else "用目标播放器打开",available&&!state.busy&&state.selectedPackage!=null) {if(state.localCopy)confirmCopy=true else onOpen()}
     }
     if(state.busy)LinearProgressIndicator(Modifier.fillMaxWidth())
-    if(state.preparingCopy) {Text("准备并校验播放副本：${state.bytes}${state.total?.let{" / $it"}.orEmpty()} 字节");TextButton(onCancel,modifier=Modifier.heightIn(min=48.dp)){Text("取消副本准备")}}
+    if(state.preparingCopy) {Text("准备并校验播放副本：${managementTransferProgress(state.bytes, state.total)}");TextButton(onCancel,modifier=Modifier.heightIn(min=48.dp)){Text("取消副本准备")}}
     state.message?.let {Text(it,color=RemoteColors.Secondary)}
     state.error?.let {Text(it,color=RemoteColors.Warning)}
     if(state.resourceId!=null || state.publicationId!=null) OutlinedButton(onRelease,enabled=available&&!state.busy,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp), shape = MaterialTheme.shapes.small){Text("释放播放资源")}

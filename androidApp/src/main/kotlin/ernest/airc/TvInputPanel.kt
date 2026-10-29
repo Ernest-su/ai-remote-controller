@@ -131,7 +131,7 @@ internal fun TvInputContent(input: TvInputState, targetName: String, connected: 
             modifier = Modifier.fillMaxWidth().focusRequester(editorFocus).testTag("tv-input-draft"), minLines = 3, maxLines = 5,
             isError = input.draft.toByteArray().size > 65536,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, autoCorrectEnabled = false))
-        if (input.draft.toByteArray().size > 65536) Text("文字过长，请缩短后发送（最多 65536 UTF-8 字节）。",
+        if (input.draft.toByteArray().size > 65536) Text("文字过长，请缩短后发送（最多 64 KB UTF-8）。",
             style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Warning)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TvInputTextAction("粘贴手机剪贴板", R.drawable.ic_clipboard, !input.busy, pastePhone)

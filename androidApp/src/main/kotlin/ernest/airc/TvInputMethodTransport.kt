@@ -14,7 +14,7 @@ data class TvImeStatus(val installed: Boolean = false, val aligned: Boolean = fa
 /** No raw user text is interpolated into shell code or retained in files. */
 internal fun imeCommitCommand(user: Int, text: String): String {
     val bytes = text.toByteArray(Charsets.UTF_8)
-    require(text.isNotBlank() && bytes.size <= 65536) { "请输入不超过 65536 UTF-8 字节的文字" }
+    require(text.isNotBlank() && bytes.size <= 65536) { "请输入不超过 64 KB UTF-8的文字" }
     return "content call --user $user --uri content://ernest.airc.ime.control --method commit --extra text:s:${Base64.getEncoder().encodeToString(bytes)}"
 }
 

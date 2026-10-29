@@ -97,7 +97,7 @@ fun DesktopDeviceInfo(state: DesktopState, controller: DesktopController) = Page
             InfoRow("SDK", info.sdk?.toString() ?: "未知")
             InfoRow("ABI", info.abis?.joinToString() ?: "未知")
             InfoRow("有效屏幕尺寸", info.screen?.let { "${it.width} × ${it.height} px" } ?: "未知")
-            InfoRow("可用存储", info.storage?.let { "${it.availableBytes / (1024 * 1024)} MiB" } ?: "未知")
+            InfoRow("可用存储", info.storage?.let { managementFileSize(it.availableBytes) } ?: "未知")
         }
     }
     OperationDetails(state.output)

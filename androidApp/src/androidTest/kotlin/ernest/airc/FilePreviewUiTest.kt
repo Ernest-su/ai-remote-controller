@@ -46,7 +46,7 @@ class FilePreviewUiTest {
                 if(show) AndroidFilePreview(TargetFileEntry(f.name,"file",bytes.size.toLong()),f.client,"inbox",f.name)
             }}}
             compose.waitUntil(15000) {compose.onAllNodesWithTag("file-text-preview").fetchSemanticsNodes().isNotEmpty()}
-            compose.onNodeWithText("UTF-8 · 仅显示前 256 KiB，完整内容请下载查看").assertExists()
+            compose.onNodeWithText("UTF-8 · 仅显示前 256 KB，完整内容请下载查看").assertExists()
             assertEquals("bytes=0-262143",f.lastRange)
             compose.onNodeWithText("关闭测试预览").performClick()
             compose.waitUntil(5000) {f.released.get()==1}

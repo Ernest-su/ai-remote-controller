@@ -17,7 +17,7 @@ internal fun incomingShare(intent: Intent, id: Long): IncomingShare? {
     val stream = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
     if (stream != null) return if (stream.scheme == "content") IncomingShare(id, uri = stream) else IncomingShare(id, error = "请选择可读取的内容文件。")
     val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
-    if (text != null && text.toByteArray(Charsets.UTF_8).size > 65536) return IncomingShare(id, error = "分享文字超过 64 KiB，请缩短后重试。")
+    if (text != null && text.toByteArray(Charsets.UTF_8).size > 65536) return IncomingShare(id, error = "分享文字超过 64 KB，请缩短后重试。")
     return if (text.isNullOrBlank()) IncomingShare(id, error = "未收到可用的文字或文件。") else IncomingShare(id, text = text)
 }
 

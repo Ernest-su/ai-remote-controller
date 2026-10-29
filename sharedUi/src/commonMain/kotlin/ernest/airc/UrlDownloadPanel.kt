@@ -64,7 +64,7 @@ fun UrlDownloadPanel(
         if(total != null && total > 0) {
             val progress = (state.bytes.toDouble() / total).toFloat().coerceIn(0f, 1f)
             LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
-            Text("${(progress * 100).toInt()}% · ${managementFileSize(state.bytes)} / ${managementFileSize(total)}")
+            Text("${(progress * 100).toInt()}% · ${managementTransferProgress(state.bytes, total)}")
         } else {
             if(state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             Text("已下载 ${managementFileSize(state.bytes)}" + if(state.busy && total == null) " · 总大小未知" else "")

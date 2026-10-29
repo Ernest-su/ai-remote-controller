@@ -15,7 +15,7 @@ fun validateApkSet(apks: List<TargetApkInfo>) {
     require(apks.all { it.packageName == first.packageName && it.versionCode == first.versionCode }) { "APK 包名或版本不一致" }
     require(apks.count { it.split.isNullOrEmpty() } == 1) { "必须包含一个且仅一个 base APK" }
     require(apks.map { it.split.orEmpty() }.distinct().size == apks.size) { "split 名称重复" }
-    require(apks.all { it.sizeBytes in 1..4L*1024*1024*1024 && it.sha256.matches(Regex("[a-f0-9]{64}")) } && apks.sumOf { it.sizeBytes } <= 4L*1024*1024*1024) { "APK 大小或摘要无效（整组上限 4 GiB）" }
+    require(apks.all { it.sizeBytes in 1..4L*1024*1024*1024 && it.sha256.matches(Regex("[a-f0-9]{64}")) } && apks.sumOf { it.sizeBytes } <= 4L*1024*1024*1024) { "APK 大小或摘要无效（整组上限 4 GB）" }
     val known = apks.map { apk -> apk.signatures.flatMap { it.certificateSha256 }.toSet() }.filter { it.isNotEmpty() }
     require(known.distinct().size <= 1) { "APK 声明签名证书不一致" }
 }

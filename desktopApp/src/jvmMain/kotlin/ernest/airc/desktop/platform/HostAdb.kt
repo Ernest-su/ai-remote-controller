@@ -32,7 +32,7 @@ internal suspend fun runHostCommand(arguments: List<String>, timeoutSeconds: Lon
             while (true) {
                 val count = input.read(block)
                 if (count < 0) break
-                check(buffer.size() + count <= 1024 * 1024) { "宿主命令输出超过 1 MiB" }
+                check(buffer.size() + count <= 1024 * 1024) { "宿主命令输出超过 1 MB" }
                 buffer.write(block, 0, count)
             }
             buffer.toString(Charsets.UTF_8)

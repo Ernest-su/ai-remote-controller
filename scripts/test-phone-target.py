@@ -13,7 +13,7 @@ from instrumentation_result import require_passed
 
 ROOT = Path(__file__).resolve().parent.parent
 SUITES = {
-    "file-editing-ui": ("ernest.airc.FileEditingUiTest,ernest.airc.FileTaskTabsUiTest", 5),
+    "file-editing-ui": ("ernest.airc.FileEditingUiTest,ernest.airc.FileTaskTabsUiTest", 6),
     "apk-file-selection-ui": ("ernest.airc.ApkFileSelectionUiTest", 2),
     "project-information-ui": ("ernest.airc.ProjectInformationUiTest", 2),
     "storage-task-tabs-ui": ("ernest.airc.StorageFriendlyUiTest,ernest.airc.FileTaskTabsUiTest", 4),
@@ -29,7 +29,7 @@ SUITES = {
     "screen-power-ui": ("ernest.airc.ScreenPowerUiTest", 1),
     "remote-volume-ui": ("ernest.airc.RemoteVolumeUiTest", 1),
     "remote-menu-ui": ("ernest.airc.RemoteQuickMenuUiTest,ernest.airc.RemoteLayoutUiTest", 5),
-    "file-page-ui": ("ernest.airc.FilePageLayoutUiTest,ernest.airc.FileLinkUiTest,ernest.airc.FileTaskNoticeUiTest", 3),
+    "file-page-ui": ("ernest.airc.FilePageLayoutUiTest,ernest.airc.FileLinkUiTest,ernest.airc.FileTaskNoticeUiTest", 4),
     "library-layout-ui": ("ernest.airc.LibraryLayoutUiTest", 1),
     "mobile-convenience-ui": ("ernest.airc.MobileConvenienceUiTest", 4),
     "remote-haptics-input-ui": ("ernest.airc.RemoteHapticsInputUiTest", 7),

@@ -21,7 +21,7 @@ fun AppInstallationPanel(state: AppInstallationState, apk: TargetApkInfo?, avail
         SectionTitle("多包安装（${state.selectedApks.size}/32）", "逐个解析并加入 base 与所需 split APK，再统一确认安装。")
         state.selectedApks.forEach { entry ->
             InfoRow(entry.split?.takeIf { it.isNotEmpty() } ?: "base APK", entry.path)
-            Text("${entry.sizeBytes} 字节 · ${entry.sha256}", color=RemoteColors.Secondary)
+            Text("${managementFileSize(entry.sizeBytes)} · ${entry.sha256}", color=RemoteColors.Secondary)
             onRemove?.let { remove -> OutlinedButton({remove(entry)}, enabled=!state.busy, modifier=Modifier.fillMaxWidth().heightIn(min=48.dp), shape = MaterialTheme.shapes.small) { Text("移除此 APK") } }
         }
         val validationError = runCatching { validateApkSet(state.selectedApks) }.exceptionOrNull()?.message
@@ -39,7 +39,7 @@ fun AppInstallationPanel(state: AppInstallationState, apk: TargetApkInfo?, avail
                 InfoRow("Android 用户", proposal.userId.toString())
                 proposal.apks.ifEmpty { listOf(proposal.apk) }.forEach { entry ->
                     InfoRow(entry.split?.takeIf { it.isNotEmpty() } ?: "base APK",entry.path)
-                    InfoRow("文件大小", "${entry.sizeBytes} 字节")
+                    InfoRow("文件大小", managementFileSize(entry.sizeBytes))
                     InfoRow("文件 SHA-256", entry.sha256)
                 }
                 Text("全部 APK 通过同一个 Android 安装会话提交；缺少依赖或签名不一致时由包管理器拒绝。")
@@ -53,7 +53,7 @@ fun AppInstallationPanel(state: AppInstallationState, apk: TargetApkInfo?, avail
     if (state.busy) {
         LinearProgressIndicator(Modifier.fillMaxWidth())
         Text(if (state.phase == "verifying") "正在确认被控设备安装结果，不能取消" else if (state.phase == "committing") "正在提交安装，不能取消" else if (state.phase == "awaiting_approval") "等待安装确认" else "正在准备 APK 安装")
-        state.total?.takeIf { state.phase == "preparing" }?.let { Text("已处理 ${state.bytes} / $it 字节", color = RemoteColors.Secondary) }
+        state.total?.takeIf { state.phase == "preparing" }?.let { Text("已处理 ${managementTransferProgress(state.bytes, it)}", color = RemoteColors.Secondary) }
         if (state.phase == "preparing") OutlinedButton(onCancel, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = MaterialTheme.shapes.small) { Text("取消安装准备") }
     }
     state.message?.let { Text(it, color = RemoteColors.Secondary) }
