@@ -23,6 +23,7 @@ data class DesktopState(
     val modelConfigured: Boolean = false,
     val apps: List<InstalledApp> = emptyList(),
     val appsLoading: Boolean = false,
+    val appsSizing: Boolean = false,
     val appsError: String? = null,
     val deviceInfo: DeviceInfo? = null,
     val feedback: RemoteFeedback = RemoteFeedback(),

@@ -352,6 +352,27 @@ pub(crate) fn start_background(
     size: u64,
     operation: impl FnOnce(&AtomicBool, &AtomicU64) -> Result<Value> + Send + 'static,
 ) -> Result<Value> {
+    start_background_reporting(root, name, direction, size, move |cancel, count, _| {
+        operation(cancel, count)
+    })
+}
+
+pub(crate) struct BackgroundReporter(Arc<Transfer>);
+impl BackgroundReporter {
+    pub(crate) fn update<T>(&self, update: impl FnOnce(&mut Option<Value>) -> T) -> T {
+        update(&mut self.0.result.lock().unwrap())
+    }
+}
+
+pub(crate) fn start_background_reporting(
+    root: String,
+    name: String,
+    direction: &str,
+    size: u64,
+    operation: impl FnOnce(&AtomicBool, &AtomicU64, &BackgroundReporter) -> Result<Value>
+        + Send
+        + 'static,
+) -> Result<Value> {
     let mut registry = tasks().lock().unwrap();
     reserve(&mut registry)?;
     let task = Arc::new(Transfer {
@@ -366,7 +387,7 @@ pub(crate) fn start_background(
         phase: Mutex::new(
             if direction == "delete" {
                 "deleting"
-            } else if direction == "storage_scan" {
+            } else if direction == "storage_scan" || direction == "app_sizes" {
                 "scanning"
             } else if direction == "apk_prepare" {
                 "preparing"
@@ -394,7 +415,8 @@ pub(crate) fn start_background(
     registry.insert(task.id.clone(), task.clone());
     drop(registry);
     tokio::task::spawn_blocking(move || {
-        match operation(&task.cancelled, &task.bytes) {
+        let reporter = BackgroundReporter(task.clone());
+        match operation(&task.cancelled, &task.bytes, &reporter) {
             Ok(result) => {
                 if matches!(
                     task.direction.as_str(),

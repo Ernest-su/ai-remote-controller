@@ -57,7 +57,7 @@ class DesktopController(
     init {
         scope.launch {
             runtime.session.collectLatest { session ->
-                if (session == null) { schedules.clear(); appIcons.clear(); screenshots.clear(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll(); mutable.update { it.copy(connected = false, apps = emptyList(), appsLoading = false, appsError = null, deviceInfo = null, tools = emptyList(), media = "未连接设备") } }
+                if (session == null) { schedules.clear(); appIcons.clear(); screenshots.clear(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll(); mutable.update { it.copy(connected = false, apps = emptyList(), appsLoading = false, appsSizing = false, appsError = null, deviceInfo = null, tools = emptyList(), media = "未连接设备") } }
                 else while (true) {
                     if (runtime.session.value != session) return@collectLatest
                     val send = runCatching { runtime.toolWriter() }.getOrNull() ?: return@collectLatest
@@ -108,7 +108,7 @@ class DesktopController(
         generation++; feedbackGeneration++
         schedules.clear(); appIcons.clear(); screenshots.clear(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll()
         runtime.disconnect()
-        mutable.update { it.copy(connected = false, apps = emptyList(), appsLoading = false, appsError = null, deviceInfo = null, status = "正在连接服务…", touchBusy = false) }
+        mutable.update { it.copy(connected = false, apps = emptyList(), appsLoading = false, appsSizing = false, appsError = null, deviceInfo = null, status = "正在连接服务…", touchBusy = false) }
         val release = bundledRelease()
         val status = try { runtime.connect(host, port, release) }
         catch (e: RuntimeAlignmentRequired) {
@@ -172,18 +172,32 @@ class DesktopController(
         }
     }
     fun key(value: String) = execute("remote.key", buildJsonObject { put("key", value) })
-    fun listApps() {
-        if (!state.value.connected || state.value.appsLoading) return
-        val send = runCatching { runtime.toolWriter() }.getOrNull() ?: return
-        val session = generation
-        mutable.update { it.copy(appsLoading = true, appsError = null) }
-        scope.launch {
+    fun listApps() = listAppsInternal(false)
+    fun listAppSizes() = listAppsInternal(true)
+    private var appListJob: Job?=null
+    private var appListGeneration=0L
+    private fun listAppsInternal(includeSizes: Boolean) {
+        if(!state.value.connected || state.value.appsLoading || (includeSizes && state.value.appsSizing))return
+        val send=runCatching { runtime.toolWriter() }.getOrNull() ?: return
+        appListJob?.cancel()
+        val token=++appListGeneration
+        val session=generation
+        fun current()=token==appListGeneration && session==generation && state.value.connected
+        mutable.update { it.copy(appsLoading=true,appsSizing=false,appsError=null) }
+        appListJob=scope.launch {
             try {
-                val apps = decodeInstalledApps(send("apps.list", buildJsonObject {}))
-                if (session == generation) { appIcons.updateApps(apps); mutable.update { it.copy(apps = apps) } }
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (session == generation) mutable.update { it.copy(appsError = e.message ?: "无法查询应用列表") } }
-            finally { if (session == generation) mutable.update { it.copy(appsLoading = false) } }
+                val output=send("apps.list",buildJsonObject { if(includeSizes)put("includeSizes",true) })
+                val apps=decodeInstalledApps(output)
+                if(current()) { appIcons.updateApps(apps); mutable.update { it.copy(apps=apps,appsLoading=false,appsSizing=includeSizes) } }
+                if(includeSizes) {
+                    val measured=awaitAppSizes(output,send) { partial ->
+                        if(current())mutable.update { it.copy(apps=mergeAppSizes(it.apps,partial,complete=false)) }
+                    }
+                    if(measured!=null && current())mutable.update { it.copy(apps=mergeAppSizes(it.apps,measured)) }
+                }
+            } catch(e:CancellationException) { throw e }
+            catch(e:Exception) { if(current())mutable.update { it.copy(appsError=e.message ?: "无法查询应用列表") } }
+            finally { if(current())mutable.update { it.copy(appsLoading=false,appsSizing=false) } }
         }
     }
     fun openApp(packageName: String) = execute("apps.open", buildJsonObject { put("package", packageName.trim()) })

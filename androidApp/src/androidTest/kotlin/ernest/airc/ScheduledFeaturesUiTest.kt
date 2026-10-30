@@ -168,6 +168,34 @@ class ScheduledFeaturesUiTest {
         } finally {scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()}
     }
 
+    @Test fun pollingKeepsRowsStillAndRunOnceRequiresBoundConfirmation() {
+        var state by mutableStateOf(ScheduleState(sessionKey="fixture", data=ScheduleList(
+            listOf(ScheduledAction("one", "set_volume", kind="delay", nextAt=1, enabled=false, volumePercent=37)),
+            1, "2032-02-29 20:30", 0)))
+        var quietRefreshes = 0
+        var runs = 0
+        var connected by mutableStateOf(true)
+        compose.setContent { RemoteTheme { SchedulePanel(connected, state, emptyList(), {}, {},
+            {_,_,_,_,_,_->}, {_,_->}, {_,_,_->}, targetName="测试电视",
+            runOnce={id, session -> assertEquals("one", id); assertEquals("fixture", session); runs++},
+            refreshQuietly={quietRefreshes++}) } }
+        compose.onNodeWithTag("schedule-run-one").performScrollTo().assertIsEnabled()
+        val before = compose.onNodeWithTag("schedule-run-one").fetchSemanticsNode().boundsInRoot
+        compose.mainClock.advanceTimeBy(10_100)
+        compose.runOnIdle { assertEquals(1, quietRefreshes); state=state.copy(data=state.data!!.copy(targetNow=11)) }
+        assertEquals(before, compose.onNodeWithTag("schedule-run-one").fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithTag("schedule-run-one").performClick()
+        compose.onNodeWithText("立即在 测试电视 执行一次：媒体音量调至 37%。原定时计划保持不变。").assertExists()
+        compose.runOnIdle { assertEquals(0, runs) }
+        compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithTag("schedule-run-one").performClick()
+        compose.onNodeWithText("确认").performClick()
+        compose.runOnIdle { assertEquals(1, runs); state=state.copy(data=state.data!!.copy(tasks=state.data!!.tasks.map { it.copy(lastStatus="running") })) }
+        compose.onNodeWithTag("schedule-run-one").assertIsNotEnabled()
+        compose.runOnIdle { connected=false; state=state.copy(data=state.data!!.copy(tasks=state.data!!.tasks.map { it.copy(lastStatus="submitted") })) }
+        compose.onNodeWithTag("schedule-run-one").assertIsNotEnabled()
+    }
+
     private fun captureSchedule(name: String, tag: String) {
         val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
         java.io.File(instrumentation.targetContext.getExternalFilesDir(null), "schedule-$name.png").outputStream().use {

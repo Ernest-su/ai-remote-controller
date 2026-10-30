@@ -9,29 +9,23 @@ static CACHE: OnceLock<Mutex<HashMap<String, CacheProposal>>> = OnceLock::new();
 fn store() -> &'static Mutex<HashMap<String, CacheProposal>> {
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
-const HELP_COMMAND: &str = r#"pm help; airc_help_status=$?; case "$airc_help_status" in 0|255) exit 0 ;; *) exit "$airc_help_status" ;; esac"#;
-fn declares_cache_only(help: &str) -> bool {
-    help.lines()
-        .any(|line| line.trim() == "clear [--user USER_ID] [--cache-only] PACKAGE")
-        && help
-            .lines()
-            .any(|line| line.trim().starts_with("--cache-only:"))
+fn supported(probe: &Value, uid: u32) -> bool {
+    (uid == 0 || uid == 2000)
+        && probe["uid"].as_u64() == Some(uid as u64)
+        && probe["cacheDeleteGranted"] == true
+        && probe["cacheOnlyApiAvailable"] == true
 }
 pub(super) async fn capabilities() -> Result<Value> {
     let uid = unsafe { libc::geteuid() };
-    // Android ShellCommand help convention may return -1 (shell status 255).
-    // Accept it only for this fixed read-only invocation, never for clear.
-    let help = crate::tools::run_command("sh", &["-c".into(), HELP_COMMAND.into()]).await?;
-    let permission =
-        match crate::platform_bridge::cache_permission(info::current_user().await?).await {
-            Ok(payload) => serde_json::from_str::<Value>(&payload)
-                .ok()
-                .filter(|value| value["uid"].as_u64() == Some(uid as u64))
-                .is_some_and(|value| value["internalDeleteCacheGranted"] == true),
-            Err(_) => false,
-        };
+    let probe = match crate::platform_bridge::cache_capabilities(info::current_user().await?).await
+    {
+        Ok(payload) => serde_json::from_str::<Value>(&payload).unwrap_or(Value::Null),
+        Err(_) => Value::Null,
+    };
     Ok(
-        json!({"supported":declares_cache_only(&help)&&permission&&(uid==0||uid==2000),"declaredCacheOnly":declares_cache_only(&help),"internalDeleteCacheGranted":permission,"runtimeUid":uid,"mode":"package_manager_cache_only","appDataClearAllowed":false}),
+        json!({"supported":supported(&probe,uid),"cacheOnlyApiAvailable":probe["cacheOnlyApiAvailable"]==true,
+        "cacheDeleteGranted":probe["cacheDeleteGranted"]==true,"runtimeUid":uid,
+        "cacheDeletePermission":probe["cacheDeletePermission"],"mode":"package_manager_cache_only","appDataClearAllowed":false}),
     )
 }
 async fn require_support() -> Result<()> {
@@ -85,15 +79,6 @@ pub(super) async fn execute(tool: &str, args: &Value) -> Result<String> {
     items.insert(proposal.id.clone(), proposal);
     Ok(value.to_string())
 }
-fn command(app: &info::AppInfo) -> Vec<String> {
-    vec![
-        "clear".into(),
-        "--cache-only".into(),
-        "--user".into(),
-        app.user_id.to_string(),
-        app.package.clone(),
-    ]
-}
 pub(crate) async fn approve(args: &Value) -> Result<String> {
     let object = args.as_object().context("cache approval must be object")?;
     if object
@@ -129,8 +114,9 @@ pub(crate) async fn approve(args: &Value) -> Result<String> {
     Ok(crate::transfers::start_background("apps".into(),name,"app_cache_clear",0,move|_,count|runtime.block_on(async move{
         // Recheck inside the task immediately before the fixed cache-only command.
         require_support().await?;if info::read(&current.package).await?!=current {bail!("application changed before cache cleanup");}
-        let output=crate::tools::run_command("pm",&command(&current)).await?;
-        if !output.lines().any(|line|line.trim()=="Success"){bail!("cache-only package-manager operation failed: {}",output.chars().take(256).collect::<String>());}
+        let output=crate::platform_bridge::clear_app_cache(current.user_id,&current.package).await?;
+        let result:Value=serde_json::from_str(&output)?;
+        if result["package"]!=current.package || result["userId"]!=current.user_id || result["cacheOnly"]!=true || result["completed"]!=true {bail!("cache-only package-manager result mismatch");}
         if info::read(&current.package).await?!=current {bail!("package manager completed cache cleanup but application identity changed; verify target state");}
         count.store(1,std::sync::atomic::Ordering::Relaxed);
         Ok(json!({"package":current.package,"userId":current.user_id,"cacheOnly":true,"completed":true,"verifiedBy":"package_manager","reclaimedBytes":null,"appDataVerified":false}))
@@ -140,49 +126,19 @@ pub(crate) async fn approve(args: &Value) -> Result<String> {
 mod tests {
     use super::*;
     #[test]
-    fn help_status_255_is_accepted_only_by_the_fixed_read_only_probe() {
-        use std::os::unix::fs::PermissionsExt;
-        let dir = std::env::temp_dir().join(format!("airc-help-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir(&dir).unwrap();
-        let pm = dir.join("pm");
-        for (code, success) in [(255, true), (1, false)] {
-            std::fs::write(&pm,format!("#!/bin/sh\nprintf '%s\\n' 'clear [--user USER_ID] [--cache-only] PACKAGE' '--cache-only: only cache data'\nexit {code}\n")).unwrap();
-            std::fs::set_permissions(&pm, std::fs::Permissions::from_mode(0o700)).unwrap();
-            let output = std::process::Command::new("/bin/sh")
-                .args(["-c", HELP_COMMAND])
-                .env("PATH", &dir)
-                .output()
-                .unwrap();
-            assert_eq!(output.status.success(), success);
-            if success {
-                assert!(declares_cache_only(&String::from_utf8_lossy(
-                    &output.stdout
-                )));
-            }
+    fn support_requires_the_api_permission_and_actual_privileged_identity() {
+        let probe = json!({"uid":0,"cacheOnlyApiAvailable":true,"cacheDeleteGranted":true});
+        assert!(supported(&probe, 0));
+        assert!(!supported(&probe, 2000));
+        for field in ["cacheOnlyApiAvailable", "cacheDeleteGranted"] {
+            let mut missing = probe.clone();
+            missing[field] = json!(false);
+            assert!(!supported(&missing, 0));
         }
-        std::fs::remove_dir_all(dir).unwrap();
-    }
-    #[test]
-    fn support_requires_the_explicit_cache_only_command_and_no_data_fallback() {
-        assert!(!declares_cache_only(
-            "clear [--user USER_ID] PACKAGE\n--cache-only: unavailable"
+        assert!(!supported(
+            &json!({"uid":10001,"cacheOnlyApiAvailable":true,"cacheDeleteGranted":true}),
+            10001
         ));
-        assert!(declares_cache_only(
-            " clear [--user USER_ID] [--cache-only] PACKAGE\n --cache-only: only cache data"
-        ));
-        let app = info::AppInfo {
-            package: "com.test.app".into(),
-            user_id: 10,
-            app_id: 10001,
-            version_code: 1,
-            version_name: None,
-            code_path: "/data/app/test".into(),
-            last_update_time: "test".into(),
-            system: false,
-        };
-        assert_eq!(
-            command(&app),
-            vec!["clear", "--cache-only", "--user", "10", "com.test.app"]
-        );
+        assert!(!supported(&Value::Null, 0));
     }
 }

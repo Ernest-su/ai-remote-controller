@@ -9,19 +9,23 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
 @Composable
-internal fun FileTaskNotice(message: String, onView: () -> Unit, onDismiss: () -> Unit) {
-    Row(Modifier.fillMaxWidth().testTag("files-task-notice"), horizontalArrangement = Arrangement.Center,
+internal fun FileTaskNotice(message: String, onView: () -> Unit, onDismiss: () -> Unit) =
+    TaskNotice(message, onView, onDismiss, "files", "关闭文件任务提示")
+
+@Composable
+internal fun TaskNotice(message: String, onView: () -> Unit, onDismiss: () -> Unit, prefix: String, dismissLabel: String) {
+    Row(Modifier.fillMaxWidth().testTag("$prefix-task-notice"), horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically) {
         Text(message, style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary,
-            modifier = Modifier.weight(1f, fill = false).testTag("files-task-message"))
-        TextButton(onView, modifier = Modifier.heightIn(min = 48.dp).testTag("files-task-view"),
+            modifier = Modifier.weight(1f, fill = false).testTag("$prefix-task-message"))
+        TextButton(onView, modifier = Modifier.heightIn(min = 48.dp).testTag("$prefix-task-view"),
             contentPadding = PaddingValues(horizontal = 8.dp)) {
             Icon(ManagementIcons.List, null, Modifier.size(20.dp))
             Spacer(Modifier.width(4.dp))
             Text("查看", style = MaterialTheme.typography.bodyMedium)
         }
-        IconButton(onDismiss, modifier = Modifier.size(48.dp).testTag("files-task-dismiss")) {
-            Icon(ManagementIcons.Close, "关闭文件任务提示", Modifier.size(20.dp), tint = RemoteColors.Secondary)
+        IconButton(onDismiss, modifier = Modifier.size(48.dp).testTag("$prefix-task-dismiss")) {
+            Icon(ManagementIcons.Close, dismissLabel, Modifier.size(20.dp), tint = RemoteColors.Secondary)
         }
     }
 }

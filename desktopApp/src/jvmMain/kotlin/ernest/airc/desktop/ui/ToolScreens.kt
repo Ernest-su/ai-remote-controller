@@ -21,8 +21,11 @@ fun DesktopApplications(state: DesktopState, controller: DesktopController, onDe
     val control by controller.appControl.state.collectAsState()
     ApplicationsPanel(state.apps, state.connected, state.appsLoading, state.appsError, state.output,
         controller::listApps, controller::openApp,
+        onReadSizes = controller::listAppSizes,
+        sizing = state.appsSizing,
         onDetails = onDetails,
         actionsBusy = control.busy || state.busy || state.submitting || management.busy || installation.busy || cache.busy,
+        operationNoticeIds = listOfNotNull(management.noticeId, cache.noticeId, installation.noticeId),
         operationMessage = when {
             management.proposal != null || cache.proposal != null || installation.proposal != null -> "有应用操作等待确认"
             management.busy || installation.busy || cache.busy -> "应用任务正在进行，可查看进度"

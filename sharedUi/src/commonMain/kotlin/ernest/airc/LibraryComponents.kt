@@ -63,7 +63,7 @@ fun LibraryDialog(title: String, tag: String, onBack: () -> Unit, subtitle: Stri
 
 @Composable
 fun ApplicationListRow(app: InstalledApp, onClick: () -> Unit, icon: @Composable () -> Unit = {},
-    enabled: Boolean = true, clickLabel: String = "打开应用", trailing: @Composable RowScope.() -> Unit = {}) {
+    enabled: Boolean = true, clickLabel: String = "打开应用", metadata: String? = null, trailing: @Composable RowScope.() -> Unit = {}) {
     Surface(color = RemoteColors.Surface) {
         Column {
             Row(Modifier.fillMaxWidth().heightIn(min = RemoteDimensions.ManagementRowHeight).testTag("app-row-${app.packageName}"), verticalAlignment = Alignment.CenterVertically) {
@@ -77,6 +77,7 @@ fun ApplicationListRow(app: InstalledApp, onClick: () -> Unit, icon: @Composable
                         Text(app.label ?: app.packageName, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         if (app.label != null) Text(app.packageName, style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(when (app.system) { true -> "系统应用"; false -> "用户安装"; null -> "类型未知" }, style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
+                        metadata?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary, modifier = Modifier.testTag("app-sort-value-${app.packageName}")) }
                     }
                 }
                 trailing()

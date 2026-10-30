@@ -17,7 +17,8 @@ import kotlinx.coroutines.isActive
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SchedulePanel(connected: Boolean, state: ScheduleState, apps: List<InstalledApp>, loadApps: () -> Unit, refresh: () -> Unit,
-    save: (String, String?, String, String, String?, Int?) -> Unit, delete: (String, String?) -> Unit, enable: (String, Boolean, String?) -> Unit, targetName: String = "当前被控设备") {
+    save: (String, String?, String, String, String?, Int?) -> Unit, delete: (String, String?) -> Unit, enable: (String, Boolean, String?) -> Unit, targetName: String = "当前被控设备",
+    runOnce: (String, String?) -> Unit = { _, _ -> }, refreshQuietly: () -> Unit = refresh) {
     var creating by rememberSaveable { mutableStateOf(false) }
     var kind by rememberSaveable { mutableStateOf("delay") }
     var action by rememberSaveable { mutableStateOf("pause") }
@@ -28,9 +29,12 @@ fun SchedulePanel(connected: Boolean, state: ScheduleState, apps: List<Installed
     var dailyTime by rememberSaveable { mutableStateOf("") }
     var picker by rememberSaveable { mutableStateOf("") }
     var targetElapsedSeconds by remember(state.data?.targetNow, state.sessionKey) { mutableLongStateOf(0) }
-    LaunchedEffect(state.data?.targetNow, state.sessionKey) {
-        val received = kotlin.time.TimeSource.Monotonic.markNow()
-        while (isActive) { delay(1000); targetElapsedSeconds = received.elapsedNow().inWholeSeconds }
+    val received = remember(state.data?.targetNow, state.sessionKey) { kotlin.time.TimeSource.Monotonic.markNow() }
+    LaunchedEffect(received, creating, kind) {
+        if (creating && kind == "once") {
+            targetElapsedSeconds = received.elapsedNow().inWholeSeconds
+            while (isActive) { delay(1000); targetElapsedSeconds = received.elapsedNow().inWholeSeconds }
+        }
     }
     val onceValue = nextScheduleOnceTime(onceTime, state.data?.targetLocalTime.orEmpty(), targetElapsedSeconds + (state.data?.targetNow?.rem(60) ?: 0))
     val value = when (kind) { "delay" -> delayValue; "daily" -> dailyTime; else -> onceValue.orEmpty() }
@@ -41,7 +45,7 @@ fun SchedulePanel(connected: Boolean, state: ScheduleState, apps: List<Installed
     var confirmation by remember { mutableStateOf<(() -> Unit)?>(null) }
     var confirmationText by remember { mutableStateOf("") }
     LaunchedEffect(state.sessionKey) { confirmation = null }
-    LaunchedEffect(connected, state.sessionKey) { if (connected) { refresh(); loadApps(); while (isActive) { delay(10000); refresh() } } }
+    LaunchedEffect(connected, state.sessionKey) { if (connected) { refresh(); loadApps(); while (isActive) { delay(10000); refreshQuietly() } } }
     if (choosing) {
         LibraryDialog("选择定时操作的应用", "schedule-app-picker", { choosing = false }) {
             ApplicationLibraryPanel(if (action == "stop_app") apps.filter { it.system == false } else apps, emptyList(), connected,
@@ -63,7 +67,7 @@ fun SchedulePanel(connected: Boolean, state: ScheduleState, apps: List<Installed
         state.error?.let { ManagementMessage(it, error = true) }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({ creating = !creating }, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (creating) "收起新建任务" else "新建定时操作") }
-            OutlinedButton(refresh, enabled = connected && !state.busy, modifier = Modifier.heightIn(min = 48.dp)) { Text("刷新") }
+            OutlinedButton(refresh, enabled = connected && !state.busy && !state.refreshing, modifier = Modifier.heightIn(min = 48.dp)) { Text("刷新") }
         }
         if (creating) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -104,7 +108,7 @@ fun SchedulePanel(connected: Boolean, state: ScheduleState, apps: List<Installed
                 confirmation = { save(a, p, k, v, session, volume); creating = false }
             }, enabled = connected && !state.busy && validTime && (action != "set_volume" || volumePercent != null) && (!needsApp || packageName.isNotEmpty()), modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("保存定时任务") }
         }
-        state.data?.tasks?.forEach { task ->
+        state.data?.tasks?.forEach { task -> key(task.id) {
             Surface(color = RemoteColors.Surface, shape = MaterialTheme.shapes.small) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(scheduledActionLabel(task.action, task.volumePercent) + (task.packageName?.let { name -> " · ${apps.find { it.packageName == name }?.label ?: name}" } ?: ""), style = MaterialTheme.typography.bodyLarge)
@@ -113,6 +117,12 @@ fun SchedulePanel(connected: Boolean, state: ScheduleState, apps: List<Installed
                     task.lastResult?.let { result -> var expanded by remember { mutableStateOf(false) }; TextButton({ expanded = !expanded }) { Text(if (expanded) "收起执行详情" else "执行详情") }; if (expanded) Text(result, style = MaterialTheme.typography.bodySmall) }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton({
+                            confirmationText = "立即在 $targetName 执行一次：${scheduledActionLabel(task.action, task.volumePercent)}${task.packageName?.let { " · $it" }.orEmpty()}。原定时计划保持不变。" +
+                                when (task.action) { "shutdown" -> "关机会中断当前使用。"; "stop_app" -> "强行停止可能丢失未保存内容。"; else -> "" }
+                            val session = state.sessionKey
+                            confirmation = { runOnce(task.id, session) }
+                        }, enabled = connected && !state.busy && task.lastStatus != "running", modifier = Modifier.heightIn(min = 48.dp).testTag("schedule-run-${task.id}")) { Text("执行一次") }
+                        OutlinedButton({
                             confirmationText = "${if (task.enabled) "暂停" else "启用"}此定时任务：${scheduledActionLabel(task.action, task.volumePercent)} ${task.packageName.orEmpty()}？"
                             val session=state.sessionKey; confirmation = { enable(task.id, !task.enabled, session) }
                         }, enabled = connected && !state.busy && task.lastStatus != "running", modifier = Modifier.heightIn(min = 48.dp)) { Text(if (task.enabled) "暂停任务" else "启用任务") }
@@ -120,7 +130,7 @@ fun SchedulePanel(connected: Boolean, state: ScheduleState, apps: List<Installed
                     }
                 }
             }
-        }
+        } }
         if (state.data?.tasks?.isEmpty() == true) Text("还没有定时任务", color = RemoteColors.Secondary)
     }
     confirmation?.let { submit -> AlertDialog(onDismissRequest = { confirmation = null }, title = { Text("确认定时操作") },

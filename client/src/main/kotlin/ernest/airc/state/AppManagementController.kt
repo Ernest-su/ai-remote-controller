@@ -11,7 +11,7 @@ class AppManagementController(private val scope:CoroutineScope,private val runti
     fun confirm(accepted:Boolean){approval?.complete(accepted)}
     private fun run(available:Boolean,operation:suspend(Long,RuntimeTransferTarget)->Unit){
         if(!available||state.value.busy)return
-        val token=generation;mutable.update{it.copy(busy=true,error=null,message=null)}
+        val token=generation;mutable.update{it.copy(busy=true,error=null,message=null,noticeId=java.util.UUID.randomUUID().toString())}
         job=scope.launch{try{operation(token,runtime.transferTarget())}catch(e:CancellationException){throw e}catch(e:Exception){if(token==generation)mutable.update{it.copy(error=e.message ?: "应用操作失败")}}finally{if(token==generation)mutable.update{it.copy(busy=false,proposal=null)}}}
     }
     fun inspect(packageName:String,available:Boolean)=run(available){token,target->

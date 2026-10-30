@@ -59,6 +59,7 @@ data class RemoteUiState(
     val shortcuts: AppShortcuts = AppShortcuts(),
     val apps: List<InstalledApp> = emptyList(),
     val appsLoading: Boolean = false,
+    val appsSizing: Boolean = false,
     val appsError: String? = null,
     val deviceInfo: DeviceInfo? = null,
     val deviceInfoLoading: Boolean = false,
@@ -203,7 +204,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
             runtime.connected.collect { connected ->
                 val lostConnection = state.value.connected && !connected
                 if (!connected) { deviceInfoGeneration++; deviceInfoJob?.cancel(); appsGeneration++; appsJob?.cancel(); gestureGeneration++ }
-                if (!connected) mutable.update { it.copy(connected = false, tools = emptyList(), touchBusy = false, deviceInfo = null, deviceInfoLoading = false, deviceInfoError = null, apps = emptyList(), appsLoading = false, appsError = null) }
+                if (!connected) mutable.update { it.copy(connected = false, tools = emptyList(), touchBusy = false, deviceInfo = null, deviceInfoLoading = false, deviceInfoError = null, apps = emptyList(), appsLoading = false, appsSizing = false, appsError = null) }
                 if (lostConnection && automaticReconnectEnabled) {
                     (automaticTarget ?: state.value.history.find { it.id == state.value.selected })?.let { startAutomaticRecovery(it) }
                 }
@@ -601,23 +602,34 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         }
         return true
     }
-    fun listApps() {
-        if (!state.value.connected || state.value.appsLoading) return
-        val send = runCatching { runtime.toolWriter() }.getOrNull() ?: return
-        val generation = ++appsGeneration
-        val deviceId = state.value.selected
-        mutable.update { it.copy(appsLoading = true, appsError = null) }
-        appsJob = viewModelScope.launch {
+    fun listApps() = listAppsInternal(false)
+    fun listAppSizes() = listAppsInternal(true)
+    private fun listAppsInternal(includeSizes: Boolean) {
+        if (!state.value.connected || state.value.appsLoading || (includeSizes && state.value.appsSizing)) return
+        val send=runCatching { runtime.toolWriter() }.getOrNull() ?: return
+        appsJob?.cancel()
+        val generation=++appsGeneration
+        val deviceId=state.value.selected
+        mutable.update { it.copy(appsLoading=true, appsSizing=false, appsError=null) }
+        appsJob=viewModelScope.launch {
             try {
-                val apps = decodeInstalledApps(send("apps.list", buildJsonObject {}))
-                if (generation == appsGeneration && state.value.connected && state.value.selected == deviceId) appIcons.updateApps(apps)
-                mutable.update { if (generation == appsGeneration && it.connected && it.selected == deviceId) it.copy(apps = apps, shortcuts = readShortcuts(deviceId)) else it }
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) {
-                mutable.update { if (generation == appsGeneration) it.copy(appsError = e.message ?: "无法查询应用列表") else it }
-            } finally {
-                mutable.update { if (generation == appsGeneration) it.copy(appsLoading = false) else it }
-            }
+                val output=send("apps.list",buildJsonObject { if(includeSizes) put("includeSizes",true) })
+                val apps=decodeInstalledApps(output)
+                if(generation==appsGeneration && state.value.connected && state.value.selected==deviceId) {
+                    appIcons.updateApps(apps)
+                    mutable.update { it.copy(apps=apps,appsLoading=false,appsSizing=includeSizes,shortcuts=readShortcuts(deviceId)) }
+                }
+                if(includeSizes) {
+                    val measured=awaitAppSizes(output,send) { partial ->
+                        if(generation==appsGeneration && state.value.connected && state.value.selected==deviceId)
+                            mutable.update { it.copy(apps=mergeAppSizes(it.apps,partial,complete=false)) }
+                    }
+                    if(measured!=null && generation==appsGeneration && state.value.connected && state.value.selected==deviceId)
+                        mutable.update { it.copy(apps=mergeAppSizes(it.apps,measured)) }
+                }
+            } catch(e:CancellationException) { throw e }
+            catch(e:Exception) { if(generation==appsGeneration) mutable.update { it.copy(appsError=e.message ?: "无法查询应用列表") } }
+            finally { if(generation==appsGeneration) mutable.update { it.copy(appsLoading=false,appsSizing=false) } }
         }
     }
     private fun readRemoteLayout(device: String?): RemoteLayout {

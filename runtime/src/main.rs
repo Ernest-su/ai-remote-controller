@@ -126,7 +126,7 @@ async fn dispatch(
             }
             result
         }
-        "schedule_list" | "schedule_save" | "schedule_delete" | "schedule_toggle" => {
+        "schedule_list" | "schedule_save" | "schedule_delete" | "schedule_toggle" | "schedule_run_once" => {
             state
                 .schedules
                 .request(&request.kind, &request.arguments)

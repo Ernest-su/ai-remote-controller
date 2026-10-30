@@ -6,7 +6,6 @@ import android.system.OsConstants;
 import android.system.StructStat;
 import java.io.*;
 import java.nio.channels.FileLock;
-import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.*;
 import org.json.JSONObject;
@@ -88,7 +87,7 @@ final class AppMetadataCache implements AutoCloseable {
         try {
             Os.chmod(temporary.getPath(),0600);
             try(FileOutputStream output = new FileOutputStream(temporary)) { output.write(bytes); output.getFD().sync(); }
-            Files.move(temporary.toPath(),new File(directory,name).toPath(),StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);
+            Os.rename(temporary.getPath(),new File(directory,name).getPath());
         } finally { temporary.delete(); }
     }
     void remove(int user, String name) {
@@ -109,7 +108,12 @@ final class AppMetadataCache implements AutoCloseable {
     private void trim() {
         File[] files=directory.listFiles(); if(files==null) return;
         ArrayList<File> entries=new ArrayList<>(); long bytes=0;
-        for(File f:files) if(f.getName().matches("[0-9]+-[a-zA-Z0-9_.]+\\.(json|png)") && Files.isRegularFile(f.toPath(),LinkOption.NOFOLLOW_LINKS)) { entries.add(f);bytes+=f.length(); }
+        for(File f:files) if(f.getName().matches("[0-9]+-[a-zA-Z0-9_.]+\\.(json|png)")) {
+            try {
+                StructStat stat=Os.lstat(f.getPath());
+                if(OsConstants.S_ISREG(stat.st_mode)) { entries.add(f);bytes+=stat.st_size; }
+            } catch(android.system.ErrnoException removed) { /* Concurrent removal is harmless. */ }
+        }
         entries.sort(Comparator.comparingLong(File::lastModified));
         int count=entries.size();
         for(File f:entries) {

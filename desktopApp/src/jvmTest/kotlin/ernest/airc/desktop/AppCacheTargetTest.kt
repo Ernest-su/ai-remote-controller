@@ -28,7 +28,7 @@ class AppCacheTargetTest {
             val capability=Json.parseToJsonElement(runtime.request("tool","apps.cache_capabilities")).jsonObject
             if(root)assertTrue(capability["supported"]!!.jsonPrimitive.boolean,"Root fixture must exercise actual cache cleanup")
             if(!capability["supported"]!!.jsonPrimitive.boolean) {
-                assertFalse(capability["internalDeleteCacheGranted"]!!.jsonPrimitive.boolean)
+                assertFalse(capability["cacheDeleteGranted"]!!.jsonPrimitive.boolean)
                 assertFails{runtime.request("tool","apps.clear_cache",buildJsonObject{put("package",pkg)})}
                 assertEquals("cache-marker",own("cat cache/owned"));assertEquals("data-marker",own("cat files/owned"))
                 return@runBlocking

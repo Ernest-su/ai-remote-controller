@@ -96,13 +96,39 @@ public final class AppsBridge {
         try {
             if(args.length==3 && args[0].equals("archive_icon")) { archiveIcon(Integer.parseInt(args[1]),args[2]); return; }
             if(args.length==4 && (args[0].equals("icon") || args[0].equals("info"))) { installed(args[0],Integer.parseInt(args[1]),args[2],args[3]);return; }
-            if(args.length!=3 || !args[0].equals("list")) throw new IllegalArgumentException("invalid app bridge operation");
+            if((args.length!=3&&args.length!=4) || !args[0].equals("list")) throw new IllegalArgumentException("invalid app bridge operation");
             int user=Integer.parseInt(args[1]);
             android.content.Context context=FrameworkContext.forUser(user);
             PackageManager manager=context.getPackageManager();
             List<android.content.pm.PackageInfo> apps=new ArrayList<>(manager.getInstalledPackages(0));
             if(apps.size()>4096) throw new IllegalStateException("installed application count exceeds 4096");
             Collections.sort(apps,Comparator.comparing(info->info.packageName));
+            boolean sizesRequested=args.length==4;
+            if(sizesRequested&&!args[3].equals("sizes_stream"))throw new IllegalArgumentException("invalid storage stream mode");
+            java.util.Map<String,android.content.pm.PackageInfo> identities=new java.util.HashMap<>();
+            for(android.content.pm.PackageInfo app:apps)identities.put(app.packageName,app);
+            java.util.concurrent.atomic.AtomicInteger processed=new java.util.concurrent.atomic.AtomicInteger();
+            java.util.concurrent.atomic.AtomicBoolean accepting=new java.util.concurrent.atomic.AtomicBoolean(true);
+            if(sizesRequested)System.out.println(new JSONObject().put("kind","start").put("userId",user).put("total",apps.size()));
+            java.util.Map<String,Long> sizes=sizesRequested?AppStorage.read(context,user,apps,(name,size)->{
+                try {
+                    int active=(Integer)Class.forName("android.app.ActivityManager").getMethod("getCurrentUser").invoke(null);
+                    if(active!=user)throw new IllegalStateException("Android user changed during storage scan");
+                    android.content.pm.PackageInfo original=identities.get(name), live;
+                    try { live=manager.getPackageInfo(name,0); }
+                    catch(PackageManager.NameNotFoundException removed) { live=original;size=null; }
+                    String identity=key(user,live,context.getResources().getConfiguration());
+                    if(!identity.equals(key(user,original,context.getResources().getConfiguration())))size=null;
+                    JSONObject app=new JSONObject().put("package",name).put("system",(live.applicationInfo.flags&ApplicationInfo.FLAG_SYSTEM)!=0)
+                        .put("cacheKey",identity).put("sizeBytes",size==null?JSONObject.NULL:size);
+                    synchronized(System.out) {
+                    if(!accepting.get())return;
+                    System.out.println(new JSONObject().put("kind","size").put("userId",user).put("app",app).put("processed",processed.incrementAndGet()).put("total",apps.size()));
+                    if(System.out.checkError())throw new IllegalStateException("storage stream closed");
+                    }
+                } catch(Exception failed) { throw new IllegalStateException("storage result could not be published",failed); }
+            }):java.util.Collections.emptyMap();
+            synchronized(System.out) { accepting.set(false); }
             JSONArray values=new JSONArray();int labelErrors=0;
             try(AppMetadataCache cache=new AppMetadataCache(args[2])) {
                 java.util.Set<String> installed=new java.util.HashSet<>();
@@ -113,13 +139,16 @@ public final class AppsBridge {
                     catch(PackageManager.NameNotFoundException removedDuringList) { continue; }
                     if(value.isNull("label")) labelErrors++;
                     values.put(new JSONObject().put("package",name).put("label",value.opt("label"))
-                        .put("system",(info.applicationInfo.flags&ApplicationInfo.FLAG_SYSTEM)!=0).put("cacheKey",value.getString("cacheKey")));
+                        .put("system",(info.applicationInfo.flags&ApplicationInfo.FLAG_SYSTEM)!=0).put("cacheKey",value.getString("cacheKey"))
+                        .put("firstInstallTime",info.firstInstallTime>0?info.firstInstallTime:JSONObject.NULL)
+                        .put("sizeBytes",sizes.containsKey(name)?sizes.get(name):JSONObject.NULL));
                 }
                 cache.retain(user,installed);
             }
-            String result=new JSONObject().put("apps",values).put("source","package_manager").put("userId",user).put("labelErrors",labelErrors).toString();
+            String result=new JSONObject().put("apps",values).put("source","package_manager").put("userId",user).put("sizesRequested",sizesRequested).put("labelErrors",labelErrors).toString();
             if(result.getBytes("UTF-8").length>1024*1024)throw new IllegalStateException("app list exceeds 1 MiB");
-            System.out.println(result);
+            if(sizesRequested)System.out.println(new JSONObject().put("kind","complete").put("result",new JSONObject(result)));
+            else System.out.println(result);
         } catch(Throwable error) {
             while(error.getCause()!=null)error=error.getCause();
             System.err.println(error.getClass().getSimpleName()+": "+error.getMessage());System.exit(1);

@@ -312,3 +312,17 @@ JVM fixture、模拟器和真实设备分别说明。UI fixture 不证明目标�
 ### ADB 握手诊断
 
 `AdbConnectionDiagnosticTargetTest` 仅对显式传入的 `adbDiagnosticHost` 和 `adbDiagnosticPort` 发起握手及 `echo` 只读探测，使用当前 App 的既有身份；`AircAdbDiagnostic` 只记录报文头和阶段，不记录正文或密钥。构建并安装测试 APK 后，以 instrumentation `-e class ernest.airc.AdbConnectionDiagnosticTargetTest -e adbDiagnosticHost <目标IP> -e adbDiagnosticPort <ADB端口>` 运行。部分厂商旧版 adbd 的既有电脑连接会阻塞新手机握手；对照诊断应先记录超时，再仅断开电脑自己的目标连接重试，不重启 adbd 或清除授权。
+
+被控端专用缓存接口验证：构建并部署配套服务后，执行 `uv run --with websockets python runtime/app_cache_target_test.py --url ws://<目标地址>:9876/ws`。该专项需要显式选择 root 服务；只安装唯一包名的临时测试应用，在该应用写入缓存、代码缓存、普通文件、设置与数据库标记，验证取消不删除、确认后缓存删除且非缓存摘要不变、一次性确认及系统应用拒绝，最后卸载测试应用和移除自建目录。不会清理已有应用缓存。
+
+应用列表排序由 `InstalledAppsTest` 验证大小/首次安装时间解析、未知值末尾、0字节、同值稳定排序、收藏优先与显式排序，以及全量排序后分页。构建App与测试APK后，执行 `python3 scripts/test-phone-target.py --phone <自有模拟器> --suite app-sorting-ui`，由 Android `ApplicationSortingUiTest` 验证按需只读一次大小、刷新/旋转保留排序与方向及离线切换；使用本地列表，不改变被控应用。
+
+`AppSizeSnapshotTest` 验证大小任务的原 ID/类型核对、无任务时不轮询、完成结果解析，以及同包更新后拒绝套用旧版本大小。空间统计后台执行，期间应用列表动作保持可用。
+
+配套服务部署后，可用 `uv run --with websockets python runtime/app_sort_target_test.py --url ws://<目标>:9876/ws` 只读验证首次安装时间、异步大小任务复用、统计期间普通列表可读及系统占用结果。该专项不安装、删除或修改应用；Android 7 使用系统逐应用统计，可能需要数分钟。
+
+应用与文件任务提示的同行布局和关闭行为：构建 App/测试 APK 后执行 `python3 scripts/test-phone-target.py --phone <自有模拟器> --suite app-task-notice-ui`，覆盖320dp/1.5倍字体亮暗布局、48dp查看/关闭触控、打开任务详情、隐藏后跨进度/完成/导航/旋转保持隐藏，以及新任务重新显示。
+
+增量大小统计：`AppSizeSnapshotTest` 覆盖完成前逐批回调、未返回条目保留和跨版本隔离；Rust `tools::stream_tests` 验证首帧不等待进程结束及截断 JSON 拒绝。`app_sort_target_test.py` 同时要求在任务完成前观察到递增的部分结果，并记录首批返回时间。
+
+定时操作回归覆盖10秒静默轮询时任务按钮位置稳定、执行一次确认与连接绑定、离线/运行中禁用；控制器验证轮询不占动作busy且可被手动操作取代；runtime通过注入执行器验证先落盘再执行、重复提交拒绝、原计划保留、与到期任务重叠时不重复执行及失败结果持久化，不对真实设备执行关机等动作。

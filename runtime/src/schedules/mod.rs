@@ -105,6 +105,20 @@ impl Scheduler {
                 .collect();
             return Ok(json!({"tasks":tasks,"targetNow":now,"targetLocalTime":time::formatted(now),"utcOffsetSeconds":local.tm_gmtoff,"runningRequired":true}).to_string());
         }
+        if operation == "schedule_run_once" {
+            let object = args.as_object().context("arguments must be object")?;
+            if object
+                .keys()
+                .any(|k| !["id", "confirmed"].contains(&k.as_str()))
+                || args["confirmed"] != true
+            {
+                bail!("run once requires explicit user confirmation and id");
+            }
+            let id = args["id"].as_str().context("id required")?;
+            self.run_once_with(id, |entry| async move { perform(&entry).await })
+                .await?;
+            return Ok(json!({"id":id,"submitted":true}).to_string());
+        }
         if operation == "schedule_save" {
             let draft: Draft = serde_json::from_value(args.clone())?;
             if !draft.confirmed {
@@ -211,6 +225,59 @@ impl Scheduler {
         }
         Ok(json!({"id":id,"saved":true}).to_string())
     }
+    async fn run_once_with<F, Fut>(&self, id: &str, execute: F) -> Result<()>
+    where
+        F: FnOnce(Entry) -> Fut + Send + 'static,
+        Fut: std::future::Future<Output = Result<String>> + Send,
+    {
+        let entry = {
+            let mut store = self.0.lock().await;
+            let index = store
+                .entries
+                .iter()
+                .position(|e| e.id == id)
+                .context("schedule not found")?;
+            if store.entries[index].last_status == "running" {
+                bail!("任务正在执行，请等待结果");
+            }
+            let old = store.entries[index].clone();
+            let entry = &mut store.entries[index];
+            entry.last_at = Some(time::now());
+            entry.last_status = "running".into();
+            entry.last_result = None;
+            let run = entry.clone();
+            if let Err(error) = store.persist() {
+                store.entries[index] = old;
+                return Err(error);
+            }
+            run
+        };
+        let scheduler = self.clone();
+        tokio::spawn(async move {
+            if let Err(error) = scheduler.finish_with(entry.clone(), execute(entry)).await {
+                eprintln!("manual schedule execution failed: {error:#}");
+            }
+        });
+        Ok(())
+    }
+    async fn finish_with(
+        &self,
+        entry: Entry,
+        execute: impl std::future::Future<Output = Result<String>>,
+    ) -> Result<()> {
+        let result = tokio::time::timeout(std::time::Duration::from_secs(45), execute).await;
+        let (status, output) = match result {
+            Ok(Ok(value)) => ("submitted", value),
+            Ok(Err(error)) => ("failed", error.to_string()),
+            Err(_) => ("uncertain", "执行超时，结果不确定，不自动重试。".into()),
+        };
+        let mut store = self.0.lock().await;
+        if let Some(stored) = store.entries.iter_mut().find(|e| e.id == entry.id) {
+            stored.last_status = status.into();
+            stored.last_result = Some(output.chars().take(4096).collect());
+        }
+        store.persist()
+    }
     pub async fn run(self, mut stop: tokio::sync::watch::Receiver<bool>) {
         loop {
             tokio::select! { _=stop.changed()=>break, _=tokio::time::sleep(std::time::Duration::from_secs(1))=>{} }
@@ -244,6 +311,15 @@ impl Scheduler {
                 };
                 let old = store.entries[index].clone();
                 let entry = &mut store.entries[index];
+                // A manually running action consumes an overlapping due occurrence, never duplicates it.
+                if entry.last_status == "running" {
+                    advance(entry, now)?;
+                    if let Err(error) = store.persist() {
+                        store.entries[index] = old;
+                        return Err(error);
+                    }
+                    continue;
+                }
                 entry.last_at = Some(entry.next_at);
                 entry.last_status = if now - entry.next_at > 60 {
                     "missed"
@@ -263,20 +339,7 @@ impl Scheduler {
             if entry.last_status == "missed" {
                 continue;
             }
-            let result =
-                tokio::time::timeout(std::time::Duration::from_secs(45), execute(entry.clone()))
-                    .await;
-            let (status, output) = match result {
-                Ok(Ok(value)) => ("submitted", value),
-                Ok(Err(error)) => ("failed", error.to_string()),
-                Err(_) => ("uncertain", "执行超时，结果不确定，不自动重试。".into()),
-            };
-            let mut store = self.0.lock().await;
-            if let Some(stored) = store.entries.iter_mut().find(|e| e.id == entry.id) {
-                stored.last_status = status.into();
-                stored.last_result = Some(output.chars().take(4096).collect());
-            }
-            store.persist()?;
+            self.finish_with(entry.clone(), execute(entry)).await?;
         }
     }
 }
@@ -430,6 +493,95 @@ async fn perform(entry: &Entry) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn manual_run_preserves_plan_and_claims_before_execution() {
+        let dir =
+            std::env::temp_dir().join(format!("airc-schedule-manual-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&dir).unwrap();
+        let scheduler = Scheduler::load(&dir).unwrap();
+        let saved: Value = serde_json::from_str(
+            &scheduler
+                .request(
+                    "schedule_save",
+                    &json!({"kind":"delay","delaySeconds":60,"action":"pause","confirmed":true}),
+                )
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        let id = saved["id"].as_str().unwrap();
+        assert!(scheduler
+            .request("schedule_run_once", &json!({"id":id}))
+            .await
+            .is_err());
+        assert!(scheduler
+            .request(
+                "schedule_run_once",
+                &json!({"id":id,"confirmed":true,"extra":1})
+            )
+            .await
+            .is_err());
+        let release = Arc::new(tokio::sync::Notify::new());
+        let gate = release.clone();
+        scheduler
+            .run_once_with(id, move |_| async move {
+                gate.notified().await;
+                Ok("manual fixture".into())
+            })
+            .await
+            .unwrap();
+        assert!(scheduler
+            .run_once_with(id, |_| async { panic!("duplicate") })
+            .await
+            .is_err());
+        {
+            let mut store = scheduler.0.lock().await;
+            assert_eq!(store.entries[0].next_at, saved["nextAt"].as_i64().unwrap());
+            assert!(store.entries[0].enabled);
+            assert_eq!(store.entries[0].last_status, "running");
+            // A planned occurrence that becomes due during the manual action must not run twice.
+            store.entries[0].next_at = time::now() - 1;
+        }
+        scheduler
+            .tick_with(|_| async { panic!("overlapping scheduled execution") })
+            .await
+            .unwrap();
+        assert_eq!(scheduler.0.lock().await.entries[0].last_status, "running");
+        release.notify_one();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if scheduler.0.lock().await.entries[0].last_status == "submitted" {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        // Completed/disabled jobs can still be run once, without re-enabling their plan.
+        scheduler
+            .run_once_with(id, |_| async { anyhow::bail!("fixture failure") })
+            .await
+            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if scheduler.0.lock().await.entries[0].last_status == "failed" {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let reloaded = Scheduler::load(&dir).unwrap();
+        let store = reloaded.0.lock().await;
+        assert!(!store.entries[0].enabled);
+        assert_eq!(
+            store.entries[0].last_result.as_deref(),
+            Some("fixture failure")
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
     #[tokio::test]
     async fn due_tasks_execute_once_without_a_controller_and_daily_tasks_advance() {
         let dir = std::env::temp_dir().join(format!("airc-schedule-due-{}", uuid::Uuid::new_v4()));

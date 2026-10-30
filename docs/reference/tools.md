@@ -190,11 +190,11 @@ apps.list / apps_list 优先通过短时框架桥接读取当前 Android 用户�
 
 ## 应用缓存清理 {#app-cache}
 
-`apps.cache_capabilities` / `apps_cache_capabilities {}` 查询系统帮助中明确的 `clear [--user USER_ID] [--cache-only] PACKAGE` 和选项说明，以及 runtime UID 是否 shell/root、短时框架探测的 INTERNAL_DELETE_CACHE_FILES 权限；三项均满足才声明 supported。`apps.clear_cache` / `apps_clear_cache {package}` 准备用户应用的 `app_cache_clear` 提案，不执行清理。`apps.cache_pending` / `apps_cache_pending {}` 查询待审核提案。32项、15分钟限额，与卸载/安装提案独立。
+`apps.cache_capabilities` / `apps_cache_capabilities {}` 查询专用 PackageManager 缓存接口是否存在（`cacheOnlyApiAvailable`）、当前系统要求的缓存删除权限（`cacheDeletePermission`、`cacheDeleteGranted`）以及 `runtimeUid`；接口存在、权限允许且 UID 为 shell/root 时才声明 supported。Android 7–8 探测 DELETE_CACHE_FILES，Android 9 起探测 INTERNAL_DELETE_CACHE_FILES。`apps.clear_cache` / `apps_clear_cache {package}` 准备用户应用的 `app_cache_clear` 提案，不执行清理。`apps.cache_pending` / `apps_cache_pending {}` 查询待审核提案。32项、15分钟限额，与卸载/安装提案独立。
 
-直接人工 `type:approve_cache {id,accepted?}` 消耗一次性提案；拒绝不执行，确认重新核对当前用户/版本/代码路径/应用身份及能力，创建不可取消的 `app_cache_clear` 长任务。任务再次核对，然后只执行 `pm clear --cache-only --user <approved-user> <package>`，没有删除数据的 fallback。结果含 `cacheOnly:true,completed:true,verifiedBy:package_manager,reclaimedBytes:null,appDataVerified:false`，不把系统成功当作任意数据完整性或释放字节证明。
+直接人工 `type:approve_cache {id,accepted?}` 消耗一次性提案；拒绝不执行，确认重新核对当前用户/版本/代码路径/应用身份及能力，创建不可取消的 `app_cache_clear` 长任务。任务再次核对，然后只调用 `deleteApplicationCacheFilesAsUser(package,userId,observer)`。匹配包名且成功的系统异步回调才确认完成；20秒未回调报告未确认，但操作可能继续完成，不自动重试。不会调用应用数据清除接口或直接递归删除应用目录。结果含 `cacheOnly:true,completed:true,verifiedBy:package_manager,reclaimedBytes:null,appDataVerified:false`，不把系统成功当作任意数据完整性或释放字节证明。
 
-[AOSP PackageManagerShellCommand](https://android.googlesource.com/platform/frameworks/base/%2B/5b361c07f928fd8c02a347b074a50b977e044f97/services/core/java/com/android/server/pm/PackageManagerShellCommand.java) 中缓存标志走 deleteApplicationCacheFilesAsUser，普通数据清除走不同分支；本项目始终保留缓存标志并按目标声明探测，不按 Android 版本猜测。
+[AOSP Android 7.0 PackageManagerService](https://android.googlesource.com/platform/frameworks/base/+/android-7.0.0_r1/services/core/java/com/android/server/pm/PackageManagerService.java) 的 deleteApplicationCacheFilesAsUser 只清理缓存与代码缓存，并通过 observer 回调完成；与 clearApplicationUserData 是不同接口。本项目探测专用方法和实际 caller 权限，执行时等待系统回调。
 
 ## H.264 镜像工具 {#screen-mirror}
 
@@ -288,3 +288,5 @@ remote.key 的 power 参数仅供直接手动控制；模型别名 remote_key �
 标准 `media.status` 会话补充可选的 `appName`、`artist`、`album` 与 `actions`；顶层 `transportAvailable` 表示会话播放命令接口是否可用。无法取得的字段保留未知，不伪造应用名、封面或播放能力；平台桥不可用时不宣称 transport 可用。
 
 播放与媒体音量工具共用 runtime 所有的常驻 Android 桥接进程，通过有界、带请求关联的逐行 JSON 交换结果，复用 framework 上下文并在当前 Android 用户变化时切换上下文，避免每次启动 am/app_process。等待中的取消不会提交迟到操作；已经开始的帧读完后再交给下一请求，超时或响应丢失会丢弃进程且不自动重放写操作。独立 AudioBridge CLI 仍用于显式用户的定时操作与验证工具。
+
+`apps.list` 支持可选布尔 `includeSizes`，默认 false。条目增加 `firstInstallTime`（首次安装的 epoch 毫秒）及 `sizeBytes`（系统报告的应用总占用字节）；未知为 null。响应 `sizesRequested` 标记是否已尝试读取大小。普通列表不读取空间；大小读取通过 `sizeTask` 返回的 `app_sizes` 后台任务执行（root=apps，name=app-sizes，unit=items），使用 task.progress 查询；列表先返回基础信息，统计过程中逐条发布结果，客户端约每300毫秒合并已返回的同版本应用大小；统计结束后补齐最终快照。同一用户的并发请求复用进行中的任务；单次统计最多5分钟，可返回部分已读值，刷新后重新测量，不持久缓存动态大小。Android 8 起使用 StorageStats 的 appBytes + dataBytes（dataBytes 已含缓存），Android 7 使用当前用户的 PackageStats 统计；不遍历应用私有目录。

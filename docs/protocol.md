@@ -187,7 +187,7 @@ apps.list 返回 apps 数组，并提供 source、labelsAvailable、userId 与 l
 
 `gamepad.pulse {buttons?,x?,y?,rightX?,rightY?,holdMs?}` 是 10..2000 毫秒的有限输入事务，默认100，按钮最多六个、轴值 -1..1。`gamepad.reset {}` 提交全部受控合成按键抬起与零轴。工具响应包含 `operation:pulse|reset,submitted,released,sourceGamepad:1025,sourceJoystick:16777232,elapsedMs,gameVerified:false`；released 只确认系统队列接受释放。请求中止不取消已接受的在途事务，按钮/轴状态不落盘。输入拒绝或释放失败返回错误；服务强制终止不保证释放。详见[手柄工具](reference/tools.md#gamepad)。
 
-应用缓存清理为独立提案/确认流程：`apps.clear_cache {package}` 返回 `{id,kind:app_cache_clear,app,approvalRequired:true,cacheOnly:true,mode:package_manager_cache_only}`；模型只能准备或查询 `apps.cache_pending`。人工 `approve_cache` 拒绝或提交不可取消的缓存长任务。`apps.cache_capabilities` 只读探测；未明确声明 cache-only、缺少 INTERNAL_DELETE_CACHE_FILES 或 UID 不适用时拒绝，不执行数据清除 fallback。任务结果不提供回收字节，不宣称全面的数据保留验证。
+应用缓存清理为独立提案/确认流程：`apps.clear_cache {package}` 返回 `{id,kind:app_cache_clear,app,approvalRequired:true,cacheOnly:true,mode:package_manager_cache_only}`；模型只能准备或查询 `apps.cache_pending`。人工 `approve_cache` 拒绝或提交不可取消的缓存长任务。`apps.cache_capabilities` 只读探测；专用缓存删除接口不存在、缺少当前系统要求的缓存删除权限或 UID 不适用时拒绝，不执行数据清除 fallback。任务结果不提供回收字节，不宣称全面的数据保留验证。
 
 ## AVC 镜像流 v1 {#screen-mirror-stream}
 
@@ -290,6 +290,7 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 | --- | --- | --- |
 | `schedule_list` | `{}` | 返回tasks、targetNow（Unix秒）、targetLocalTime、utcOffsetSeconds与runningRequired |
 | `schedule_save` | action、kind、confirmed=true，以及对应时间字段；应用动作带package | 明确用户确认后保存并启用任务 |
+| `schedule_run_once` | id、confirmed=true | 持久保存执行中状态后异步执行一次；返回id、submitted，不改变未来计划；执行中拒绝重复提交，计划恰好到期时跳过该次以避免重复；不向模型暴露 |
 | `schedule_toggle` | id、enabled；启用须confirmed=true | 暂停或启用，过期单次任务拒绝重新启用 |
 | `schedule_delete` | id | 删除未来调度；执行中拒绝删除 |
 

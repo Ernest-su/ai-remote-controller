@@ -341,18 +341,122 @@ pub(crate) async fn run_platform_bridge(argv: &[String], path: &std::path::Path)
         .get(1)
         .is_some_and(|v| v == "ernest.airc.bridge.AppsBridge")
         && argv.get(2).is_some_and(|v| v == "list");
+    let cache_clear = argv
+        .get(1)
+        .is_some_and(|v| v == "ernest.airc.bridge.AppCacheBridge")
+        && argv.get(2).is_some_and(|v| v == "clear");
     Ok(String::from_utf8_lossy(
         &run_binary_with_input(
             "app_process",
             argv,
             if app_list { 1024 * 1024 } else { 256 * 1024 },
             Stdio::null(),
-            Duration::from_secs(if app_list { 30 } else { 10 }),
+            Duration::from_secs(if app_list || cache_clear { 30 } else { 10 }),
             Some(path),
         )
         .await?,
     )
     .into_owned())
+}
+
+pub(crate) async fn run_platform_bridge_stream(
+    argv: &[String],
+    path: &std::path::Path,
+    on_frame: impl FnMut(Value) -> Result<()>,
+) -> Result<()> {
+    let mut command = Command::new("app_process");
+    command.args(argv).env("CLASSPATH", path);
+    run_json_stream(command, Duration::from_secs(320), on_frame).await
+}
+
+async fn run_json_stream(
+    mut command: Command,
+    timeout: Duration,
+    mut on_frame: impl FnMut(Value) -> Result<()>,
+) -> Result<()> {
+    use tokio::io::{AsyncBufReadExt, BufReader};
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .process_group(0)
+        .kill_on_drop(true)
+        .spawn()?;
+    let _group = ProcessGroup(child.id().context("missing stream child PID")? as i32);
+    let mut stdout = BufReader::new(child.stdout.take().context("stream stdout missing")?);
+    let stderr = child.stderr.take().context("stream stderr missing")?;
+    let read = async {
+        loop {
+            let mut line = Vec::new();
+            loop {
+                let bytes = stdout.fill_buf().await?;
+                if bytes.is_empty() {
+                    if line.is_empty() {
+                        return Ok::<_, anyhow::Error>(());
+                    }
+                    bail!("incomplete platform stream frame");
+                }
+                let newline = bytes.iter().position(|byte| *byte == b'\n');
+                let count = newline.map_or(bytes.len(), |index| index + 1);
+                if line.len() + count > 1024 * 1024 {
+                    bail!("platform stream frame exceeds 1 MiB");
+                }
+                line.extend_from_slice(&bytes[..count]);
+                stdout.consume(count);
+                if newline.is_some() {
+                    break;
+                }
+            }
+            on_frame(serde_json::from_slice(&line).context("invalid platform stream JSON")?)?;
+        }
+    };
+    let (status, _, stderr) = tokio::time::timeout(timeout, async {
+        tokio::try_join!(
+            async { Ok::<_, anyhow::Error>(child.wait().await?) },
+            read,
+            read_output(stderr, 256 * 1024)
+        )
+    })
+    .await
+    .context("platform stream timed out")??;
+    if !status.success() {
+        bail!(
+            "platform stream exited with {status}: {}",
+            String::from_utf8_lossy(&stderr)
+        );
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod stream_tests {
+    use super::*;
+    #[tokio::test]
+    async fn publishes_frames_before_process_completion_and_rejects_partial_json() {
+        let mut command = Command::new("python3");
+        command.args(["-u","-c","import json,time; print(json.dumps({'kind':'size'}),flush=True); time.sleep(0.2); print(json.dumps({'kind':'complete'}),flush=True)"]);
+        let mut observed = Vec::new();
+        let mut first = None;
+        run_json_stream(command, Duration::from_secs(5), |frame| {
+            if first.is_none() {
+                first = Some(std::time::Instant::now());
+            }
+            observed.push(frame["kind"].as_str().unwrap().to_owned());
+            Ok(())
+        })
+        .await
+        .unwrap();
+        assert_eq!(observed, vec!["size", "complete"]);
+        assert!(
+            first.unwrap().elapsed() >= Duration::from_millis(150),
+            "first frame was buffered until process exit"
+        );
+        let mut broken = Command::new("python3");
+        broken.args(["-c", "print('{',end='')"]);
+        assert!(run_json_stream(broken, Duration::from_secs(2), |_| Ok(()))
+            .await
+            .is_err());
+    }
 }
 
 async fn run_binary_with_input(

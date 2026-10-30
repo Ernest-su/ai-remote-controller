@@ -165,19 +165,27 @@ pub(crate) async fn system_capabilities() -> Result<String> {
     )
     .await
 }
-pub(crate) async fn cache_permission(user: u32) -> Result<String> {
+pub(crate) async fn cache_capabilities(user: u32) -> Result<String> {
     invoke_class(
-        "ernest.airc.bridge.CachePermissionBridge",
-        "permission",
+        "ernest.airc.bridge.AppCacheBridge",
+        "capabilities",
         &[user.to_string()],
+    )
+    .await
+}
+pub(crate) async fn clear_app_cache(user: u32, package: &str) -> Result<String> {
+    invoke_class(
+        "ernest.airc.bridge.AppCacheBridge",
+        "clear",
+        &[user.to_string(), package.to_owned()],
     )
     .await
 }
 pub(crate) async fn gamepad(operation: &str, arguments: &[String]) -> Result<String> {
     invoke_class("ernest.airc.bridge.GamepadBridge", operation, arguments).await
 }
-pub(crate) async fn apps(arguments: &[String]) -> Result<String> {
-    let mut arguments = arguments.to_vec();
+pub(crate) async fn apps(options: &[String]) -> Result<String> {
+    let mut arguments = vec![options[0].clone()];
     arguments.push(
         APP_CACHE
             .get()
@@ -185,7 +193,27 @@ pub(crate) async fn apps(arguments: &[String]) -> Result<String> {
             .to_string_lossy()
             .into_owned(),
     );
+    arguments.extend_from_slice(&options[1..]);
     invoke_class("ernest.airc.bridge.AppsBridge", "list", &arguments).await
+}
+pub(crate) async fn app_sizes_stream(
+    user: u32,
+    on_frame: impl FnMut(serde_json::Value) -> Result<()>,
+) -> Result<()> {
+    let path = BRIDGE
+        .get()
+        .context("Android framework bridge unavailable")?;
+    verify(path)?;
+    let cache = APP_CACHE.get().context("application cache unavailable")?;
+    let args = vec![
+        "/system/bin".into(),
+        "ernest.airc.bridge.AppsBridge".into(),
+        "list".into(),
+        user.to_string(),
+        cache.to_string_lossy().into_owned(),
+        "sizes_stream".into(),
+    ];
+    crate::tools::run_platform_bridge_stream(&args, path, on_frame).await
 }
 pub(crate) async fn app_control(user: u32, package: &str) -> Result<String> {
     invoke_class(
