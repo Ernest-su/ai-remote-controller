@@ -11,33 +11,75 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import ernest.ascrcpy.scrcpy.ScrcpyState
 import org.junit.*
 import org.junit.Assert.*
 
 class ConnectionStatusUiTest {
-    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    val compose = createAndroidComposeRule<ComponentActivity>()
+    @get:Rule val rules: org.junit.rules.TestRule = org.junit.rules.RuleChain.outerRule(DeviceHistoryIsolation()).around(compose)
     @Test fun compactStatusesUseTextAndDotsWithoutRecoveryOrPreviewButtons() {
         var dark by mutableStateOf(false)
         var green = 0; var red = 0
+        var message by mutableStateOf("正在等待被控端 ADB 响应…")
         compose.setContent { RemoteTheme(darkTheme = dark) {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density,1.5f)) {
                 green = RemoteColors.Brand.toArgb(); red = RemoteColors.Warning.toArgb()
-                Box(Modifier.width(320.dp)) { ConnectionStatusSummary(true,false,false,ScrcpyState.Idle,false,{}) }
+                Box(Modifier.width(320.dp)) { ConnectionStatusSummary(true,false,false,false,{},message) }
             }
         } }
         repeat(2) {
             compose.onNodeWithContentDescription("遥控服务，已连接").assertExists()
             compose.onNodeWithContentDescription("ADB，按需自动连接").assertExists()
-            compose.onNodeWithContentDescription("动态预览，未开启").assertExists()
+            compose.onNodeWithText("动态预览").assertDoesNotExist()
+            compose.onNodeWithText("未开启").assertDoesNotExist()
+            compose.onNodeWithTag("device-connection-status").assertTextEquals(message)
+            compose.runOnIdle { message = "被控端 ADB 未响应，3 秒后重试" }
+            compose.onNodeWithTag("device-connection-status").assertTextEquals(message)
             for (text in listOf("恢复遥控服务","恢复 ADB","打开预览与重试","遥控、ADB 和预览分别连接；预览关闭不影响普通遥控。")) compose.onNodeWithText(text).assertDoesNotExist()
             fun dot(label: String): Int {
                 val bitmap=compose.onNodeWithTag("connection-dot-$label",useUnmergedTree=true).captureToImage().asAndroidBitmap()
                 return bitmap.getPixel(bitmap.width/2,bitmap.height/2)
             }
-            assertEquals(green,dot("遥控服务"));assertEquals(red,dot("ADB"));assertEquals(red,dot("动态预览"))
+            assertEquals(green,dot("遥控服务"));assertEquals(red,dot("ADB"))
+            val directory = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null)
+            val image = compose.onNodeWithTag("connection-summary").captureToImage().asAndroidBitmap()
+            java.io.File(directory, "connection-summary-${if (dark) "dark" else "light"}.png").outputStream().use {
+                image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            }
+            image.recycle()
             compose.runOnIdle { dark=true }
+        }
+    }
+    @Test fun remoteHomeShowsConnectionProgressAndReturnsToPlaybackAfterCancellation() {
+        val context = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val server = okhttp3.mockwebserver.MockWebServer().apply {
+            dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+                override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest) =
+                    okhttp3.mockwebserver.MockResponse().setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.NO_RESPONSE)
+            }
+            start()
+        }
+        DeviceStore(context).remember(RememberedDevice("home-progress-fixture", "Fixture", ConnectionMethod.TCP,
+            "127.0.0.1", 1, runtimePort = server.port, lastConnectedAt = 1))
+        val owner = androidx.lifecycle.ViewModelStore()
+        lateinit var model: RemoteViewModel
+        try {
+            compose.runOnUiThread {
+                model = RemoteViewModel(context.applicationContext as android.app.Application)
+                owner.put("home-progress", model)
+            }
+            compose.setContent { RemoteTheme { RemoteApp(model) } }
+            compose.waitUntil(5000) { compose.onAllNodesWithTag("remote-connection-progress").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("连接状态").assertIsDisplayed()
+            compose.onNodeWithTag("remote-connection-progress").assertTextEquals("连接遥控服务")
+            compose.onNodeWithTag("remote-playback").assertDoesNotExist()
+            compose.runOnUiThread { model.cancelConnection() }
+            compose.onNodeWithTag("remote-connection-progress").assertDoesNotExist()
+            compose.onNodeWithTag("remote-playback").assertExists()
+        } finally {
+            compose.runOnUiThread { owner.clear() }
+            server.shutdown()
         }
     }
     @Test fun headerAlternatesNameAndStatusAndStaysClickable() {

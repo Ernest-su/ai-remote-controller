@@ -138,7 +138,7 @@ pub(crate) fn initialize(state: &Path) -> Result<()> {
     Ok(())
 }
 pub(crate) async fn invoke(operation: &str, arguments: &[String]) -> Result<String> {
-    invoke_class("ernest.airc.bridge.MediaBridge", operation, arguments).await
+    crate::playback_bridge::invoke("media", operation, arguments).await
 }
 pub(crate) async fn scheduled_audio(operation: &str, arguments: &[String]) -> Result<String> {
     invoke_class("ernest.airc.bridge.AudioBridge", operation, arguments).await

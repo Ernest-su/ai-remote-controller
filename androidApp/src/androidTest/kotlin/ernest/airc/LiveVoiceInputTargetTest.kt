@@ -27,7 +27,7 @@ class LiveVoiceInputTargetTest {
             controller.settings(VoiceSettings(arguments.getString("voicePackage") ?: "com.konka.bestlauncher", arguments.getString("voiceKey") ?: "1017"))
             runBlocking { runtime.connect(host, port) }
             compose.setContent { RemoteTheme { RemoteCommandInput(controller, true, false, false, "保留草稿", {}, {}) } }
-            compose.waitUntil(5000) { compose.activity.hasWindowFocus() }
+            compose.waitUntil(5000) { compose.activity.hasWindowFocus() && controller.state.value.targetVersionChecked }
             compose.onNodeWithContentDescription("切换为语音输入").performClick()
             val button = compose.onNodeWithContentDescription("按住说话")
             button.performTouchInput { down(center) }

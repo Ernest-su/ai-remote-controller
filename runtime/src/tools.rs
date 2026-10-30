@@ -75,6 +75,7 @@ pub const TOOLS: &[&str] = &[
     "media.status",
     "media.volume",
     "media.seek",
+    "media.command",
     "media.custom_action",
     "media.players",
     "media.publish",
@@ -261,6 +262,9 @@ pub async fn execute(tool: &str, args: &Value) -> Result<String> {
     }
     if matches!(tool, "media.players" | "media.open" | "media.release") {
         return media_open::execute(tool, args).await;
+    }
+    if tool == "media.command" {
+        return media::command(args).await;
     }
     if tool == "media.custom_action" {
         return media::custom_action(args).await;

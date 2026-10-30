@@ -13,6 +13,7 @@ internal class AutomaticConnection(
     private val maxAttempts: Int = 3,
     private val onExhausted: () -> Unit = {},
     private val cooldownMillis: Long? = null,
+    private val onRetry: (Long) -> Unit = {},
     private val attempt: suspend (RememberedDevice) -> Boolean,
 ) {
     private var job: Job? = null
@@ -29,12 +30,15 @@ internal class AutomaticConnection(
                 repeat(maxAttempts) { index ->
                     if (attempt(device)) return@launch
                     if (index + 1 < maxAttempts) {
+                        onRetry(retryDelay)
                         waitForRetry(retryDelay)
                         retryDelay = (retryDelay * 2).coerceAtMost(30_000L)
                     }
                 }
                 onExhausted()
-                waitForRetry(cooldownMillis ?: return@launch)
+                val cooldown = cooldownMillis ?: return@launch
+                onRetry(cooldown)
+                waitForRetry(cooldown)
             }
         }
     }

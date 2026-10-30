@@ -42,6 +42,7 @@ internal fun VoiceControls(controller: AndroidVoiceController, connected: Boolea
     var keyboardPress by remember { mutableStateOf<Long?>(null) }
     fun begin(): Long? {
         if (!connected || draining || !lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) || !window.isWindowFocused) return null
+        if (!controller.checkTargetVersion()) return null
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) return controller.start()
         permission.launch(Manifest.permission.RECORD_AUDIO)
         return null
@@ -114,6 +115,7 @@ internal fun RemoteCommandInput(controller: AndroidVoiceController, connected: B
                 focus.clearFocus()
                 keyboard?.hide()
                 voiceMode = !voiceMode
+                if (voiceMode && connected) controller.checkTargetVersion()
             }, Modifier.size(48.dp).testTag("remote-input-mode")) {
                 Icon(painterResource(if (voiceMode) R.drawable.ic_keyboard else R.drawable.ic_microphone),
                     if (voiceMode) "切换为文字输入" else "切换为语音输入", Modifier.size(24.dp))

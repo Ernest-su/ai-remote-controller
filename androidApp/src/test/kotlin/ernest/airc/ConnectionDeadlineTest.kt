@@ -46,4 +46,25 @@ class ConnectionDeadlineTest {
         assertTrue(messages.last(), messages.last().contains("2 KB / 2 KB"))
         assertEquals(-1, stream.read())
     }
+    @Test fun delayedAdbWaitingIsReportedOncePerStageAndFailureReasonMatchesTheStage() {
+        var time = 0L
+        val messages = mutableListOf<String>()
+        val deadline = ConnectionDeadline(clock = { time }, report = messages::add)
+        deadline.begin(ConnectionStage.CONNECT)
+        time = 7999; deadline.reportWaiting()
+        assertEquals(listOf(ConnectionStage.CONNECT.label), messages)
+        time = 8000; deadline.reportWaiting(); deadline.reportWaiting()
+        assertEquals("正在等待被控端 ADB 响应…", messages.last())
+        assertEquals(2, messages.size)
+        assertEquals("被控端 ADB 未响应", deadline.retryReason(timedOut = true))
+        assertEquals("被控端 ADB 连接失败", deadline.retryReason())
+        deadline.begin(ConnectionStage.RUNTIME)
+        time += 8000; deadline.reportWaiting()
+        assertEquals(ConnectionStage.RUNTIME.label, messages.last())
+        assertEquals("遥控服务未响应", deadline.retryReason(timedOut = true))
+        deadline.begin(ConnectionStage.CONNECT)
+        time += 8000; deadline.reportWaiting()
+        assertEquals("正在等待被控端 ADB 响应…", messages.last())
+    }
+
 }

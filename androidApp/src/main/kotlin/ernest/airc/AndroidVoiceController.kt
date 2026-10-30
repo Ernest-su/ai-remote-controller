@@ -8,6 +8,8 @@ import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -17,6 +19,7 @@ internal data class VoiceState(
     val recording: Boolean = false,
     val draining: Boolean = false,
     val message: String = "",
+    val targetVersionChecked: Boolean = false,
 )
 
 /** Audio and recording state stay in memory, with a hard 60 second limit. */
@@ -30,7 +33,44 @@ internal class AndroidVoiceController(private val context: Context, private val 
     private var released = AtomicBoolean(false)
     private var captureStopped = CompletableDeferred<Unit>().apply { complete(Unit) }
     private val generation = AtomicLong()
-    init { scope.launch { runtime.session.drop(1).collect { stop() } } }
+    private data class TargetVersion(val session: RuntimeSession, val sdk: Int?, val error: String?)
+    private var targetVersion: TargetVersion? = null
+    private val deviceInfoJson = Json { ignoreUnknownKeys = true }
+    init {
+        scope.launch {
+            runtime.session.collectLatest { session ->
+                stop()
+                targetVersion = null
+                mutable.update { it.copy(message = "", targetVersionChecked = false) }
+                if (session != null) {
+                    val result = try {
+                        val info = deviceInfoJson.decodeFromString<DeviceInfo>(
+                            runtime.toolWriter()("device.info", buildJsonObject {}))
+                        TargetVersion(session, info.sdk, null)
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (error: Exception) { TargetVersion(session, null, "无法读取被控设备 Android 版本，请重新连接后重试") }
+                    if (runtime.session.value == session) {
+                        targetVersion = result
+                        mutable.update { it.copy(targetVersionChecked = true) }
+                    }
+                }
+            }
+        }
+    }
+    /** Runs before the permission prompt as well as before any microphone or voice request. */
+    fun checkTargetVersion(): Boolean {
+        val session = runtime.session.value ?: return false
+        val version = targetVersion?.takeIf { it.session == session }
+        val error = when {
+            version == null -> "需要先确认被控设备 Android 版本，正在读取，请稍后重试"
+            version.error != null -> version.error
+            version.sdk == null || version.sdk <= 0 -> "无法确认被控设备 Android 版本，请重新连接后重试"
+            version.sdk < 34 -> "需要被控设备 Android 14 及以上才能使用语音遥控（当前 API ${version.sdk}）"
+            else -> null
+        }
+        if (error != null) mutable.update { it.copy(message = "语音失败：$error") }
+        return error == null
+    }
     fun settings(value: VoiceSettings) {
         stop()
         mutable.update { it.copy(settings = value, message = "") }
@@ -40,6 +80,7 @@ internal class AndroidVoiceController(private val context: Context, private val 
     fun start(): Long? {
         val previous = job
         if (previous?.isActive == true) return null
+        if (!checkTargetVersion()) return null
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { permissionDenied(); return null }
         val session = runtime.session.value ?: return null
         val settings = state.value.settings

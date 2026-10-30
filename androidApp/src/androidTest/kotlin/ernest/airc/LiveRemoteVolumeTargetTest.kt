@@ -33,6 +33,9 @@ class LiveRemoteVolumeTargetTest {
         assumeTrue("Explicit owned target required", host != null && port != null)
         val observer = RuntimeConnection()
         var model: RemoteViewModel? = null
+        fun muted(): Boolean = runBlocking {
+            Json.parseToJsonElement(observer.request("tool", "media.volume", buildJsonObject {})).jsonObject["muted"]!!.jsonPrimitive.boolean
+        }
         fun query(): RemoteVolume = runBlocking {
             checkNotNull(parseRemoteVolume(observer.request("tool", "media.volume", buildJsonObject {}))) { "Target did not report media volume" }
         }
@@ -68,8 +71,10 @@ class LiveRemoteVolumeTargetTest {
                 val before = query()
                 val bounds = slider.fetchSemanticsNode().boundsInRoot
                 Log.i("AircVolumeTarget", "$label gesture width=${bounds.width}, delta=${bounds.width * (fraction - before.fraction)}, touchSlop=${android.view.ViewConfiguration.get(compose.activity).scaledTouchSlop}")
+                val thumb = compose.onNodeWithTag("remote-volume-thumb", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center
+                val start = thumb - bounds.topLeft
                 slider.performTouchInput {
-                    swipe(Offset(width * before.fraction, centerY), Offset(width * fraction, centerY), 600)
+                    swipe(start, Offset((start.x + width * (fraction - before.fraction)).coerceIn(1f, width - 1f), start.y), 600)
                 }
                 compose.waitUntil(10000) { !active.remoteVolume.setting.value && active.remoteVolume.state.value?.index != before.index }
                 val value = query()
@@ -90,6 +95,29 @@ class LiveRemoteVolumeTargetTest {
             actual = query()
             assertTrue(actual.index < before.index)
             verifyThumb(actual); report("key-down", actual)
+            // Exercise actual held gestures through the phone, including target-side repeats.
+            for ((description, label, increasing) in listOf(Triple("音量 +", "held-up", true), Triple("音量 −", "held-down", false))) {
+                before = query()
+                val button = compose.onNodeWithContentDescription(description)
+                button.performTouchInput { down(center) }
+                try { Thread.sleep(850) } finally { button.performTouchInput { up() } }
+                actual = query()
+                if (increasing) assertTrue("Held + must repeat on MUSIC", actual.index > before.index + 1)
+                else assertTrue("Held - must repeat on MUSIC", actual.index < before.index - 1)
+                verifyThumb(actual); report(label, actual)
+                Thread.sleep(350)
+                assertEquals("Released key must stop adjustment", actual.index, query().index)
+            }
+            val wasMuted = muted()
+            val mute = compose.onNodeWithContentDescription("静音")
+            mute.performTouchInput { down(center) }
+            try { Thread.sleep(850) } finally { mute.performTouchInput { up() } }
+            compose.waitUntil(10000) { muted() != wasMuted }
+            Log.i("AircVolumeTarget", "held-mute: MUSIC muted=${muted()}, original=$wasMuted")
+            report("held-mute", query())
+            mute.performTouchInput { click() }
+            compose.waitUntil(10000) { muted() == wasMuted }
+            Log.i("AircVolumeTarget", "mute-restored: MUSIC muted=${muted()}")
             // A change through another controller must also move the thumb.
             runBlocking { observer.request("tool", "media.volume", buildJsonObject {
                 put("percent", (original.fraction * 100).toInt())

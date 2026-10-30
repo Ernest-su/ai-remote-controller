@@ -106,6 +106,8 @@ fun DesktopDeviceInfo(state: DesktopState, controller: DesktopController) = Page
 @Composable
 fun DesktopMediaControls(state: DesktopState, controller: DesktopController) {
     val control by controller.mediaControl.state.collectAsState()
+    val renderedSelection = control.selected
     val available = state.connected && "media.status" in state.tools
-    MediaControlPanel(control, available, { controller.mediaControl.refresh(available) }, controller.mediaControl::choose, { controller.mediaControl.seek(it, available && "media.seek" in state.tools) }, { controller.mediaControl.customAction(it, available && "media.custom_action" in state.tools) })
+    LaunchedEffect(available) { controller.mediaControl.refresh(available) }
+    MediaControlPanel(control, available, { controller.mediaControl.refresh(available) }, controller.mediaControl::choose, { controller.mediaControl.seek(it, available && "media.seek" in state.tools, renderedSelection) }, { controller.mediaControl.customAction(it, available && "media.custom_action" in state.tools, renderedSelection) }, { controller.mediaControl.command(it, available && "media.command" in state.tools, renderedSelection) })
 }

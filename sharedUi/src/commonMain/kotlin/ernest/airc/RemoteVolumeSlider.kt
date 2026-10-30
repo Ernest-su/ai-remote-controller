@@ -46,7 +46,7 @@ fun RemoteVolumeSlider(volume: RemoteVolume?, connected: Boolean, onSet: (Float)
             enabled = enabled,
             colors = colors,
             thumb = {
-                Box(Modifier.size(RemoteDimensions.VolumeThumbSize)
+                Box(Modifier.size(RemoteDimensions.VolumeThumbSize).testTag("remote-volume-thumb")
                     .background(if (connected && volume != null) RemoteColors.Action else RemoteColors.Disabled, CircleShape))
             },
             track = { state ->

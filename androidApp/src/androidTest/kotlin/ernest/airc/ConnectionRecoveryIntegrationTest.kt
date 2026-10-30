@@ -70,6 +70,45 @@ class ConnectionRecoveryIntegrationTest {
             devices.remove("recovery-runtime-fixture")
         }
     }
+    @Test fun stalledAdbShowsWaitingAndShortRetryReasonWithoutOpeningTheForm() = runBlocking {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val http = MockWebServer().apply {
+            dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+                override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest) = MockResponse().setResponseCode(503)
+            }
+            start()
+        }
+        val adb = java.net.ServerSocket(0, 1, java.net.InetAddress.getByName("127.0.0.1")).apply { soTimeout = 3000 }
+        val record = RememberedDevice("stalled-adb-fixture", "Fixture", ConnectionMethod.TCP,
+            "127.0.0.1", adb.localPort, runtimePort = http.port, lastConnectedAt = 1)
+        DeviceStore(context).remember(record)
+        val owner = ViewModelStore()
+        lateinit var model: RemoteViewModel
+        var candidate: java.net.Socket? = null
+        try {
+            instrumentation.runOnMainSync {
+                model = RemoteViewModel(context.applicationContext as Application, 10_000)
+                owner.put("adb-waiting", model)
+            }
+            candidate = withContext(Dispatchers.IO) { adb.accept() }
+            withTimeout(10_000) {
+                while (model.state.value.status != "正在等待被控端 ADB 响应…") delay(20)
+            }
+            withTimeout(4000) {
+                while (model.state.value.status != "被控端 ADB 未响应，3 秒后重试") delay(20)
+            }
+            assertFalse(model.state.value.busy)
+            assertTrue(model.state.value.reconnecting)
+            assertNull(model.state.value.manualConnectionTarget)
+            assertNotEquals(FeedbackPhase.ERROR, model.state.value.feedback.phase)
+            instrumentation.runOnMainSync { model.cancelConnection() }
+            assertEquals("已取消", model.state.value.status)
+        } finally {
+            instrumentation.runOnMainSync { owner.clear() }
+            candidate?.close(); adb.close(); http.shutdown()
+        }
+    }
     private fun readyServer(id: String) = MockWebServer().apply {
         dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
             override fun dispatch(request: okhttp3.mockwebserver.RecordedRequest): MockResponse = when (request.path) {

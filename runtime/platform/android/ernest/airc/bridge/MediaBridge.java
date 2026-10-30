@@ -11,8 +11,9 @@ import java.util.List;
 
 /** Short-lived framework adapter, invoked by the native runtime; no service or APK. */
 public final class MediaBridge {
+    private static Context caller;
     private static List<MediaController> sessions(int user) throws Exception {
-        Context caller=FrameworkContext.forUser(user);
+        caller=FrameworkContext.forUser(user);
         try {
             Class<?> initializer=Class.forName("android.media.MediaFrameworkPlatformInitializer");
             if(initializer.getMethod("getMediaServiceManager").invoke(null)==null) {
@@ -28,6 +29,15 @@ public final class MediaBridge {
         PlaybackState state=controller.getPlaybackState();MediaMetadata metadata=controller.getMetadata();
         result.put("packageName",controller.getPackageName());result.put("active",true);String tag=controller.getTag();result.put("sessionTag",tag==null||tag.length()>128?JSONObject.NULL:tag);
         result.put("state",state==null?JSONObject.NULL:state.getState());
+        result.put("actions",state==null||state.getActions()<0?JSONObject.NULL:state.getActions());
+        String appName=null;
+        try { appName=caller.getPackageManager().getApplicationLabel(caller.getPackageManager().getApplicationInfo(controller.getPackageName(),0)).toString(); }
+        catch(Exception unavailable) { /* The identity remains available in details. */ }
+        result.put("appName",appName==null?JSONObject.NULL:appName.substring(0,Math.min(appName.length(),128)));
+        String artist=metadata==null?null:metadata.getString(MediaMetadata.METADATA_KEY_ARTIST);
+        String album=metadata==null?null:metadata.getString(MediaMetadata.METADATA_KEY_ALBUM);
+        result.put("artist",artist==null?JSONObject.NULL:artist.substring(0,Math.min(artist.length(),256)));
+        result.put("album",album==null?JSONObject.NULL:album.substring(0,Math.min(album.length(),256)));
         result.put("positionMs",state==null||state.getPosition()<0?JSONObject.NULL:state.getPosition());
         result.put("updatedAtElapsedMs",state==null?JSONObject.NULL:state.getLastPositionUpdateTime());
         result.put("seekSupported",state==null?JSONObject.NULL:(state.getActions()&PlaybackState.ACTION_SEEK_TO)!=0);
@@ -37,15 +47,14 @@ public final class MediaBridge {
         result.put("customActions",MediaCustomActions.snapshot(state));
         return result;
     }
-    public static void main(String[] args) {
-        try {
+    static JSONObject execute(String[] args) throws Exception {
             if(args.length!=2&&args.length!=5) throw new IllegalArgumentException("invalid media bridge arguments");
             int user=Integer.parseInt(args[1]);if(user<0)throw new IllegalArgumentException("invalid user");
             List<MediaController> controllers=sessions(user);
             if(controllers.size()>64)throw new IllegalStateException("too many active media sessions");
             if(args[0].equals("status")&&args.length==2) {
                 JSONArray values=new JSONArray();for(MediaController controller:controllers)values.put(snapshot(controller));
-                System.out.println(new JSONObject().put("sessions",values).put("seekAvailable",true).put("customActionAvailable",true).put("source","media_controller").put("userId",user).toString());
+                return new JSONObject().put("sessions",values).put("seekAvailable",true).put("customActionAvailable",true).put("transportAvailable",true).put("source","media_controller").put("userId",user);
             } else if(args[0].equals("pause_current")&&args.length==2) {
                 MediaController selected=null;
                 // Android returns active sessions in priority order. Pause one playing session,
@@ -57,9 +66,11 @@ public final class MediaBridge {
                 }
                 if(selected==null)throw new IllegalStateException("no playing media session with pause support");
                 selected.getTransportControls().pause();
-                System.out.println(new JSONObject().put("operation","pause").put("packageName",selected.getPackageName()).put("submitted",true).put("playbackVerified",false).toString());
+                return new JSONObject().put("operation","pause").put("packageName",selected.getPackageName()).put("submitted",true).put("playbackVerified",false);
+            } else if(args[0].equals("command")&&args.length==5) {
+                return MediaCommands.send(controllers,args[2],args[3],args[4]);
             } else if(args[0].equals("custom_action")&&args.length==5) {
-                System.out.println(MediaCustomActions.send(controllers,args[2],args[3],args[4]).toString());
+                return MediaCustomActions.send(controllers,args[2],args[3],args[4]);
             } else if(args[0].equals("seek")&&args.length==5) {
                 String pkg=args[2];String tag=args[3];long position=Long.parseLong(args[4]);if(position<0)throw new IllegalArgumentException("position must be nonnegative");
                 MediaController selected=null;
@@ -72,8 +83,17 @@ public final class MediaBridge {
                 MediaMetadata metadata=selected.getMetadata();
                 if(metadata!=null&&metadata.containsKey(MediaMetadata.METADATA_KEY_DURATION)&&metadata.getLong(MediaMetadata.METADATA_KEY_DURATION)>0&&position>metadata.getLong(MediaMetadata.METADATA_KEY_DURATION))throw new IllegalArgumentException("position exceeds duration");
                 selected.getTransportControls().seekTo(position);
-                System.out.println(new JSONObject().put("packageName",pkg).put("requestedMs",position).put("submitted",true).put("playbackVerified",false).put("session",snapshot(selected)).toString());
+                for(int attempt=0;attempt<5;attempt++) {
+                    PlaybackState observed=selected.getPlaybackState();
+                    long tolerance=observed!=null&&observed.getState()==PlaybackState.STATE_PLAYING?1500:500;
+                    if(observed!=null&&observed.getPosition()>=0&&Math.abs(observed.getPosition()-position)<=tolerance)break;
+                    Thread.sleep(40);
+                }
+                return new JSONObject().put("packageName",pkg).put("requestedMs",position).put("submitted",true).put("playbackVerified",false).put("session",snapshot(selected));
             } else throw new IllegalArgumentException("unsupported media bridge operation");
+    }
+    public static void main(String[] args) {
+        try { System.out.println(execute(args).toString());
         } catch(Throwable error) {
             while(error.getCause()!=null)error=error.getCause();
             System.err.println(error.getClass().getSimpleName()+": "+error.getMessage());System.exit(1);

@@ -58,7 +58,6 @@ internal fun Devices(state: RemoteUiState, model: RemoteViewModel) {
         Panel(Modifier.testTag("device-discovery-header")) {
             DeviceDiscoveryHeader(state.adbScanning, state.adbScanStatus, model::scanAdbDevices)
             Text("自动查找同网段 ADB 与遥控服务，点击设备后连接。", style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
-            Text(state.status, modifier = Modifier.testTag("device-connection-status"), style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary)
         }
         Surface(color = RemoteColors.Surface, shape = MaterialTheme.shapes.small, modifier = Modifier.testTag("unified-device-list")) {
             Column {
@@ -181,8 +180,13 @@ internal fun UnifiedDeviceRow(
         }
         if (showManagement) Column(Modifier.padding(horizontal = 16.dp)) {
             entry.history.forEach { device ->
-                DeviceNameEditor(device.id, device.visibleName, !state.busy) { onRename(device.id, it) }
-                TextButton({ onForget(device.id) }, enabled = !state.busy) { Text("忘记已保存记录", color = RemoteColors.Secondary) }
+                Row(Modifier.fillMaxWidth().padding(bottom = 12.dp).height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DeviceNameEditor(device.id, device.visibleName, !state.busy, Modifier.weight(1f).fillMaxHeight()) { onRename(device.id, it) }
+                    OutlinedButton({ onForget(device.id) }, enabled = !state.busy,
+                        modifier = Modifier.weight(1f).fillMaxHeight().heightIn(min = 48.dp),
+                        shape = MaterialTheme.shapes.small, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) { Text("从已保存记录移除") }
+                }
             }
         }
     }

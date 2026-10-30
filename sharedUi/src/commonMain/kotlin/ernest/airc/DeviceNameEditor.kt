@@ -10,10 +10,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun DeviceNameEditor(id: String, name: String, enabled: Boolean, onSave: (String) -> Unit) {
+fun DeviceNameEditor(id: String, name: String, enabled: Boolean, modifier: Modifier = Modifier, onSave: (String) -> Unit) {
     var editing by rememberSaveable(id) { mutableStateOf(false) }
     var draft by rememberSaveable(id, name) { mutableStateOf(name) }
-    TextButton({ draft = name; editing = true }, enabled = enabled, modifier = Modifier.heightIn(min = 48.dp)) { Text("修改显示名") }
+    OutlinedButton({ draft = name; editing = true }, enabled = enabled, modifier = modifier.heightIn(min = 48.dp),
+        shape = MaterialTheme.shapes.small, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) { Text("修改显示名") }
     if (editing) AlertDialog(
         onDismissRequest = { editing = false },
         title = { Text("设备显示名") },

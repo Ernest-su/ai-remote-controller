@@ -1,5 +1,7 @@
 package ernest.airc.bridge;
 
+import android.content.Context;
+import android.media.AudioManager;
 import android.os.Process;
 import android.os.SystemClock;
 import android.system.Os;
@@ -18,6 +20,7 @@ import org.json.JSONObject;
 public final class InputBridge {
     private final Object manager;
     private final Method inject;
+    private AudioManager audio;
     private final Map<Integer,Long> pressed = new HashMap<>();
     private static final class Hold {
         final String id; final long down;
@@ -43,6 +46,19 @@ public final class InputBridge {
         send(code,action,down,0,0);
     }
     private void send(int code,int action,long down,int repeat,int flags) throws Exception {
+        // Volume keys always target MUSIC, even when the foreground app selects another stream.
+        if(code==KeyEvent.KEYCODE_VOLUME_UP||code==KeyEvent.KEYCODE_VOLUME_DOWN||code==KeyEvent.KEYCODE_VOLUME_MUTE) {
+            if(action==KeyEvent.ACTION_DOWN&&(code!=KeyEvent.KEYCODE_VOLUME_MUTE||repeat==0)) {
+                if(audio==null) {
+                    int user=(Integer)Class.forName("android.app.ActivityManager").getMethod("getCurrentUser").invoke(null);
+                    audio=(AudioManager)FrameworkContext.forUser(user).getSystemService(Context.AUDIO_SERVICE);
+                }
+                int direction=code==KeyEvent.KEYCODE_VOLUME_UP?AudioManager.ADJUST_RAISE:
+                    code==KeyEvent.KEYCODE_VOLUME_DOWN?AudioManager.ADJUST_LOWER:AudioManager.ADJUST_TOGGLE_MUTE;
+                audio.adjustStreamVolume(AudioManager.STREAM_MUSIC,direction,0);
+            }
+            return;
+        }
         KeyEvent event=new KeyEvent(down,SystemClock.uptimeMillis(),action,code,repeat,0,-1,0,flags,InputDevice.SOURCE_KEYBOARD);
         // Submission confirmation; receiving application consumption is verified separately.
         if(!Boolean.TRUE.equals(inject.invoke(manager,event,0))) throw new IllegalStateException("input submission rejected");

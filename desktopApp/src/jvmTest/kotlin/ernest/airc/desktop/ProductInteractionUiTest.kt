@@ -53,6 +53,7 @@ class ProductInteractionUiTest {
         compose.setContent { RemoteTheme { Box(Modifier.width(320.dp).height(640.dp)) {
             MediaControlPanel(MediaControlState(listOf(session), session.selection(), seekAvailable = true), true, {}, {}, {})
         } } }
+        compose.onNodeWithTag("media-precise-toggle").performScrollTo().performClick()
         compose.onNodeWithTag("media-seek-position").performScrollTo().performTextInput("-1")
         compose.onNodeWithText("请输入有效的分:秒或时:分:秒").assertExists()
         compose.onNodeWithText("跳转").performScrollTo().assertIsNotEnabled()

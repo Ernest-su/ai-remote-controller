@@ -41,7 +41,7 @@ pub(super) fn parse(dump: &str) -> Result<Value> {
             current = Some(json!({"packageName":package,"active":active,"state":state,
                 "positionMs":number(line,"position=").filter(|n| *n >= 0),
                 "durationMs":null,"description":null,"updatedAtElapsedMs":number(line,"updated=").filter(|n| *n >= 0),
-                "seekSupported":actions.map(|n| n & 256 != 0)}));
+                "actions":actions,"seekSupported":actions.map(|n| n & 256 != 0)}));
         } else if line.starts_with("metadata:") {
             if let Some(ref mut session) = current {
                 // Some platform dumps expose the standard duration key; never infer duration from titles.
@@ -65,8 +65,7 @@ pub(super) async fn execute(args: &Value) -> Result<String> {
         bail!("media.status accepts an empty argument object");
     }
     let standard = async {
-        let user = current_user().await?;
-        let payload = crate::platform_bridge::invoke("status", &[user]).await?;
+        let payload = crate::platform_bridge::invoke("status", &[]).await?;
         let mut value: Value = serde_json::from_str(&payload)?;
         if !value["sessions"].is_array() {
             bail!("invalid standard media status");
@@ -88,7 +87,7 @@ pub(super) async fn execute(args: &Value) -> Result<String> {
 }
 
 pub(super) async fn pause_current() -> Result<String> {
-    let result = crate::platform_bridge::invoke("pause_current", &[current_user().await?]).await?;
+    let result = crate::platform_bridge::invoke("pause_current", &[]).await?;
     let value: Value = serde_json::from_str(&result)?;
     if value["operation"] != "pause"
         || value["submitted"] != true
@@ -99,13 +98,6 @@ pub(super) async fn pause_current() -> Result<String> {
     Ok(result)
 }
 
-async fn current_user() -> Result<String> {
-    let user = run_command("am", &["get-current-user".into()])
-        .await?
-        .trim()
-        .parse::<u32>()?;
-    Ok(user.to_string())
-}
 fn seek_arguments(args: &Value) -> Result<Vec<String>> {
     let object = args.as_object().context("seek arguments must be object")?;
     if object
@@ -159,23 +151,64 @@ fn custom_action_arguments(args: &Value) -> Result<Vec<String>> {
     parameters[2] = action.into();
     Ok(parameters)
 }
+fn command_arguments(args: &Value) -> Result<Vec<String>> {
+    let object = args
+        .as_object()
+        .context("media.command requires an object")?;
+    if object
+        .keys()
+        .any(|key| !["package", "sessionTag", "command"].contains(&key.as_str()))
+    {
+        bail!("media.command accepts only package, sessionTag and command");
+    }
+    let command = args["command"].as_str().context("command required")?;
+    if !["play", "pause", "previous", "next"].contains(&command) {
+        bail!("unsupported media command");
+    }
+    let mut selection = args.clone();
+    selection.as_object_mut().unwrap().remove("command");
+    selection["action"] = json!(command);
+    custom_action_arguments(&selection)
+}
+pub(super) async fn command(args: &Value) -> Result<String> {
+    let arguments = command_arguments(args)?;
+    crate::platform_bridge::invoke("command", &arguments).await
+}
+
 pub(super) async fn custom_action(args: &Value) -> Result<String> {
     let arguments = custom_action_arguments(args)?;
-    let mut parameters = vec![current_user().await?];
-    parameters.extend(arguments);
-    crate::platform_bridge::invoke("custom_action", &parameters).await
+    crate::platform_bridge::invoke("custom_action", &arguments).await
 }
 
 pub(super) async fn seek(args: &Value) -> Result<String> {
     let arguments = seek_arguments(args)?;
-    let mut parameters = vec![current_user().await?];
-    parameters.extend(arguments);
-    crate::platform_bridge::invoke("seek", &parameters).await
+    crate::platform_bridge::invoke("seek", &arguments).await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn transport_commands_require_exact_session_identity_and_bounded_commands() {
+        for command in ["play", "pause", "previous", "next"] {
+            assert_eq!(
+                command_arguments(
+                    &json!({"package":"com.test.player","sessionTag":"fixture","command":command})
+                )
+                .unwrap(),
+                vec!["com.test.player", "fixture", command]
+            );
+        }
+        for invalid in [
+            json!(null),
+            json!({"package":"com.test.player","command":"toggle"}),
+            json!({"package":"com.test.player;reboot","command":"play"}),
+            json!({"package":"com.test.player","command":"play","positionMs":0}),
+            json!({"package":"com.test.player","command":"pause","sessionTag":"bad\n"}),
+        ] {
+            assert!(command_arguments(&invalid).is_err());
+        }
+    }
     #[test]
     fn seek_input_is_absolute_and_cannot_inject_shell_arguments() {
         assert!(
@@ -265,14 +298,14 @@ fn volume_percent(args: &Value) -> Result<Option<u64>> {
 
 pub(super) async fn volume(args: &Value) -> Result<String> {
     let percent = volume_percent(args)?;
-    let mut arguments = vec![current_user().await?];
+    let mut arguments = Vec::new();
     let action = if let Some(percent) = percent {
         arguments.push(percent.to_string());
         "set_volume"
     } else {
         "status"
     };
-    let payload = crate::platform_bridge::scheduled_audio(action, &arguments).await?;
+    let payload = crate::playback_bridge::invoke("audio", action, &arguments).await?;
     let value: Value = serde_json::from_str(&payload)?;
     if value["stream"] != "media" || value["operation"] != action || value["verified"] != true {
         bail!("invalid media volume acknowledgement");

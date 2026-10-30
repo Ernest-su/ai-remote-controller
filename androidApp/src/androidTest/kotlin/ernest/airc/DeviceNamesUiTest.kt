@@ -55,9 +55,21 @@ class DeviceNamesUiTest {
                 connect.performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
             }
             compose.onNodeWithText("Hardware model").assertDoesNotExist()
+            compose.onNodeWithContentDescription("管理 客厅电视").performScrollTo().performClick()
+            val rename = compose.onNodeWithText("修改显示名")
+            val remove = compose.onNodeWithText("从已保存记录移除")
+            rename.performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+            remove.performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+            val renameBounds = rename.fetchSemanticsNode().boundsInRoot
+            val removeBounds = remove.fetchSemanticsNode().boundsInRoot
+            assertEquals(renameBounds.top, removeBounds.top, 1f)
+            assertEquals(renameBounds.bottom, removeBounds.bottom, 1f)
+            org.junit.Assert.assertTrue(renameBounds.right <= removeBounds.left)
+            compose.onNodeWithText("忘记已保存记录").assertDoesNotExist()
             val output = File(requireNotNull(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null)),
                 "device-names-${if (mode) "dark" else "light"}.png")
             output.outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
+            compose.onNodeWithContentDescription("管理 客厅电视").performScrollTo().performClick()
         }
         compose.runOnIdle { assertEquals(List(2) { listOf("192.0.2.1", "192.0.2.2", "192.0.2.3") }.flatten(), connections) }
     }

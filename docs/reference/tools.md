@@ -154,7 +154,7 @@ Android 页面显示名称、包名、图标与类型，支持名称/包名搜�
 
 `media.status` 优先使用一次性标准 MediaController 桥接，返回 seekAvailable、source=media_controller、userId 和活动 sessions；会话增加 sessionTag，读取真实报告位置、更新时钟、时长、ACTION_SEEK_TO 支持与标题。位置是播放器报告值，不在控制端外推。桥接不可用时回退原 dumpsys 解析，seekAvailable=false 并附有限长度 bridgeError。
 
-`media.seek` / `media_seek` 接收 package、非负整数 positionMs 和可选 sessionTag。选择当前 Android 用户活动会话，检查 ACTION_SEEK_TO 和已知正时长边界；多个匹配会话时拒绝猜测。通过标准 TransportControls.seekTo 提交，不用方向/快进键模拟。返回 packageName、requestedMs、submitted=true、playbackVerified=false 和提交时 session 快照。提交不证明执行：控制端随后读取位置核对，播放器拒绝或未及时更新时如实显示未观察到目标位置。接口依据 [MediaSessionManager](https://developer.android.com/reference/android/media/session/MediaSessionManager#getActiveSessions(android.content.ComponentName)) 与 [TransportControls.seekTo](https://developer.android.com/reference/android/media/session/MediaController.TransportControls#seekTo(long))。
+`media.seek` / `media_seek` 接收 package、非负整数 positionMs 和可选 sessionTag。选择当前 Android 用户活动会话，检查 ACTION_SEEK_TO 和已知正时长边界；多个匹配会话时拒绝猜测。通过标准 TransportControls.seekTo 提交，不用方向/快进键模拟。返回 packageName、requestedMs、submitted=true、playbackVerified=false 和提交时 session 快照。提交不证明执行：适配在提交后最多等待200ms读取真实状态，响应的 session 为实际会话快照。控制端优先使用它核对位置，不追加多轮状态读取；尚未观察到目标位置时如实提示待更新，后续由常规读取更新。接口依据 [MediaSessionManager](https://developer.android.com/reference/android/media/session/MediaSessionManager#getActiveSessions(android.content.ComponentName)) 与 [TransportControls.seekTo](https://developer.android.com/reference/android/media/session/MediaController.TransportControls#seekTo(long))。
 
 常驻服务仍为 Rust 原生二进制。Android 构建时编译并嵌入短时 Java/Dex 桥接，只经系统 app_process 为当前请求调用 framework，不安装服务 APK或后台 Java 服务。初始化到服务私有 platform 目录中的 SHA-256 命名只读资产，核对 owner、模式、长度和内容；子进程默认限时 10 秒、输出 256 KiB；应用列表框架查询限时 30 秒、输出 1 MiB。反射只用于获取系统/当前用户上下文与 Android 媒体模块初始化；厂商或权限阻止时返回不可用，不切换或提权。最多 64 会话，标题限 256 字符、tag 超过 128 字符返回 null。Root 身份、Android 版本与厂商权限差异需在对应目标验证。
 
@@ -280,3 +280,11 @@ remote.key 的 power 参数仅供直接手动控制；模型别名 remote_key �
 ### 物理屏幕电源
 
 `screen.power` 接受 `{}` 读取服务最后成功提交的模式，或 `{"on":false}` / `{"on":true}` 关闭/打开物理显示，返回 `{"on":布尔值}`。不发送电源按键、不休眠、不锁屏；平台失败返回错误并保留上次模式。服务初始模式为打开，不探测其他应用或实体按键改变的显示状态。
+
+## 会话播放控制 {#media-command}
+
+`media.command` / `media_command` 接受 `package`、可选 `sessionTag` 和枚举 `command`（`play`、`pause`、`previous`、`next`），拒绝额外字段。对当前 Android 用户重新查询活动会话，要求匹配唯一。声明独立标准 PlaybackState 动作位时通过该会话的 TransportControls 提交；仅声明 ACTION_PLAY_PAUSE 的播放/暂停请求，根据当前明确状态向该会话发送成对的播放暂停按键，同方向已满足时不再切换，状态不明确时拒绝。不会向系统分发全局媒体按键。返回 `packageName`、实际 `sessionTag`、`command`、`submitted:true`、`playbackVerified:false`，提交后应读取 `media.status` 核对实际状态。
+
+标准 `media.status` 会话补充可选的 `appName`、`artist`、`album` 与 `actions`；顶层 `transportAvailable` 表示会话播放命令接口是否可用。无法取得的字段保留未知，不伪造应用名、封面或播放能力；平台桥不可用时不宣称 transport 可用。
+
+播放与媒体音量工具共用 runtime 所有的常驻 Android 桥接进程，通过有界、带请求关联的逐行 JSON 交换结果，复用 framework 上下文并在当前 Android 用户变化时切换上下文，避免每次启动 am/app_process。等待中的取消不会提交迟到操作；已经开始的帧读完后再交给下一请求，超时或响应丢失会丢弃进程且不自动重放写操作。独立 AudioBridge CLI 仍用于显式用户的定时操作与验证工具。

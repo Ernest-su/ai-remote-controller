@@ -9,6 +9,8 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import okhttp3.*
 import okhttp3.mockwebserver.*
 import okio.ByteString
@@ -48,7 +50,7 @@ class VoiceInputUiTest {
         server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
                 "/status" -> MockResponse().setBody("""{"version":"fixture","protocol":1,"deviceId":"voice-fixture","tools":[],"modelConfigured":false}""")
-                "/ws" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {})
+                "/ws" -> MockResponse().withWebSocketUpgrade(versionListener { 34 })
                 "/voice" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                     private var received = 0L
                     override fun onMessage(webSocket: WebSocket, text: String) {
@@ -89,6 +91,7 @@ class VoiceInputUiTest {
         try {
             runBlocking { runtime.connect("127.0.0.1", server.port) }
             compose.setContent { RemoteTheme { if (visible) VoiceControls(controller, true) } }
+            compose.waitUntil(5000) { controller.state.value.targetVersionChecked }
             // A quick tap cancelled before the IO coroutine starts must not leave a pending state.
             compose.runOnIdle { controller.start(); controller.stop() }
             compose.waitUntil(5000) { !controller.state.value.preparing && !controller.state.value.recording && !controller.state.value.draining }
@@ -140,7 +143,7 @@ class VoiceInputUiTest {
         server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
                 "/status" -> MockResponse().setBody("""{"version":"fixture","protocol":1,"deviceId":"voice-buffer-fixture","tools":[]}""")
-                "/ws" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {})
+                "/ws" -> MockResponse().withWebSocketUpgrade(versionListener { 34 })
                 "/voice" -> MockResponse().withWebSocketUpgrade(object : WebSocketListener() {
                     private var bytes = 0L
                     override fun onMessage(webSocket: WebSocket, text: String) {
@@ -184,6 +187,7 @@ class VoiceInputUiTest {
         try {
             runBlocking { runtime.connect("127.0.0.1", server.port) }
             compose.setContent { RemoteTheme { VoiceControls(controller, true) } }
+            compose.waitUntil(5000) { controller.state.value.targetVersionChecked }
             compose.waitUntil(5000) { compose.activity.hasWindowFocus() }
             val button = compose.onNodeWithContentDescription("按住说话")
             button.performTouchInput { down(center) }
@@ -198,6 +202,58 @@ class VoiceInputUiTest {
             assertArrayEquals(synchronized(produced) { produced.toByteArray() }, synchronized(received) { received.toByteArray() })
             assertFalse(controller.state.value.message, controller.state.value.message.startsWith("语音失败"))
         } finally { gate.countDown(); controller.stop(); scope.cancel(); runtime.close(); server.shutdown() }
+    }
+
+    private fun versionListener(sdk: () -> Int?) = object : WebSocketListener() {
+        override fun onMessage(webSocket: WebSocket, text: String) {
+            val request = Json.decodeFromString<RuntimeRequest>(text)
+            check(request.tool == "device.info")
+            val version = sdk()
+            webSocket.send(Json.encodeToString(if (version == -1) RuntimeResponse(request.id, false, error = "fixture failure")
+                else RuntimeResponse(request.id, true, result = "{\"sdk\":$version}")))
+        }
+    }
+
+    @Test fun unsupportedAndUnknownTargetVersionsAreRejectedBeforeCaptureAndVoiceRequest() {
+        val sdk = AtomicInteger(33)
+        val voiceRequests = AtomicInteger()
+        val captures = AtomicInteger()
+        val server = MockWebServer()
+        server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
+                "/status" -> MockResponse().setBody("""{"version":"fixture","protocol":1,"deviceId":"version-fixture","tools":["device.info"]}""")
+                "/ws" -> MockResponse().withWebSocketUpgrade(versionListener { sdk.get().takeIf { it != 0 } })
+                else -> { voiceRequests.incrementAndGet(); MockResponse().setResponseCode(404) }
+            }
+        }
+        server.start()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        val runtime = RuntimeConnection()
+        val controller = AndroidVoiceController(context, scope, runtime) {
+            captures.incrementAndGet(); error("Unsupported target must never capture")
+        }
+        try {
+            runBlocking { runtime.connect("127.0.0.1", server.port) }
+            compose.setContent { RemoteTheme { RemoteCommandInput(controller, true, false, false, "", {}, {}) } }
+            compose.waitUntil(5000) { controller.state.value.targetVersionChecked && compose.activity.hasWindowFocus() }
+            compose.onNodeWithContentDescription("切换为语音输入").performClick()
+            compose.onNodeWithTag("voice-error").assertTextContains("需要被控设备 Android 14", substring = true)
+            compose.onNodeWithContentDescription("按住说话").performTouchInput { down(center); up() }
+            compose.onNodeWithTag("voice-error").assertTextContains("需要被控设备 Android 14", substring = true)
+            compose.runOnIdle { assertNull(controller.start()) }
+            assertFalse(controller.state.value.preparing || controller.state.value.recording)
+            // A new generation must not reuse the previous target's version.
+            for (version in listOf(34, 0, -1)) {
+                sdk.set(version)
+                runBlocking { runtime.connect("127.0.0.1", server.port) }
+                compose.waitForIdle()
+                compose.waitUntil(5000) { controller.state.value.targetVersionChecked }
+                compose.runOnIdle { assertEquals(version == 34, controller.checkTargetVersion()) }
+            }
+            compose.onNodeWithTag("voice-error").assertTextContains("无法读取被控设备 Android 版本", substring = true)
+            assertEquals(0, captures.get())
+            assertEquals(0, voiceRequests.get())
+        } finally { controller.stop(); scope.cancel(); runtime.close(); server.shutdown() }
     }
 
 }

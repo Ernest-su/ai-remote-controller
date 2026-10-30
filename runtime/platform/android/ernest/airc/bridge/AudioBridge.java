@@ -7,8 +7,7 @@ import org.json.JSONObject;
 
 /** Explicit media-stream operations for remote controls and target-owned schedules; never uses mute-toggle keys. */
 public final class AudioBridge {
-    public static void main(String[] args) {
-        try {
+    static JSONObject execute(String[] args) throws Exception {
             if(args.length<2)throw new IllegalArgumentException("invalid audio arguments");
             int user=Integer.parseInt(args[1]);
             Context context=FrameworkContext.forUser(user);
@@ -45,7 +44,10 @@ public final class AudioBridge {
                 .put("maxVolumeIndex",audio.getStreamMaxVolume(stream)).put("fixed",audio.isVolumeFixed())
                 .put("muted",audio.isStreamMute(stream)).put("verified",true);
             if(requested>=0)result.put("requestedPercent",requested);
-            System.out.println(result.toString());
+            return result;
+    }
+    public static void main(String[] args) {
+        try { System.out.println(execute(args).toString());
         } catch(Throwable error) {
             while(error.getCause()!=null)error=error.getCause();
             System.err.println(error.getClass().getSimpleName()+": "+error.getMessage());System.exit(1);

@@ -8,6 +8,7 @@ mod i18n;
 mod media_publications;
 mod media_resources;
 mod platform_bridge;
+mod playback_bridge;
 mod remote_input;
 mod schedules;
 mod screen_capture;

@@ -56,6 +56,7 @@ class DesktopUiTest {
         compose.setContent { RemoteTheme { MediaControlPanel(MediaControlState(listOf(session), session.selection(), seekAvailable = true), true, {}, {}, { requested = it }) } }
         compose.onNodeWithText("0:01").assertExists()
         compose.onNodeWithText("0:20").assertExists()
+        compose.onNodeWithTag("media-precise-toggle").performScrollTo().performClick()
         compose.onNodeWithTag("media-seek-position").performTextInput("0:07")
         compose.onNodeWithText("跳转").performScrollTo().performClick(); assertEquals(7000L, requested)
     }

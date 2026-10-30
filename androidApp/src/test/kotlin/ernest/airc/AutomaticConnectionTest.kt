@@ -11,10 +11,12 @@ class AutomaticConnectionTest {
 
     @Test fun retriesWithBackoffUntilConnected() = runTest {
         val times = mutableListOf<Long>()
-        val reconnect = AutomaticConnection(this, maxAttempts = 5) { times += currentTime; times.size == 5 }
+        val retries = mutableListOf<Long>()
+        val reconnect = AutomaticConnection(this, maxAttempts = 5, onRetry = retries::add) { times += currentTime; times.size == 5 }
         reconnect.start(device)
         advanceUntilIdle()
         assertEquals(listOf(0L, 3000L, 9000L, 21000L, 45000L), times)
+        assertEquals(listOf(3000L, 6000L, 12000L, 24000L), retries)
     }
 
     @Test fun explicitStopCancelsAttemptAndFutureRetries() = runTest {
@@ -57,10 +59,12 @@ class AutomaticConnectionTest {
 
     @Test fun backgroundRecoveryWaitsBetweenBurstsAndCanBeStopped() = runTest {
         val times = mutableListOf<Long>()
-        val reconnect = AutomaticConnection(backgroundScope, cooldownMillis = 30_000) { times += currentTime; false }
+        val retries = mutableListOf<Long>()
+        val reconnect = AutomaticConnection(backgroundScope, cooldownMillis = 30_000, onRetry = retries::add) { times += currentTime; false }
         reconnect.start(device)
         advanceTimeBy(9_001); runCurrent()
         assertEquals(listOf(0L, 3000L, 9000L), times)
+        assertEquals(listOf(3000L, 6000L, 30000L), retries)
         advanceTimeBy(30_000); runCurrent()
         assertEquals(39_000L, times[3])
         reconnect.stop(); advanceTimeBy(120_000); runCurrent()

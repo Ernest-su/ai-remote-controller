@@ -35,9 +35,10 @@ internal class ConnectionDeadline(
     private var lastProgress = started
     private var transferred = 0L
     private var reported = Long.MIN_VALUE
+    private var waitingReported = false
 
     @Synchronized fun begin(next: ConnectionStage, message: String = next.label) {
-        stage = next; entered = clock(); lastProgress = entered; transferred = 0; reported = Long.MIN_VALUE
+        stage = next; entered = clock(); lastProgress = entered; transferred = 0; reported = Long.MIN_VALUE; waitingReported = false
         report(message)
     }
     @Synchronized fun progress(bytes: Long, total: Long, label: String) {
@@ -50,6 +51,19 @@ internal class ConnectionDeadline(
         }
     }
     @Synchronized fun pulse() { lastProgress = clock() }
+    @Synchronized fun reportWaiting() {
+        if (!waitingReported && stage == ConnectionStage.CONNECT && clock() - entered >= 8_000) {
+            waitingReported = true
+            report("正在等待被控端 ADB 响应…")
+        }
+    }
+    @Synchronized fun retryReason(timedOut: Boolean = false): String = when (stage) {
+        ConnectionStage.CONNECT -> if (timedOut) "被控端 ADB 未响应" else "被控端 ADB 连接失败"
+        ConnectionStage.RUNTIME -> if (timedOut) "遥控服务未响应" else "遥控服务连接失败"
+        ConnectionStage.PUSH -> "设备端程序传输未完成"
+        ConnectionStage.START -> "被控端服务未就绪"
+        else -> "${stage.label}未完成"
+    }
     @Synchronized fun timeoutMessage() = "连接超时（${stage.label}）：阶段操作未及时完成，请检查目标状态或重试"
     @Synchronized fun failure(totalLimitMillis: Long): String? {
         val now = clock()

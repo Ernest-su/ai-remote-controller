@@ -19,7 +19,7 @@ fun DesktopDevices(state: DesktopState, controller: DesktopController) = PageCon
     state.deviceId?.let { id ->
         Panel {
             SectionTitle(state.name)
-            DeviceNameEditor(id, state.name, !state.busy, controller::renameDevice)
+            DeviceNameEditor(id, state.name, !state.busy, onSave = controller::renameDevice)
         }
     }
     Panel {

@@ -103,6 +103,10 @@ object RemoteColors {
 
 /** Dimensions from AIVoice phoneRemoteApp, with scrolling for short windows / large text. */
 object RemoteDimensions {
+    val PlaybackThumbSize = 16.dp
+    val PlaybackTrackHeight = 4.dp
+    val PlaybackMainButton = 72.dp
+    val PlaybackButton = 56.dp
     const val DeviceScanRotationMillis = 900
     const val ConnectionLabelIntervalMillis = 3_000L
     val ConnectionStatusDot = 8.dp

@@ -13,9 +13,9 @@ from instrumentation_result import require_passed
 
 ROOT = Path(__file__).resolve().parent.parent
 SUITES = {
-    "device-recovery-ui": ("ernest.airc.ConnectionRecoveryIntegrationTest,ernest.airc.DeviceRecoveryUiTest,ernest.airc.ConnectionStatusUiTest", 10),
+    "device-recovery-ui": ("ernest.airc.ConnectionRecoveryIntegrationTest,ernest.airc.DeviceRecoveryUiTest,ernest.airc.ConnectionStatusUiTest", 12),
     "remote-composer-ui": ("ernest.airc.RemoteLayoutUiTest,ernest.airc.RemoteExecutionUiTest#unconfiguredStatusPreservesComposerButDisablesSubmitUntilConfigured,ernest.airc.RemoteExecutionUiTest#remoteInputSendsOnlyTextAndPreservesDraftAcrossNavigationAndRotation,ernest.airc.RemoteNavigationUiTest#textDraftSurvivesFeatureSwitchAndOfflineRemoteActionsStayDisabled,ernest.airc.RemoteNavigationUiTest#remoteTypePickerRestoresAndKeepsStandardRemoteDraft", 8),
-    "voice-input-ui": ("ernest.airc.VoiceInputUiTest,ernest.airc.RemoteCommandInputUiTest", 5),
+    "voice-input-ui": ("ernest.airc.VoiceInputUiTest,ernest.airc.RemoteCommandInputUiTest", 6),
     "file-editing-ui": ("ernest.airc.FileEditingUiTest,ernest.airc.FileTaskTabsUiTest", 6),
     "apk-file-selection-ui": ("ernest.airc.ApkFileSelectionUiTest", 2),
     "project-information-ui": ("ernest.airc.ProjectInformationUiTest", 2),
@@ -30,6 +30,7 @@ SUITES = {
     "tv-input-ui": ("ernest.airc.TvInputUiTest,ernest.airc.TvInputFocusUiTest", 2),
     "remote-volume-target": ("ernest.airc.LiveRemoteVolumeTargetTest", 1),
     "screen-power-ui": ("ernest.airc.ScreenPowerUiTest", 1),
+    "media-control-ui": ("ernest.airc.MediaControlUiTest", 2),
     "remote-volume-ui": ("ernest.airc.RemoteVolumeUiTest", 1),
     "remote-menu-ui": ("ernest.airc.RemoteQuickMenuUiTest,ernest.airc.RemoteLayoutUiTest", 5),
     "file-page-ui": ("ernest.airc.FilePageLayoutUiTest,ernest.airc.FileLinkUiTest,ernest.airc.FileTaskNoticeUiTest", 4),
@@ -75,7 +76,7 @@ def main():
     parser.add_argument("--preview-quality", choices=["流畅", "均衡", "清晰"], help="Initial quality for live floating-remote validation")
     parser.add_argument("--suite", choices=[*SUITES, "all"], default="all")
     args = parser.parse_args()
-    phone_only=args.suite in ("device-recovery-ui", "remote-composer-ui", "voice-input-ui", "screen-power-ui", "file-editing-ui", "apk-file-selection-ui", "project-information-ui", "storage-task-tabs-ui", "upload-local-picker-ui", "file-task-navigation-ui", "batch-download-mode-ui", "file-multiselect-ui", "url-conflict-ui", "launcher-shortcut-ui", "scheduled-features-ui", "tv-input-ui", "remote-menu-ui", "remote-volume-ui", "file-page-ui", "library-layout-ui", "mobile-convenience-ui", "app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-surface-ui", "mirror-toolbar-ui", "mirror-ui", "gamepad-ui", "models", "profile-isolation", "controller-ui")
+    phone_only=args.suite in ("media-control-ui", "device-recovery-ui", "remote-composer-ui", "voice-input-ui", "screen-power-ui", "file-editing-ui", "apk-file-selection-ui", "project-information-ui", "storage-task-tabs-ui", "upload-local-picker-ui", "file-task-navigation-ui", "batch-download-mode-ui", "file-multiselect-ui", "url-conflict-ui", "launcher-shortcut-ui", "scheduled-features-ui", "tv-input-ui", "remote-menu-ui", "remote-volume-ui", "file-page-ui", "library-layout-ui", "mobile-convenience-ui", "app-details-ui", "remote-haptics-input-ui", "remote-haptics-ui", "lan-connection-ui", "product-pages", "appearance", "management-ui", "file-preview-ui", "app-packages-ui", "mirror-surface-ui", "mirror-toolbar-ui", "mirror-ui", "gamepad-ui", "models", "profile-isolation", "controller-ui")
     if not phone_only and (not args.target or not args.host):
         parser.error("This suite requires --target and --host")
     if not phone_only and args.phone == args.target:
@@ -139,34 +140,46 @@ def main():
     tests_installed = False
     service=None
     original_audio = None
+    def target_audio_command(action="status", percent=None):
+        dex = adb(args.target, "shell", f"ls {directory}/state/platform/android-*.dex").strip()
+        if not dex.startswith(directory + "/state/platform/") or "\n" in dex:
+            raise RuntimeError("Cannot identify the owned audio bridge")
+        user = int(adb(args.target, "shell", "am get-current-user").strip())
+        extra = "" if percent is None else f" {percent}"
+        output = adb(args.target, "shell", f"CLASSPATH={shlex.quote(dex)} app_process /system/bin ernest.airc.bridge.AudioBridge {action} {user}{extra}")
+        return json.loads(output)
     def target_audio():
-        volume = adb(args.target, "shell", "cmd media_session volume --stream 3 --get")
-        match = re.search(r"volume is (\d+) in range \[(\d+)\.\.(\d+)\]", volume)
+        snapshot = target_audio_command()
+        if snapshot.get("stream") != "media" or snapshot.get("verified") is not True:
+            raise RuntimeError("Cannot read verified target media volume and mute state")
+        return snapshot["volumeIndex"], snapshot["muted"], snapshot["minVolumeIndex"], snapshot["maxVolumeIndex"]
+    def other_audio_streams():
         dump = adb(args.target, "shell", "dumpsys audio")
-        muted = re.search(r"- STREAM_MUSIC:\s+Muted: (true|false)", dump)
-        if not match or not muted:
-            raise RuntimeError("Cannot read target media volume and mute state")
-        return int(match[1]), muted[1] == "true", int(match[2]), int(match[3])
+        result = {}
+        for stream in ("RING", "ALARM"):
+            block = re.search(rf"- STREAM_{stream}:\n(.*?)(?=\n- STREAM_|\n\n)", dump, re.S)
+            if not block:
+                raise RuntimeError(f"Cannot read target {stream} stream")
+            fields = {}
+            for name in ("Muted", "Current", "Devices"):
+                match = re.search(rf"^\s+{name}: (.*)$", block[1], re.M)
+                if not match:
+                    raise RuntimeError(f"Cannot read target {stream} {name}")
+                fields[name] = match[1]
+            result[stream] = fields
+        return result
     def restore_target_audio():
         if original_audio is None:
             return
         index, muted, minimum, maximum = original_audio
         if target_audio() != original_audio:
-            dex = adb(args.target, "shell", f"ls {directory}/state/platform/android-*.dex").strip()
-            if not dex.startswith(directory + "/state/platform/") or "\n" in dex:
-                raise RuntimeError("Cannot identify the owned audio bridge for restoration")
-            user = int(adb(args.target, "shell", "am get-current-user").strip())
             percent = int((index - minimum) * 100 / (maximum - minimum) + .5)
-            adb(args.target, "shell", f"CLASSPATH={shlex.quote(dex)} app_process /system/bin ernest.airc.bridge.AudioBridge set_volume {user} {percent}")
-            if target_audio()[1] != muted:
-                adb(args.target, "shell", "input keyevent 164")
+            target_audio_command("set_volume", percent)
+            target_audio_command("mute" if muted else "unmute")
             if target_audio() != original_audio:
                 raise RuntimeError("Target audio restoration failed")
         print(f"Restored TV audio: index={index}, muted={muted}", flush=True)
     try:
-        if args.suite == "remote-volume-target":
-            original_audio = target_audio()
-            print(f"Original TV audio: index={original_audio[0]}, muted={original_audio[1]}", flush=True)
         if args.use_installed_phone:
             for package, apk in (("ernest.airc", app), ("ernest.airc.test", tests)):
                 paths = adb(args.phone, "shell", "pm", "path", package).splitlines()
@@ -188,6 +201,10 @@ def main():
                 f"{binary} service start --state-dir {directory}/state --port 0 --no-mdns"))
             if not service.get("ready") or not service.get("running"):
                 raise RuntimeError("Independent target service did not become ready")
+            if args.suite == "remote-volume-target":
+                original_audio = target_audio()
+                original_other_audio = other_audio_streams()
+                print(f"Original TV audio: {original_audio}; other streams={original_other_audio}", flush=True)
             if touch_selected:
                 adb(args.target, "install", str(receiver_apk)); receiver_installed = True
                 adb(args.target, "shell", "am", "start", "-W", "-n", f"{receiver_package}/{'.GamepadActivity' if root_target else '.ColorActivity' if args.suite == 'mirror-floating-target' else '.TouchActivity'}")
@@ -205,6 +222,11 @@ def main():
         print(output, flush=True)
         count = sum(item[1] for item in selected)
         require_passed(output, count)
+        if args.suite == "remote-volume-target":
+            final_other_audio = other_audio_streams()
+            if final_other_audio != original_other_audio:
+                raise RuntimeError(f"Ringtone/alarm changed: before={original_other_audio}, after={final_other_audio}")
+            print(f"Verified ringtone/alarm unchanged: {final_other_audio}", flush=True)
     finally:
         try:
             if copied:
@@ -225,7 +247,7 @@ def main():
                             adb(args.target, "uninstall", receiver_package)
                     finally:
                         if tests_installed:
-                            if args.suite == "mirror-floating-target":
+                            if args.suite in ("mirror-floating-target", "remote-volume-target"):
                                 adb(args.phone, "shell", "am", "force-stop", "ernest.airc")
                                 recovery = adb(args.phone, "shell", "am", "instrument", "-w", "-r", "-e", "class",
                                     "ernest.airc.DeviceHistoryRecoveryTest", "ernest.airc.test/androidx.test.runner.AndroidJUnitRunner", timeout=60)

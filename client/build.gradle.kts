@@ -6,6 +6,7 @@ dependencies {
     implementation(libs.serialization.json)
     implementation(libs.okhttp)
     testImplementation(kotlin("test-junit"))
+    testImplementation(libs.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
 }
 val buildHostRuntime = rootProject.tasks.named("buildHostRuntime")

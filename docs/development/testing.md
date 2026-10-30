@@ -74,7 +74,7 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite profil
 | `screen-power-ui` | 本地协议 fixture 验证屏幕键在电源键左侧、关屏/开屏切换、旋转保留与离线禁用；不证明物理显示电源效果 |
 | `remote-haptics-ui` | 遥控震动开关的切换、旋转与重新加载持久化；实际震感需有振动器的设备核对 |
 | `lan-connection-ui` | 仅访问控制端回环地址，验证服务连接失败后尝试 ADB 5555、失败展开并填入目标地址、草稿重建恢复；设备行 fixture 检查型号、IP 回退、已保存显示名及 320dp / 1.5 倍字号亮暗布局，不连接外部设备 |
-| `device-recovery-ui` | 回环服务验证取消、静默自动重试不busy/不弹反馈、前后台暂停恢复、手动切换与迟到回调、超时切换、失效ADB按需重建且不重启遥控；界面验证其他设备可选、扫描旋转、精简文字/绿红状态点及标题栏名称轮播（共10项） |
+| `device-recovery-ui` | 回环服务验证取消、自动重试显示简短进度且不busy/不弹反馈、前后台暂停恢复、手动切换与迟到回调、超时切换、失效ADB按需重建且不重启遥控；界面验证其他设备可选、扫描旋转、精简文字/绿红状态点、无动态预览状态行、ADB等待与实际退避重试提示及标题栏名称轮播（共12项） |
 | `appearance` | 三种外观模式、本地持久化、重建、设置返回、草稿、系统栏与未知值回退 |
 | `gamepad-ui` | NES/双摇杆类型选择、方向与跳跃多指组合、类型旋转保留、标题启停/重连图标、重连可停止且游戏按键禁用、固定无滚动视口、多指操作与取消释放、横屏方向及离页恢复；只验证控制端界面 |
 | `controller-ui` | 页面导航、提交与执行反馈、键盘间距、离线、大字体、旋转与输入工具 |
@@ -157,7 +157,7 @@ uv run --with websockets python runtime/remote_key_hold_target_test.py --serial 
 
 标准遥控音量使用 `RemoteVolumeControllerTest` 验证连接发布时序、按比例设置与断线清理，`RemoteVolumeSliderUiTest` 验证触摸拖动、实时百分比及等待目标回复期间的位置和数值保持。构建 App 和测试 APK 后，`python3 scripts/test-phone-target.py --phone <自有模拟器> --suite remote-volume-ui` 从真实标准遥控界面验证 57% 读数、拖动时百分比更新、松手后数值保留、触摸拖动提交、目标音量变化后的滑块跟随、旋转与断线禁用；使用控制端回环服务，不改变电视音量。
 
-标准遥控器的真实电视音量验证使用 `python3 scripts/test-phone-target.py --phone <控制端ADB> --target <电视ADB> --host <电视IP> --suite remote-volume-target`。该专项在电视创建 UUID 配套 runtime，核对初始读数、左右触摸拖动后的实际系统音量、音量加减后的滑块跟随、外部修改与旋转恢复，并保存截图；退出恢复原媒体音量、静音状态及控制端历史，清理自建服务和测试包。控制端使用模拟器时明确报告。
+标准遥控器的真实电视音量验证使用 `python3 scripts/test-phone-target.py --phone <控制端ADB> --target <电视ADB> --host <电视IP> --suite remote-volume-target`。该专项在电视创建 UUID 配套 runtime，核对初始读数、左右触摸拖动后的实际系统音量、音量加减后的滑块跟随、长按重复与释放停止、静音长按只切换一次、铃声/闹钟音量不变、外部修改与旋转恢复，并保存截图；真实拖动从滑块中心开始，避免扩展语义触控边界造成手势偏移。状态读取与恢复直接使用配套音频桥，不依赖平台的`cmd media_session`命令；退出恢复原媒体音量、静音状态及控制端历史，清理自建服务和测试包。控制端使用模拟器时明确报告。
 
 ### 电视输入与快捷操作
 
@@ -275,6 +275,12 @@ uv run --with websockets python runtime/scheduled_actions_target_test.py --seria
 
 ### 媒体播放
 
+播放控制页使用 `:client:test --tests ernest.airc.MediaControlControllerTest` 验证静默更新不进入操作busy、命令抢占慢查询、迟到响应隔离、刷新超时与原快照保留、按请求完成后3秒间隔轮询及取消、切换播放器后拒绝旧界面回调。构建App与测试APK后，`python3 scripts/test-phone-target.py --phone <自有模拟器> --suite media-control-ui` 检查320dp/1.5倍字体亮暗布局、静默更新时按钮与位置稳定、精确跳转草稿恢复、播放键上方的媒体音量行与按钮回调/滑动提交/离线禁用，以及真实页面前后台暂停/恢复且不与标准遥控重复轮询。该回环fixture不改变外部播放器。定位控制器同时验证复用响应中的同会话快照、无附加确认请求、待确认不锁住控件与跨会话响应拒绝；Rust `playback_bridge::tests` 验证常驻进程复用、应用错误后的帧边界、已开始请求取消后读完响应、排队取消不迟到执行，以及超时丢弃进程不重放写操作。
+
+会话播放命令平台验证：`uv run --with websockets python runtime/media_transport_target_test.py --serial <自有模拟器> --binary androidApp/src/main/assets/runtime/airc-runtime-<匹配ABI>`。专项安装UUID静音状态fixture并创建独立runtime，验证两个真实MediaSession之间的选定会话播放/暂停/上下首/定位、友好元数据、歧义/消失会话与未声明能力拒绝；结束卸载自建包、清理服务和转发、恢复原Activity。同时输出定位响应及暖播放/音量查询耗时。此专项不证明实体扬声器或第三方播放器实际消费结果。
+
+音量按键的 MUSIC 路由可在自有模拟器运行 `python3 scripts/build-platform-bridge.py androidApp/build/volume-bridge` 后，执行 `python3 runtime/media_volume_keys_target_test.py --serial <自有模拟器> --dex androidApp/build/volume-bridge/classes.dex`。专项启动独立输入桥，检查音量加减的单次/长按、释放停止及静音长按只切换一次，同时核对铃声与闹钟音量不变；结束恢复原媒体音量/静音并清理自建目录。此测试直接验证平台桥，不替代控制端完整链路或厂商电视音频策略验证。
+
 AAC 被控端播放验证使用独立模拟器：先构建 `:mediaFixture:assembleDebug`，再运行 `uv run --with av --with websockets python runtime/aac_media_target_test.py --serial <模拟器序列号> --binary androidApp/src/main/assets/runtime/airc-runtime-x86_64 --fixture-apk mediaFixture/build/outputs/apk/debug/mediaFixture-debug.apk`。临时生成静音 AAC，验证大小写扩展名、audio/aac、播放副本与实际 MediaPlayer 播放状态；不代表真实设备或其他 AAC 编码配置的兼容性。脚本拒绝替换已有 fixture App，结束移除自有应用、文件、服务和转发。
 
 ### 关于与在线帮助
@@ -289,7 +295,7 @@ JVM fixture、模拟器和真实设备分别说明。UI fixture 不证明目标�
 
 ### 实时语音输入
 
-`VoiceSettingsTest` 在JVM检查设置边界、准备与接收端就绪区分、真实WebSocket缓存突发/消费信用、排空字节确认、取消、部分帧首尾与缓冲溢出、路由错误和连接代际隔离；Rust `voice::tests` 检查严格字段与包名/键值边界。构建App和AndroidTest后执行 `python3 scripts/test-phone-target.py --phone <模拟器> --suite voice-input-ui`，检查离线禁用、配置恢复、合成采音fixture向回环服务发送PCM、松手排空和离页取消、不自动恢复，包含接收端未就绪时正常松手仍原样送出整段录音，以及共用输入区模式/草稿恢复、320dp/1.5倍字体亮暗布局、顶部电源音量一行和媒体/导航纯图标。该模拟器专项不证明实体麦克风采音。实体手机可用同一测试类附加 instrumentation 参数 `-e voiceCapture microphone` 验证真实 AudioRecord 到回环服务；不保存音频。
+`VoiceSettingsTest` 在JVM检查设置边界、准备与接收端就绪区分、真实WebSocket缓存突发/消费信用、排空字节确认、取消、部分帧首尾与缓冲溢出、路由错误和连接代际隔离；Rust `voice::tests` 检查严格字段与包名/键值边界。构建App和AndroidTest后执行 `python3 scripts/test-phone-target.py --phone <模拟器> --suite voice-input-ui`，检查离线禁用、配置恢复、Android 13/版本未知/读取失败在权限与采音前拦截、重连重新检查版本、合成采音fixture向回环服务发送PCM、松手排空和离页取消、不自动恢复，包含接收端未就绪时正常松手仍原样送出整段录音，以及共用输入区模式/草稿恢复、320dp/1.5倍字体亮暗布局、顶部电源音量一行和媒体/导航纯图标。该模拟器专项不证明实体麦克风采音。实体手机可用同一测试类附加 instrumentation 参数 `-e voiceCapture microphone` 验证真实 AudioRecord 到回环服务；不保存音频。
 
 厂商音频路由专项使用显式选定的目标：`uv run --with websockets python scripts/test-voice-target.py --serial <康佳ADB地址> --binary androidApp/src/main/assets/runtime/airc-runtime-armeabi-v7a --package com.konka.bestlauncher --key 1017`。脚本建立UUID独立服务，发送合成PCM，核对助手活跃录音与remote submix、互斥、准备阶段连续取消/重开不误报占用、正常结束、突然断线、断流、坏帧、接收缓存上限、无效配置、真实接收端就绪超时和策略清理，结束移除自建服务、目录与转发。会发送明确指定的语音键，不录制人声，不修改已有服务或系统音频配置；新增系统UID的临时AudioRecord探针只读取本次remote submix，用首/中/尾三个合成频率标记验证600ms延迟启动、约1秒缓存突发（含不足20ms末帧）的正常速率注入和排空。探针仅临时编译/推送并在结束清理，需目标可用 `su 1000`；此专项不证明自然语音识别准确率。
 
@@ -302,3 +308,7 @@ JVM fixture、模拟器和真实设备分别说明。UI fixture 不证明目标�
 先以 `-PaircAdbSource=/path/to/adb` 构建 App 与测试 APK，确认使用包含同步头部/正文合并改动的库，再在控制手机运行 `ernest.airc.RuntimeUploadTargetTest`，明确传入 `uploadHost` 和可选 `uploadRoot=true`。实验使用目标 ABI 的完整 runtime，在 UUID 独立目录比较原分包、合并分包、压缩冷/热缓存；强制无解压工具的分支也可验证。`uploadCompressionOnly=true` 可只补测压缩，不重复已完成的原始推送对照。
 
 耗时包含压缩能力探测、所需的本地压缩、网络上传、目标解压及临时压缩包清理；读回校验和程序版本检查单独执行，不计入上传耗时。每个文件都读回核对 SHA-256，检查解压后程序可运行。可用 `python3 scripts/test-runtime-upload.py --phone SERIAL --host TARGET_IP --root --output OUTPUT_DIR` 运行；多目标重复 `--host`，只补测压缩时加 `--compression-only`。实验不替换现有服务，不安装解压工具，结束清理自建文件与压缩缓存；前后核对现有服务 PID、设备标识与就绪状态。单轮结果需注明链路和权限，不能把文件变小直接当作总耗时改善。测试的进度上报不计作通过终态，仍要求完整用例数量、零失败/跳过及正常结束。
+
+### ADB 握手诊断
+
+`AdbConnectionDiagnosticTargetTest` 仅对显式传入的 `adbDiagnosticHost` 和 `adbDiagnosticPort` 发起握手及 `echo` 只读探测，使用当前 App 的既有身份；`AircAdbDiagnostic` 只记录报文头和阶段，不记录正文或密钥。构建并安装测试 APK 后，以 instrumentation `-e class ernest.airc.AdbConnectionDiagnosticTargetTest -e adbDiagnosticHost <目标IP> -e adbDiagnosticPort <ADB端口>` 运行。部分厂商旧版 adbd 的既有电脑连接会阻塞新手机握手；对照诊断应先记录超时，再仅断开电脑自己的目标连接重试，不重启 adbd 或清除授权。

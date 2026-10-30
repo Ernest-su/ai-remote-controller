@@ -343,6 +343,9 @@ internal fun RemoteControls(state: RemoteUiState, model: RemoteViewModel, showRe
                                                     color = if (state.feedback.phase == FeedbackPhase.ERROR) RemoteColors.Warning else RemoteColors.Secondary)
                                                 Text(state.feedback.text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("remote-feedback"))
                                                 TextButton(showResults, modifier = Modifier.heightIn(min = 48.dp)) { Text("查看执行结果", style = MaterialTheme.typography.bodySmall) }
+                                            } else if (!state.connected && (state.reconnecting || state.busy)) {
+                                                Text("连接状态", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
+                                                Text(state.status, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("remote-connection-progress"))
                                             } else {
                                                 Text("播放状态", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Secondary)
                                                 Text(state.mediaStatus, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("remote-playback"))
@@ -437,7 +440,7 @@ private fun RemoteTypePicker(selected: RemotePage, navigate: (RemotePage) -> Uni
 }
 
 @Composable
-private fun RemoteIconButton(onClick: () -> Unit, enabled: Boolean, modifier: Modifier = Modifier, debugName: String = "remote-key", overlayBacking: Boolean = true, content: @Composable () -> Unit) {
+internal fun RemoteIconButton(onClick: () -> Unit, enabled: Boolean, modifier: Modifier = Modifier, debugName: String = "remote-key", overlayBacking: Boolean = true, content: @Composable () -> Unit) {
     Box(modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
         .then(if (overlayBacking) Modifier.mirrorControlBacking() else Modifier).remoteKeyInput(debugName, enabled, onClick),
         contentAlignment = Alignment.Center) {
