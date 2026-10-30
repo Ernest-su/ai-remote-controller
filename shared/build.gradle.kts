@@ -1,7 +1,7 @@
 plugins {
-    id("com.android.kotlin.multiplatform.library")
-    kotlin("multiplatform")
-    kotlin("plugin.serialization")
+    alias(libs.plugins.android.kmp.library)
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.kotlin.serialization)
 }
 kotlin {
     androidLibrary {
@@ -12,7 +12,7 @@ kotlin {
     jvm()
     jvmToolchain(17)
     sourceSets {
-        commonMain.dependencies { implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2"); implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1") }
+        commonMain.dependencies { implementation(libs.coroutines.core); implementation(libs.serialization.json) }
         commonTest.dependencies { implementation(kotlin("test")) }
     }
 }

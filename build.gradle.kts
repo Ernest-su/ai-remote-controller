@@ -1,12 +1,12 @@
 plugins {
-    id("com.android.application") version "9.0.1" apply false
-    id("com.android.library") version "9.0.1" apply false
-    id("com.android.kotlin.multiplatform.library") version "9.0.1" apply false
-    id("org.jetbrains.kotlin.plugin.compose") version "2.2.10" apply false
-    id("org.jetbrains.compose") version "1.9.0" apply false
-    kotlin("jvm") version "2.2.10" apply false
-    kotlin("multiplatform") version "2.2.10" apply false
-    kotlin("plugin.serialization") version "2.2.10" apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.kmp.library) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.compose) apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.multiplatform) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
 }
 
 // A single owner avoids overlapping outputs between Android and JVM test tasks.

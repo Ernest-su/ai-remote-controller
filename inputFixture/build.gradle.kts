@@ -1,4 +1,4 @@
-plugins { id("com.android.application") }
+plugins { alias(libs.plugins.android.application) }
 android {
     namespace = "ernest.airc.inputfixture"
     compileSdk = 36

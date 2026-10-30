@@ -36,9 +36,13 @@ runtime 构建使用 Gradle 增量检查：Rust 源码、Android 桥接源码、
 | instrumentation APK | `androidApp/build/outputs/apk/androidTest/debug/androidApp-debug-androidTest.apk` |
 | 生成的 runtime 资产 | `androidApp/src/main/assets/runtime/` |
 
+## Gradle 版本管理
+
+插件、第三方依赖与应用发布版本统一由 `gradle/libs.versions.toml`（Gradle Version Catalog）维护，各模块通过 `libs` 别名引用。控制端、电视输入法与桌面版本显示共用 `app-name` 和 `app-code`；发布脚本从同一目录文件读取版本，并校验标签与 `runtime/Cargo.toml` 一致。设置阶段使用的 Foojay 插件版本保留在 `settings.gradle.kts`，Gradle Wrapper 版本保留在 `gradle/wrapper/gradle-wrapper.properties`。
+
 ## 16 KB 页大小与原生依赖
 
-Android APK 的原生库须同时满足 ELF 段对齐与 APK 内未压缩库的 ZIP 对齐，参见 [Android 官方指南](https://developer.android.com/guide/practices/page-sizes)。项目使用 AGP 9.0.1 处理 APK 对齐，runtime 使用 NDK r28 与 `-Wl,-z,max-page-size=16384`；`ascrcpy` 的依赖约束将 ADB 间接依赖的 Conscrypt 升级至 2.8.0，避免旧版 `libconscrypt_jni.so` 的 4 KB ELF 对齐。
+Android APK 的原生库须同时满足 ELF 段对齐与 APK 内未压缩库的 ZIP 对齐，参见 [Android 官方指南](https://developer.android.com/guide/practices/page-sizes)。项目使用 AGP 9.0.1 处理 APK 对齐，runtime 使用 NDK r28 与 `-Wl,-z,max-page-size=16384`；ADB v0.4.0 已提供支持 16 KB 对齐的原生依赖，App 与 `ascrcpy` 直接使用发布库，无须额外覆盖 Conscrypt 版本。
 
 构建 APK 后使用 SDK 的 `zipalign -c -P 16 -v 4 androidApp/build/outputs/apk/debug/androidApp-debug.apk` 验证 ZIP 对齐；解压 APK 后使用 NDK 的 `llvm-objdump -p` 检查各原生库及 `assets/runtime/airc-runtime-*` 的 `LOAD` 段对齐。ZIP 检查通过不能代替 ELF 检查；实际运行兼容性仍需在 `adb shell getconf PAGE_SIZE` 返回 `16384` 的模拟器或设备验证。
 

@@ -1,19 +1,19 @@
 plugins {
-    kotlin("multiplatform")
-    id("com.android.kotlin.multiplatform.library")
-    id("org.jetbrains.kotlin.plugin.compose")
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.kmp.library)
+    alias(libs.plugins.kotlin.compose)
 }
 kotlin {
     androidLibrary { namespace = "ernest.airc.ui"; compileSdk = 36; minSdk = 26 }
     jvm()
     jvmToolchain(17)
-    sourceSets.androidMain.dependencies { implementation("androidx.activity:activity-compose:1.10.1") }
+    sourceSets.androidMain.dependencies { implementation(libs.androidx.activity.compose) }
     sourceSets.commonMain.dependencies {
         implementation(project(":shared"))
-        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
-        implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-        implementation("org.jetbrains.compose.foundation:foundation:1.9.0")
-        implementation("org.jetbrains.compose.material3:material3:1.9.0")
-        implementation("org.jetbrains.compose.ui:ui:1.9.0")
+        implementation(libs.serialization.json)
+        implementation(libs.coroutines.core)
+        implementation(libs.compose.foundation)
+        implementation(libs.compose.material3)
+        implementation(libs.compose.ui)
     }
 }

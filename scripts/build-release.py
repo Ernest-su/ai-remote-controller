@@ -18,16 +18,13 @@ def validate_version(tag):
     if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?", tag):
         raise ValueError("Release tag must be vMAJOR.MINOR.PATCH, optionally with a prerelease suffix")
     cargo = tomllib.loads((ROOT / "runtime/Cargo.toml").read_text())["package"]["version"]
-    android = (ROOT / "androidApp/build.gradle.kts").read_text()
-    version = re.search(r'versionName\s*=\s*"([^"]+)"', android).group(1)
-    code = int(re.search(r'versionCode\s*=\s*(\d+)', android).group(1))
+    versions = tomllib.loads((ROOT / "gradle/libs.versions.toml").read_text())["versions"]
+    version = versions["app-name"]
+    code = int(versions["app-code"])
+    if code <= 0:
+        raise ValueError("Android versionCode must be positive")
     if tag != "v" + cargo or version != cargo:
-        raise ValueError("Tag, Android versionName and runtime Cargo version must match")
-    ime = (ROOT / "tvInputMethod/build.gradle.kts").read_text()
-    ime_version = re.search(r'versionName\s*=\s*"([^"]+)"', ime).group(1)
-    ime_code = int(re.search(r'versionCode\s*=\s*(\d+)', ime).group(1))
-    if ime_version != version or ime_code != code:
-        raise ValueError("TV input method versionName and versionCode must match the Android controller")
+        raise ValueError("Tag, catalog app-name and runtime Cargo version must match")
     return code
 
 

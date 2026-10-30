@@ -1,4 +1,4 @@
-plugins { id("com.android.application") }
+plugins { alias(libs.plugins.android.application) }
 android {
     namespace="ernest.airc.mediafixture"
     compileSdk=36
@@ -8,8 +8,8 @@ android {
 }
 
 dependencies {
-    implementation("androidx.media3:media3-exoplayer:1.10.0")
-    implementation("androidx.annotation:annotation:1.9.1")
+    implementation(libs.media3.exoplayer)
+    implementation(libs.androidx.annotation)
 }
 
 androidComponents {

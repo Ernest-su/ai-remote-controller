@@ -1,10 +1,10 @@
 import org.gradle.language.jvm.tasks.ProcessResources
 
 plugins {
-    kotlin("multiplatform")
-    kotlin("plugin.serialization")
-    id("org.jetbrains.compose")
-    id("org.jetbrains.kotlin.plugin.compose")
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.compose)
+    alias(libs.plugins.kotlin.compose)
 }
 kotlin {
     jvm()
@@ -18,16 +18,16 @@ kotlin {
                 implementation(project(":sharedUi"))
                 implementation(compose.desktop.currentOs)
                 implementation(compose.material3)
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
-                implementation("com.squareup.okhttp3:okhttp:4.12.0")
-                implementation("org.jmdns:jmdns:3.6.3")
+                implementation(libs.coroutines.swing)
+                implementation(libs.serialization.json)
+                implementation(libs.okhttp)
+                implementation(libs.jmdns)
             }
         }
         jvmTest.dependencies {
             implementation(kotlin("test-junit"))
             implementation(compose.desktop.uiTestJUnit4)
-            implementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+            implementation(libs.okhttp.mockwebserver)
         }
     }
 }
@@ -66,17 +66,19 @@ tasks.withType<Test>().configureEach {
     }
 }
 
-// Keep the About version tied to the Android controller's release configuration.
-val projectVersionSource = rootProject.layout.projectDirectory.file("androidApp/build.gradle.kts")
+// Share the release version with the Android controller and companion IME.
+val appVersionName = libs.versions.app.name.get()
+val appVersionCode = libs.versions.app.code.get()
 val generateProjectVersion by tasks.registering {
-    inputs.file(projectVersionSource)
+    inputs.property("versionName", appVersionName)
+    inputs.property("versionCode", appVersionCode)
     val destination = layout.buildDirectory.dir("generated/projectVersion")
     outputs.dir(destination)
     doLast {
-        val source = projectVersionSource.asFile.readText()
-        val name = Regex("versionName = \"([^\"]+)\"").find(source)!!.groupValues[1]
-        val code = Regex("versionCode = ([0-9]+)").find(source)!!.groupValues[1]
-        destination.get().file("airc-version.txt").asFile.apply { parentFile.mkdirs(); writeText("$name ($code)") }
+        destination.get().file("airc-version.txt").asFile.apply {
+            parentFile.mkdirs()
+            writeText("$appVersionName ($appVersionCode)")
+        }
     }
 }
 kotlin.sourceSets.named("jvmMain") { resources.srcDir(generateProjectVersion) }
