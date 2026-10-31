@@ -109,6 +109,8 @@ object RemoteDimensions {
     val PlaybackButton = 56.dp
     const val DeviceScanRotationMillis = 900
     const val ConnectionLabelIntervalMillis = 3_000L
+    val DeviceConnectingIndicator = 16.dp
+    val DeviceConnectingStroke = 2.dp
     val ConnectionStatusDot = 8.dp
     val ConnectionBadgeWidth = 112.dp
     val FloatingRemoteSnapDistance = 24.dp

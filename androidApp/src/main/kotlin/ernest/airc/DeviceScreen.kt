@@ -160,6 +160,7 @@ internal fun UnifiedDeviceRow(
 ) {
     var showManagement by remember { mutableStateOf(false) }
     val connected = state.connected && entry.history.any { it.id == state.selected }
+    val connecting = entry.isConnecting(state)
     Column(Modifier.fillMaxWidth().testTag("device-row-${entry.key}")) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(painterResource(R.drawable.ic_device_tv), null, Modifier.size(RemoteDimensions.DeviceIcon), tint = if (connected) RemoteColors.Action else RemoteColors.Secondary)
@@ -173,7 +174,14 @@ internal fun UnifiedDeviceRow(
                 }
                 if (connected) Text("当前连接", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Action)
             }
-            TextButton(onClick = onConnect, enabled = !connected, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (connected) "已连接" else "连接") }
+            TextButton(onClick = onConnect, enabled = !connected && !connecting, modifier = Modifier.heightIn(min = 48.dp)) {
+                if (connecting) {
+                    CircularProgressIndicator(Modifier.size(RemoteDimensions.DeviceConnectingIndicator).testTag("device-connecting-${entry.key}"),
+                        color = RemoteColors.Action, strokeWidth = RemoteDimensions.DeviceConnectingStroke)
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text(if (connected) "已连接" else if (connecting) "连接中" else "连接")
+            }
             if (entry.history.isNotEmpty()) IconButton({ showManagement = !showManagement }, Modifier.size(48.dp)) {
                 Icon(painterResource(R.drawable.ic_more), "管理 ${entry.name}")
             }

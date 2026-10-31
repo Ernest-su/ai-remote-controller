@@ -72,11 +72,13 @@ class ConnectionStatusUiTest {
             compose.setContent { RemoteTheme { RemoteApp(model) } }
             compose.waitUntil(5000) { compose.onAllNodesWithTag("remote-connection-progress").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText("连接状态").assertIsDisplayed()
+            compose.onNodeWithContentDescription("连接中，Fixture，管理设备").assertExists()
             compose.onNodeWithTag("remote-connection-progress").assertTextEquals("连接遥控服务")
             compose.onNodeWithTag("remote-playback").assertDoesNotExist()
             compose.runOnUiThread { model.cancelConnection() }
             compose.onNodeWithTag("remote-connection-progress").assertDoesNotExist()
             compose.onNodeWithTag("remote-playback").assertExists()
+            compose.runOnIdle { assertNull(model.state.value.connectingDevice) }
         } finally {
             compose.runOnUiThread { owner.clear() }
             server.shutdown()
@@ -97,5 +99,15 @@ class ConnectionStatusUiTest {
         compose.runOnIdle { connected=false }
         compose.onNodeWithText("连接中").assertExists()
         compose.onNodeWithText("Another device").assertDoesNotExist()
+        compose.onNodeWithContentDescription("连接中，Another device，管理设备").assertExists()
+        compose.mainClock.advanceTimeBy(RemoteDimensions.ConnectionLabelIntervalMillis + 100)
+        compose.waitUntil(5000) { compose.onAllNodesWithText("Another device").fetchSemanticsNodes().isNotEmpty() }
+        compose.runOnIdle { name = "Next target" }
+        compose.onNodeWithText("Another device").assertDoesNotExist()
+        compose.onNodeWithText("连接中").assertExists()
+        compose.mainClock.advanceTimeBy(RemoteDimensions.ConnectionLabelIntervalMillis + 100)
+        compose.waitUntil(5000) { compose.onAllNodesWithText("Next target").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("device-status").performClick()
+        compose.runOnIdle { assertEquals(2, taps) }
     }
 }

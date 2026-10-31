@@ -37,6 +37,33 @@ class DeviceRecoveryUiTest {
         compose.onNodeWithTag("refresh-adb-devices").assertIsEnabled().performClick()
         assertEquals(1, refreshes)
     }
+    @Test fun onlyPendingTargetAnimatesAndMovesWhenTargetChanges() {
+        val first = RememberedDevice("old", "Living room", ConnectionMethod.TCP, "192.0.2.10", lastConnectedAt=1)
+        val next = RememberedDevice("next", "Bedroom", ConnectionMethod.TCP, "192.0.2.11", lastConnectedAt=2)
+        var state by mutableStateOf(RemoteUiState(reconnecting=true, selected=first.id, history=listOf(first,next), connectingDevice=next))
+        compose.mainClock.autoAdvance = false
+        compose.setContent { RemoteTheme { Column(Modifier.width(320.dp)) {
+            deviceListEntries(state).forEach { UnifiedDeviceRow(it, state, {}, {_,_->}, {}) }
+        } } }
+        fun pixels(): IntArray {
+            val image=compose.onNodeWithTag("device-connecting-192.0.2.11", useUnmergedTree=true).captureToImage().asAndroidBitmap()
+            return IntArray(image.width*image.height).also { image.getPixels(it,0,image.width,0,0,image.width,image.height) }
+        }
+        compose.mainClock.advanceTimeByFrame()
+        val initial=pixels()
+        compose.mainClock.advanceTimeBy(250)
+        assertFalse(initial.contentEquals(pixels()))
+        compose.onNode(hasText("连接中") and hasAnyAncestor(hasTestTag("device-row-192.0.2.11"))).assertIsNotEnabled()
+        compose.onNode(hasText("连接") and hasAnyAncestor(hasTestTag("device-row-192.0.2.10"))).assertIsEnabled()
+        compose.runOnIdle { state=state.copy(connectingDevice=first) }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("device-connecting-192.0.2.11", useUnmergedTree=true).assertDoesNotExist()
+        compose.onNodeWithTag("device-connecting-192.0.2.10", useUnmergedTree=true).assertExists()
+        compose.runOnIdle { state=state.copy(reconnecting=false, connected=true, connectingDevice=null) }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("device-connecting-192.0.2.10", useUnmergedTree=true).assertDoesNotExist()
+        compose.onNodeWithText("已连接").assertIsNotEnabled()
+    }
     @Test fun anotherDeviceRemainsSelectableWhileConnectionRecoveryIsBusy() {
         var state by mutableStateOf(RemoteUiState(busy = true, selected = "old", history = listOf(
             RememberedDevice("old", "Old target", ConnectionMethod.TCP, "192.0.2.10", lastConnectedAt = 1),

@@ -173,7 +173,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                     Icon(painterResource(R.drawable.ic_remote_types), "切换遥控器类型", Modifier.size(24.dp))
                 }
                 ConnectionBadge(state.connected, state.reconnecting || state.busy,
-                    state.history.find { it.id == state.selected }?.visibleName.orEmpty(),
+                    if (state.connected) state.history.find { it.id == state.selected }?.visibleName.orEmpty() else state.connectingDevice?.visibleName.orEmpty(),
                     onClick = { navigate(RemotePage.DEVICES) })
                 if (page == RemotePage.REMOTE) RemoteQuickMenu({ quickApps = true }, { tvInput = true }, { routinesOpen = true })
             }
@@ -220,7 +220,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
                         RemotePage.MEDIA_CONTROL -> MediaControls(state, model)
                         RemotePage.SCHEDULES -> {
                             val scheduleState by model.schedules.state.collectAsState()
-                            SchedulePanel(state.connected, scheduleState, state.apps, model::listApps, model.schedules::refresh, model.schedules::save, model.schedules::delete, model.schedules::enable, state.history.find { it.id == state.selected }?.visibleName ?: "当前被控设备", runOnce = model.schedules::runOnce, refreshQuietly = model.schedules::refreshQuietly)
+                            SchedulePanel(state.connected, scheduleState, state.apps, model::listApps, model.schedules::refresh, model.schedules::save, model.schedules::delete, model.schedules::enable, state.history.find { it.id == state.selected }?.visibleName ?: "当前被控设备", runOnce = model.schedules::runOnce, refreshQuietly = model.schedules::refreshQuietly, update = model.schedules::update)
                         }
                         RemotePage.FILES -> FileBrowserScreen(state, model, textBackRequest)
                     }

@@ -117,7 +117,7 @@ fun DesktopApp(controller: DesktopController, navigation: DesktopNavigation = re
                             RemotePage.MEDIA_CONTROL -> DesktopMediaControls(state, controller)
                             RemotePage.SCHEDULES -> {
                                 val scheduleState by controller.schedules.state.collectAsState()
-                                SchedulePanel(state.connected, scheduleState, state.apps, controller::listApps, controller.schedules::refresh, controller.schedules::save, controller.schedules::delete, controller.schedules::enable, state.name, runOnce = controller.schedules::runOnce, refreshQuietly = controller.schedules::refreshQuietly)
+                                SchedulePanel(state.connected, scheduleState, state.apps, controller::listApps, controller.schedules::refresh, controller.schedules::save, controller.schedules::delete, controller.schedules::enable, state.name, runOnce = controller.schedules::runOnce, refreshQuietly = controller.schedules::refreshQuietly, update = controller.schedules::update)
                             }
                             RemotePage.FILES -> DesktopFileBrowser(state, controller, textBackRequest)
                         }

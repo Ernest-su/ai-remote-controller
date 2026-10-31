@@ -53,6 +53,12 @@ class ScheduleControllerTest {
             withTimeout(3000){controller.state.first {!it.busy}}
             assertEquals(37,saved.last()["volumePercent"]!!.jsonPrimitive.int)
             assertEquals("set_volume",saved.last()["action"]!!.jsonPrimitive.content)
+            controller.update("existing-task", "screen_off", null, "delay", "5400", current, null)
+            withTimeout(3000){controller.state.first {!it.busy}}
+            assertEquals("existing-task", saved.last()["id"]!!.jsonPrimitive.content)
+            assertEquals("screen_off",saved.last()["action"]!!.jsonPrimitive.content)
+            assertEquals(5400,saved.last()["delaySeconds"]!!.jsonPrimitive.int)
+            assertTrue(controller.state.value.saveRevision >= 3)
             for(action in listOf("mute","unmute")) {
                 controller.save(action,null,"daily","20:00",current)
                 withTimeout(3000){controller.state.first {!it.busy}}

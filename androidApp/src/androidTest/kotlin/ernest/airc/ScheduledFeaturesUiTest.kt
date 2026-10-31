@@ -55,11 +55,11 @@ class ScheduledFeaturesUiTest {
     }
     @Test fun schedulePickersConfirmTargetLocalTimesAndKeepDraftsSeparate() {
         var submitted: List<String?>? = null
-        val state = ScheduleState(sessionKey = "fixture-session", data = ScheduleList(emptyList(), 0, "2032-02-29 20:30", 28800))
+        var state by mutableStateOf(ScheduleState(sessionKey = "fixture-session", data = ScheduleList(emptyList(), 0, "2032-02-29 20:30", 28800)))
         val restoration = androidx.compose.ui.test.junit4.StateRestorationTester(compose)
         restoration.setContent { RemoteTheme {
             Box(Modifier.width(320.dp).fillMaxHeight()) {
-                SchedulePanel(true, state, emptyList(), {}, {}, { action, pkg, kind, value, session, _ -> submitted = listOf(action, pkg, kind, value, session) }, {_,_->}, {_,_,_->})
+                SchedulePanel(true, state, emptyList(), {}, {}, { action, pkg, kind, value, session, _ -> submitted = listOf(action, pkg, kind, value, session); state=state.copy(saveRevision=state.saveRevision+1) }, {_,_->}, {_,_,_->})
             }
         } }
         compose.onNodeWithText("新建定时操作").performScrollTo().performClick()
@@ -99,10 +99,11 @@ class ScheduledFeaturesUiTest {
     }
     @Test fun audioSchedulesValidateVolumeKeepDraftAndConfirmExplicitActions() {
         var submitted: Pair<String, Int?>? = null
+        var state by mutableStateOf(ScheduleState(sessionKey="fixture"))
         val restoration = androidx.compose.ui.test.junit4.StateRestorationTester(compose)
         restoration.setContent { RemoteTheme { Box(Modifier.width(320.dp).fillMaxHeight()) {
-            SchedulePanel(true, ScheduleState(sessionKey="fixture"), emptyList(), {}, {},
-                { action, _, _, _, _, volume -> submitted = action to volume }, {_,_->}, {_,_,_->})
+            SchedulePanel(true, state, emptyList(), {}, {},
+                { action, _, _, _, _, volume -> submitted = action to volume; state=state.copy(saveRevision=state.saveRevision+1) }, {_,_->}, {_,_,_->})
         } } }
         compose.onNodeWithText("新建定时操作").performScrollTo().performClick()
         compose.onNodeWithTag("schedule-action").performScrollTo().performClick()
@@ -194,6 +195,47 @@ class ScheduledFeaturesUiTest {
         compose.onNodeWithTag("schedule-run-one").assertIsNotEnabled()
         compose.runOnIdle { connected=false; state=state.copy(data=state.data!!.copy(tasks=state.data!!.tasks.map { it.copy(lastStatus="submitted") })) }
         compose.onNodeWithTag("schedule-run-one").assertIsNotEnabled()
+    }
+
+    @Test fun editsKeepDraftUntilAcceptedAndOfferScreenOff() {
+        var state by mutableStateOf(ScheduleState(sessionKey="fixture",data=ScheduleList(listOf(
+            ScheduledAction("edit", "set_volume",kind="delay",nextAt=1,enabled=false,delaySeconds=5400,volumePercent=37)),1,"2032-02-29 20:30",0)))
+        var submitted:List<String?>?=null
+        val restoration=androidx.compose.ui.test.junit4.StateRestorationTester(compose)
+        restoration.setContent { RemoteTheme { Box(Modifier.width(320.dp).fillMaxHeight()) {
+            SchedulePanel(true,state,emptyList(),{},{},{_,_,_,_,_,_->error("must update existing task")},{_,_->},{_,_,_->},
+                update={id,action,pkg,kind,value,session,_ -> submitted=listOf(id,action,pkg,kind,value,session)})
+        } } }
+        compose.onNodeWithTag("schedule-edit-edit").performScrollTo().performClick()
+        compose.onNodeWithTag("schedule-delay").performScrollTo().assertTextContains("90 分钟")
+        compose.onNodeWithTag("schedule-volume").performScrollTo().assertTextContains("37")
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithTag("schedule-action").performScrollTo().performClick()
+        compose.onNodeWithTag("schedule-action-screen_off").performClick()
+        compose.onNodeWithTag("schedule-volume").assertDoesNotExist()
+        compose.onNodeWithText("保存修改").performScrollTo().performClick()
+        compose.onNodeWithText("替换原定时任务",substring=true).assertExists()
+        compose.onNodeWithText("取消").performClick()
+        compose.runOnIdle { assertNull(submitted) }
+        compose.onNodeWithText("保存修改").performScrollTo().performClick()
+        compose.onNodeWithText("确认").performClick()
+        compose.runOnIdle { assertEquals(listOf("edit","screen_off",null,"delay","5400","fixture"),submitted);state=state.copy(error="fixture rejected") }
+        compose.onNodeWithText("保存修改").performScrollTo().assertExists()
+        compose.runOnIdle { state=state.copy(saveRevision=1,error=null) }
+        compose.onNodeWithTag("schedule-editing").assertDoesNotExist()
+        compose.onNodeWithText("新建定时操作").performScrollTo().assertExists()
+        compose.runOnIdle { state=state.copy(data=state.data!!.copy(tasks=state.data!!.tasks.map { it.copy(delaySeconds=61) })) }
+        compose.onNodeWithTag("schedule-edit-edit").performScrollTo().performClick()
+        compose.onNodeWithTag("schedule-delay").performScrollTo().assertTextContains("61 秒", substring=true)
+        compose.runOnIdle { state=state.copy(sessionKey="new-connection") }
+        compose.onNodeWithTag("schedule-editing").assertDoesNotExist()
+        compose.runOnIdle { state=state.copy(data=state.data!!.copy(tasks=state.data!!.tasks.map { it.copy(delaySeconds=null) })) }
+        compose.onNodeWithTag("schedule-edit-edit").performScrollTo().performClick()
+        compose.onNodeWithText("保存修改").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("schedule-delay").performScrollTo().assertTextContains("请选择倒计时时间")
+        compose.onNodeWithTag("schedule-delay").performClick()
+        compose.onNodeWithTag("schedule-delay-900").performClick()
+        compose.onNodeWithText("保存修改").performScrollTo().assertIsEnabled()
     }
 
     private fun captureSchedule(name: String, tag: String) {

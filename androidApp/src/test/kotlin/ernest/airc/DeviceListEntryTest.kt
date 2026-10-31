@@ -36,4 +36,16 @@ class DeviceListEntryTest {
         assertEquals("Service name", deviceListEntries(RemoteUiState(discovered = listOf(service), adbDevices = listOf(adb))).single().name)
         assertEquals("Hardware model", deviceListEntries(RemoteUiState(discovered = listOf(service.copy(name = "", attributes = mapOf("name" to " "))), adbDevices = listOf(adb))).single().name)
     }
+    @org.junit.Test fun pendingUnsavedTargetAppearsAndDoesNotMarkPreviousSelection() {
+        val old=device("old","192.0.2.10",1)
+        val target=device("pending","192.0.2.11",2)
+        val state=RemoteUiState(history=listOf(old), selected=old.id, reconnecting=true, connectingDevice=target)
+        val rows=deviceListEntries(state)
+        val pending=rows.single { it.host==target.host }
+        assertTrue(pending.isConnecting(state))
+        assertEquals(target.visibleName,pending.name)
+        assertTrue(pending.history.isEmpty())
+        assertFalse(rows.single { it.host==old.host }.isConnecting(state))
+        assertEquals(1,deviceListEntries(state.copy(reconnecting=false,connectingDevice=null)).size)
+    }
 }

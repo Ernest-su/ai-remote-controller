@@ -13,7 +13,7 @@ from instrumentation_result import require_passed
 
 ROOT = Path(__file__).resolve().parent.parent
 SUITES = {
-    "device-recovery-ui": ("ernest.airc.ConnectionRecoveryIntegrationTest,ernest.airc.DeviceRecoveryUiTest,ernest.airc.ConnectionStatusUiTest", 12),
+    "device-recovery-ui": ("ernest.airc.ConnectionRecoveryIntegrationTest,ernest.airc.DeviceRecoveryUiTest,ernest.airc.ConnectionStatusUiTest", 13),
     "remote-composer-ui": ("ernest.airc.RemoteLayoutUiTest,ernest.airc.RemoteExecutionUiTest#unconfiguredStatusPreservesComposerButDisablesSubmitUntilConfigured,ernest.airc.RemoteExecutionUiTest#remoteInputSendsOnlyTextAndPreservesDraftAcrossNavigationAndRotation,ernest.airc.RemoteNavigationUiTest#textDraftSurvivesFeatureSwitchAndOfflineRemoteActionsStayDisabled,ernest.airc.RemoteNavigationUiTest#remoteTypePickerRestoresAndKeepsStandardRemoteDraft", 8),
     "voice-input-ui": ("ernest.airc.VoiceInputUiTest,ernest.airc.RemoteCommandInputUiTest", 6),
     "file-editing-ui": ("ernest.airc.FileEditingUiTest,ernest.airc.FileTaskTabsUiTest", 6),
@@ -26,7 +26,7 @@ SUITES = {
     "file-multiselect-ui": ("ernest.airc.FileMultiSelectUiTest", 3),
     "url-conflict-ui": ("ernest.airc.UrlDownloadConflictUiTest", 2),
     "launcher-shortcut-ui": ("ernest.airc.LauncherShortcutUiTest", 3),
-    "scheduled-features-ui": ("ernest.airc.ScheduledFeaturesUiTest", 7),
+    "scheduled-features-ui": ("ernest.airc.ScheduledFeaturesUiTest", 8),
     "tv-input-ui": ("ernest.airc.TvInputUiTest,ernest.airc.TvInputFocusUiTest", 2),
     "remote-volume-target": ("ernest.airc.LiveRemoteVolumeTargetTest", 1),
     "screen-power-ui": ("ernest.airc.ScreenPowerUiTest", 1),

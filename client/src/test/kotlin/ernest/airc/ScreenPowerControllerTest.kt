@@ -43,6 +43,12 @@ class ScreenPowerControllerTest {
             withTimeout(5000) { controller.busy.first { !it } }
             assertEquals(false, controller.state.value)
             assertEquals(1, commands.count { it["on"] != null })
+            // A schedule can change the target mode while this controller remains connected.
+            on = true
+            controller.toggle()
+            withTimeout(5000) { controller.busy.first { !it } }
+            assertEquals(false, commands.last { it["on"] != null }["on"]!!.jsonPrimitive.boolean)
+            assertFalse(on)
             fail = true; controller.toggle()
             withTimeout(5000) { controller.busy.first { !it } }
             assertEquals(false, controller.state.value)
@@ -53,6 +59,16 @@ class ScreenPowerControllerTest {
             runtime.connect(server.hostName, server.port)
             withTimeout(5000) { controller.state.first { it == false } }
             controller.toggle()
+            withTimeout(5000) { controller.state.first { it == true } }
+            on = false
+            withTimeout(5000) { controller.state.first { it == false } }
+            controller.setForeground(false)
+            withTimeout(5000) { controller.state.first { it == null } }
+            val before = commands.size
+            delay(3100)
+            assertEquals(before, commands.size)
+            on = true
+            controller.setForeground(true)
             withTimeout(5000) { controller.state.first { it == true } }
         } finally { scope.cancel(); runtime.close(); server.shutdown() }
     }

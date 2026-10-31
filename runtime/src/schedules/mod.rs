@@ -20,6 +20,7 @@ struct Entry {
     kind: String,
     daily_time: Option<String>,
     next_at: i64,
+    delay_seconds: Option<i64>,
     enabled: bool,
     last_at: Option<i64>,
     last_status: String,
@@ -28,6 +29,7 @@ struct Entry {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Draft {
+    id: Option<String>,
     action: String,
     package: Option<String>,
     volume_percent: Option<u8>,
@@ -157,7 +159,10 @@ impl Scheduler {
                 _ => bail!("invalid schedule kind or mixed time fields"),
             };
             let entry = Entry {
-                id: uuid::Uuid::new_v4().to_string(),
+                id: draft
+                    .id
+                    .clone()
+                    .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
                 action: draft.action,
                 package: draft.package,
                 volume_percent: draft.volume_percent,
@@ -165,18 +170,34 @@ impl Scheduler {
                 kind: draft.kind,
                 daily_time: draft.daily_time,
                 next_at: next,
+                delay_seconds: draft.delay_seconds,
                 enabled: true,
                 last_at: None,
                 last_status: "pending".into(),
                 last_result: None,
             };
             let mut store = self.0.lock().await;
-            if store.entries.len() >= 100 {
-                bail!("最多保存100个定时任务，请先删除已完成任务");
+            let mut entry = entry;
+            let previous = store.entries.clone();
+            if let Some(id) = draft.id {
+                let index = store
+                    .entries
+                    .iter()
+                    .position(|e| e.id == id)
+                    .context("schedule not found")?;
+                if store.entries[index].last_status == "running" {
+                    bail!("任务正在执行，请等待结果后再编辑");
+                }
+                entry.enabled = store.entries[index].enabled;
+                store.entries[index] = entry.clone();
+            } else {
+                if store.entries.len() >= 100 {
+                    bail!("最多保存100个定时任务，请先删除已完成任务");
+                }
+                store.entries.push(entry.clone());
             }
-            store.entries.push(entry.clone());
             if let Err(error) = store.persist() {
-                store.entries.pop();
+                store.entries = previous;
                 return Err(error);
             }
             return Ok(serde_json::to_string(&entry)?);
@@ -359,6 +380,7 @@ fn validate_entry(e: &Entry) -> Result<()> {
     validate_parameters(&e.action, e.package.as_deref(), e.volume_percent)?;
     if ![
         "pause",
+        "screen_off",
         "set_volume",
         "mute",
         "unmute",
@@ -397,7 +419,7 @@ fn validate_parameters(action: &str, package: Option<&str>, volume: Option<u8>) 
 }
 async fn validate_action(action: &str, package: Option<&str>) -> Result<Option<Value>> {
     match action {
-        "pause" | "set_volume" | "mute" | "unmute" if package.is_none() => Ok(None),
+        "pause" | "screen_off" | "set_volume" | "mute" | "unmute" if package.is_none() => Ok(None),
         "shutdown" if package.is_none() => {
             crate::system_actions::check("shutdown").await?;
             Ok(None)
@@ -461,6 +483,7 @@ async fn perform(entry: &Entry) -> Result<String> {
             }
             crate::platform_bridge::scheduled_audio(&entry.action, &args).await
         }
+        "screen_off" => crate::tools::execute("screen.power", &json!({"on":false})).await,
         "shutdown" => crate::platform_bridge::system_action("shutdown").await,
         "open_app" => crate::tools::execute("apps.open", &json!({"package":entry.package})).await,
         "stop_app" => {
@@ -493,6 +516,69 @@ async fn perform(entry: &Entry) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn edits_replace_in_place_preserve_enabled_and_reject_running_or_invalid_drafts() {
+        let dir = std::env::temp_dir().join(format!("airc-schedule-edit-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&dir).unwrap();
+        let scheduler = Scheduler::load(&dir).unwrap();
+        let saved: Value = serde_json::from_str(
+            &scheduler
+                .request(
+                    "schedule_save",
+                    &json!({"action":"pause","kind":"delay","delaySeconds":900,"confirmed":true}),
+                )
+                .await
+                .unwrap(),
+        )
+        .unwrap();
+        let id = saved["id"].as_str().unwrap();
+        scheduler
+            .request("schedule_toggle", &json!({"id":id,"enabled":false}))
+            .await
+            .unwrap();
+        let draft = json!({"id":id,"action":"screen_off","kind":"daily","dailyTime":"21:45","confirmed":true});
+        let edited: Value =
+            serde_json::from_str(&scheduler.request("schedule_save", &draft).await.unwrap())
+                .unwrap();
+        assert_eq!(edited["id"], id);
+        assert_eq!(edited["action"], "screen_off");
+        assert_eq!(edited["enabled"], false);
+        assert_eq!(scheduler.0.lock().await.entries.len(), 1);
+        for invalid in [
+            json!({"confirmed":false}),
+            json!({"volumePercent":20}),
+            json!({"package":"test.player"}),
+            json!({"id":"missing"}),
+            json!({"dailyTime":"25:00"}),
+        ] {
+            let mut bad = draft.clone();
+            bad.as_object_mut()
+                .unwrap()
+                .extend(invalid.as_object().unwrap().clone());
+            assert!(scheduler.request("schedule_save", &bad).await.is_err());
+        }
+        {
+            let mut store = scheduler.0.lock().await;
+            store.entries[0].last_status = "running".into();
+        }
+        assert!(scheduler.request("schedule_save", &draft).await.is_err());
+        {
+            let mut store = scheduler.0.lock().await;
+            store.entries[0].last_status = "submitted".into();
+            store.entries[0].enabled = true;
+        }
+        let delayed = json!({"id":id,"action":"screen_off","kind":"delay","delaySeconds":5400,"confirmed":true});
+        scheduler.request("schedule_save", &delayed).await.unwrap();
+        let reload = Scheduler::load(&dir).unwrap();
+        let store = reload.0.lock().await;
+        assert_eq!(store.entries.len(), 1);
+        assert!(store.entries[0].enabled);
+        assert_eq!(store.entries[0].delay_seconds, Some(5400));
+        assert_eq!(store.entries[0].action, "screen_off");
+        assert!(store.entries[0].next_at >= time::now() + 5398);
+        assert_eq!(store.entries[0].last_status, "pending");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
     #[tokio::test]
     async fn manual_run_preserves_plan_and_claims_before_execution() {
         let dir =

@@ -25,7 +25,10 @@ class ScheduleController(private val scope: CoroutineScope, private val runtime:
         job = scope.launch {
             try {
                 val data = withTimeout(15_000) {
-                    if (!reading) send(kind, args)
+                    if (!reading) {
+                        send(kind, args)
+                        if (kind == "schedule_save" && token == generation) mutable.update { it.copy(saveRevision = it.saveRevision + 1) }
+                    }
                     json.decodeFromString<ScheduleList>(send("schedule_list", buildJsonObject {}))
                 }
                 if (token == generation) mutable.update { it.copy(data = data) }
@@ -39,7 +42,10 @@ class ScheduleController(private val scope: CoroutineScope, private val runtime:
     fun refresh() = run("schedule_list", buildJsonObject {})
     fun refreshQuietly() = run("schedule_list", buildJsonObject {}, quiet = true)
     fun runOnce(id: String, expectedSession: String?) = run("schedule_run_once", buildJsonObject { put("id", id); put("confirmed", true) }, expectedSession)
-    fun save(action: String, packageName: String?, kind: String, value: String, expectedSession: String?, volumePercent: Int? = null) = run("schedule_save", buildJsonObject {
+    fun save(action: String, packageName: String?, kind: String, value: String, expectedSession: String?, volumePercent: Int? = null) = saveDraft(null, action, packageName, kind, value, expectedSession, volumePercent)
+    fun update(id: String, action: String, packageName: String?, kind: String, value: String, expectedSession: String?, volumePercent: Int?) = saveDraft(id, action, packageName, kind, value, expectedSession, volumePercent)
+    private fun saveDraft(id: String?, action: String, packageName: String?, kind: String, value: String, expectedSession: String?, volumePercent: Int?) = run("schedule_save", buildJsonObject {
+        id?.let { put("id", it) }
         volumePercent?.let { put("volumePercent", it) }; put("action", action); packageName?.let { put("package", it) }; put("kind", kind); put("confirmed", true)
         when (kind) { "delay" -> put("delaySeconds", value.toLongOrNull() ?: 0); "daily" -> put("dailyTime", value); else -> put("localDateTime", value) }
     }, expectedSession)

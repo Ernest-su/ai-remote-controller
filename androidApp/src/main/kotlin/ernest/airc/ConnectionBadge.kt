@@ -19,19 +19,19 @@ import kotlinx.coroutines.delay
 
 @Composable
 internal fun ConnectionBadge(connected: Boolean, connecting: Boolean, deviceName: String, onClick: () -> Unit) {
-    var showName by remember(connected, deviceName) { mutableStateOf(false) }
+    var showName by remember(connected, connecting, deviceName) { mutableStateOf(false) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    LaunchedEffect(connected, deviceName, lifecycle) {
-        if (connected && deviceName.isNotBlank()) lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+    LaunchedEffect(connected, connecting, deviceName, lifecycle) {
+        if ((connected || connecting) && deviceName.isNotBlank()) lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             showName = false
             while (true) { delay(RemoteDimensions.ConnectionLabelIntervalMillis); showName = !showName }
         }
     }
-    val text = if (connected) if (showName && deviceName.isNotBlank()) deviceName else "已连接"
-        else if (connecting) "连接中" else "未连接"
+    val status = if (connected) "已连接" else if (connecting) "连接中" else "未连接"
+    val text = if ((connected || connecting) && showName && deviceName.isNotBlank()) deviceName else status
     Row(Modifier.width(RemoteDimensions.ConnectionBadgeWidth).heightIn(min = 48.dp).testTag("device-status")
         .clickable(role = Role.Button, onClickLabel = "管理设备", onClick = onClick)
-        .semantics { contentDescription = if (connected) "已连接，$deviceName，管理设备" else "$text，管理设备" }
+        .semantics { contentDescription = if ((connected || connecting) && deviceName.isNotBlank()) "$status，$deviceName，管理设备" else "$status，管理设备" }
         .padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.End)) {
         Box(Modifier.size(RemoteDimensions.ConnectionStatusDot).background(

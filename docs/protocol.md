@@ -289,12 +289,12 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 | type | arguments | 行为 |
 | --- | --- | --- |
 | `schedule_list` | `{}` | 返回tasks、targetNow（Unix秒）、targetLocalTime、utcOffsetSeconds与runningRequired |
-| `schedule_save` | action、kind、confirmed=true，以及对应时间字段；应用动作带package | 明确用户确认后保存并启用任务 |
+| `schedule_save` | action、kind、confirmed=true，以及对应时间字段；应用动作带package | 明确用户确认后新建并启用任务；可选id原位编辑；运行中拒绝编辑，保留enabled状态，重置历史结果；delaySeconds随任务返回，编辑倒计时重新从保存时计算。支持screen_off，执行复用screen.power(on=false)。 |
 | `schedule_run_once` | id、confirmed=true | 持久保存执行中状态后异步执行一次；返回id、submitted，不改变未来计划；执行中拒绝重复提交，计划恰好到期时跳过该次以避免重复；不向模型暴露 |
 | `schedule_toggle` | id、enabled；启用须confirmed=true | 暂停或启用，过期单次任务拒绝重新启用 |
 | `schedule_delete` | id | 删除未来调度；执行中拒绝删除 |
 
-`action`允许`pause`、`shutdown`、`stop_app`、`open_app`、`set_volume`、`mute`、`unmute`。`stop_app`和`open_app`必须提供package，其余动作禁止携带package；不接受Shell或任意命令。`kind=delay`须带delaySeconds（60–604800秒），`once`须带localDateTime（`yyyy-MM-dd HH:mm`），`daily`须带dailyTime（`HH:mm`），禁止混用时间字段。日期时间按被控端本地时区解析。
+`action`允许`screen_off`、`pause`、`shutdown`、`stop_app`、`open_app`、`set_volume`、`mute`、`unmute`。`stop_app`和`open_app`必须提供package，其余动作禁止携带package；不接受Shell或任意命令。`kind=delay`须带delaySeconds（60–604800秒），`once`须带localDateTime（`yyyy-MM-dd HH:mm`），`daily`须带dailyTime（`HH:mm`），禁止混用时间字段。日期时间按被控端本地时区解析。
 
 `set_volume` 必须提供整数 `volumePercent`（0–100），其他动作禁止该字段，三者均禁止 `package`。列表与被控端持久记录保留 `volumePercent`。音量百分比映射为媒体流最接近的系统档位；静音与解除使用明确状态操作，执行后核对系统状态，失败记录原因。
 

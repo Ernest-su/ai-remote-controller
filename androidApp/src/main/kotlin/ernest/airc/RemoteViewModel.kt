@@ -32,6 +32,7 @@ data class RemoteUiState(
     val output: String = "",
     val busy: Boolean = false,
     val reconnecting: Boolean = false,
+    val connectingDevice: RememberedDevice? = null,
     val submitting: Boolean = false,
     val connected: Boolean = false,
     val tools: List<String> = emptyList(),
@@ -145,11 +146,12 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
     private fun startAutomaticRecovery(device: RememberedDevice, initialDelayMillis: Long = 0) {
         automaticTarget = device
         if (!automaticReconnectEnabled || state.value.connected) return
-        mutable.update { it.copy(reconnecting = true) }
+        mutable.update { it.copy(reconnecting = true, connectingDevice = device) }
         if (recoveryForeground) automaticConnection.start(device, initialDelayMillis)
     }
     fun setConnectionForeground(foreground: Boolean) {
         recoveryForeground = foreground
+        screenPower.setForeground(foreground)
         mediaForeground.value = foreground
         if (!foreground) {
             automaticConnection.stop()
@@ -330,7 +332,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         } else retired?.close()
     }
     private fun connection(disconnectRuntime: Boolean = true, automatic: Boolean = false,
-        timeoutMillis: Long = connectionTimeoutMillis, target: RememberedDevice? = automaticTarget, action: suspend () -> Unit) {
+        timeoutMillis: Long = connectionTimeoutMillis, target: RememberedDevice? = automaticTarget, displayTarget: RememberedDevice? = target, action: suspend () -> Unit) {
         if (automatic && state.value.busy) return
         if (!automatic) {
             if (disconnectRuntime) automaticReconnectEnabled = false
@@ -342,7 +344,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         val connectionToken = connectionGeneration
         connectionAutomatic = automatic
         connectionJob = viewModelScope.launch {
-            mutable.update { it.copy(busy = !automatic, reconnecting = automatic, status = if (automatic) "正在自动连接设备…" else "正在连接…", qr = null) }
+            mutable.update { it.copy(busy = !automatic, reconnecting = automatic, connectingDevice = displayTarget, status = if (automatic) "正在自动连接设备…" else "正在连接…", qr = null) }
             val stages = ConnectionDeadline { message ->
                 if (connectionToken == connectionGeneration) mutable.update { it.copy(status = message) }
             }
@@ -356,7 +358,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
                     if (disconnectRuntime) runtime.disconnect()
                     lastConnectionFailure = stages.retryReason(timedOut = true)
                     val message = if (automatic) lastConnectionFailure else checkNotNull(failure)
-                    mutable.update { it.copy(busy = false, reconnecting = automatic, qr = null, status = message) }
+                    mutable.update { it.copy(busy = false, reconnecting = automatic, connectingDevice = if (automatic) it.connectingDevice else null, qr = null, status = message) }
                     if (!automatic) {
                         feedback(FeedbackPhase.ERROR, message)
                         if (disconnectRuntime && automaticTarget != null) {
@@ -399,7 +401,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
                 deadline.cancel()
                 if (connectionToken == connectionGeneration) {
                     connectionAutomatic = false
-                    mutable.update { it.copy(busy = false, qr = null) }
+                    mutable.update { it.copy(busy = false, qr = null, connectingDevice = if (automatic && !it.connected) it.connectingDevice else null) }
                     if (!automatic && (disconnectRuntime || automaticReconnectEnabled) && !state.value.connected && automaticTarget != null) {
                         automaticReconnectEnabled = true
                         startAutomaticRecovery(checkNotNull(automaticTarget), initialDelayMillis = 3_000)
@@ -421,7 +423,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
     fun tcp(host: String, port: Int, runtimePort: Int) = connection(target = connectionTarget(host.trim(), port, runtimePort)) {
         attach(connector.tcp(host.trim(), port), ConnectionMethod.TCP, runtimePort)
     }
-    fun pair(host: String, pairingPort: Int, code: String, runtimePort: Int, connectionPort: Int? = null) = connection(target = null) {
+    fun pair(host: String, pairingPort: Int, code: String, runtimePort: Int, connectionPort: Int? = null) = connection(target = null, displayTarget = connectionTarget(host.trim(), connectionPort ?: 5555, runtimePort)) {
         mutable.update { it.copy(status = "配对并发现目标连接端口…") }
         attach(connector.pair(host.trim(), pairingPort, code, connectionPort), ConnectionMethod.WIRELESS_CODE, runtimePort)
     }
@@ -434,7 +436,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         automaticReconnectEnabled = false; automaticConnection.stop()
         retireConnection()
         if (!state.value.connected) runtime.disconnect()
-        mutable.update { it.copy(busy = false, reconnecting = false, qr = null, status = "已取消") }
+        mutable.update { it.copy(busy = false, reconnecting = false, connectingDevice = null, qr = null, status = "已取消") }
     }
 
     private suspend fun attach(session: AdbSession, method: ConnectionMethod, runtimePort: Int, releaseUrl: String? = null) {
@@ -442,6 +444,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         operation.ensureActive()
         if (adb !== session) adb?.close()
         adb = session
+        mutable.update { it.copy(connectingDevice = connectionTarget(session.host, session.port, runtimePort)) }
         try {
             connectionStage(ConnectionStage.WAIT)
             deploymentLocks.getOrPut(session.host) { Mutex() }.withLock {
@@ -457,7 +460,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
                 automaticTarget = adbRecord.copy(runtimePort = runtimePort)
                 // A successful ADB session survives an interrupted or failed deployment.
                 val history = withContext(Dispatchers.IO) { store.remember(adbRecord) }
-                mutable.update { it.copy(history = history) }
+                mutable.update { it.copy(history = history, connectingDevice = history.firstOrNull { record -> record.id == adbRecord.id } ?: adbRecord) }
                 val release = installer.install(session.client, releaseUrl, runtimePort, state.value.preferRoot) { message -> if (operation.isActive) mutable.update { it.copy(status = message) } }
                 operation.ensureActive()
                 mutable.update { it.copy(status = "启动目标服务…") }
@@ -488,7 +491,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         automaticReconnectEnabled = true
         automaticTarget = record
         tvInput.selectTarget(record.id)
-        mutable.update { it.copy(connected = true, reconnecting = false, status = "已连接 ${history.first { it.id == record.id }.visibleName}", selected = record.id, version = status.version, tools = status.tools, runtimeUid = status.uid, modelConfigured = status.modelConfigured, history = history, shortcuts = readShortcuts(record.id), routines = readRoutines(record.id), remoteLayout = readRemoteLayout(record.id)) }
+        mutable.update { it.copy(connected = true, reconnecting = false, connectingDevice = null, status = "已连接 ${history.first { it.id == record.id }.visibleName}", selected = record.id, version = status.version, tools = status.tools, runtimeUid = status.uid, modelConfigured = status.modelConfigured, history = history, shortcuts = readShortcuts(record.id), routines = readRoutines(record.id), remoteLayout = readRemoteLayout(record.id)) }
     }
 
     fun discovered(service: DiscoveredService, adbPort: Int? = null) = connection(target = connectionTarget(service.host, adbPort ?: 5555, service.port)) {
@@ -511,6 +514,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
 
     private suspend fun connectWithDeploymentFallback(host: String, port: Int, adbPort: Int?, guid: String?, method: ConnectionMethod, name: String?) {
         val target = ManualConnectionTarget(host, adbPort ?: 5555, port)
+        mutable.update { it.copy(connectingDevice = (it.connectingDevice ?: connectionTarget(host, target.adbPort, port)).copy(host = host)) }
         connectLanOrDeploy(target,
             connectRuntime = { attachRuntime(host, port, method, adbPort, guid, name) },
             deploy = {
@@ -806,7 +810,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
 
     private fun connectionTarget(host: String, port: Int, runtimePort: Int): RememberedDevice {
         val known = state.value.history.find { it.host == host && it.adbPort == port }
-        return known?.copy(runtimePort = runtimePort) ?: RememberedDevice("adb:$host:$port", host, ConnectionMethod.TCP, host, port, runtimePort = runtimePort, lastConnectedAt = 0)
+        return known?.copy(runtimePort = runtimePort) ?: RememberedDevice("adb:$host:$port", deviceListEntries(state.value).firstOrNull { it.host == host }?.name ?: host, ConnectionMethod.TCP, host, port, runtimePort = runtimePort, lastConnectedAt = 0)
     }
     private suspend fun selectedAdb(): AdbSession = adbMutex.withLock {
         val record = state.value.history.find { it.id == state.value.selected } ?: error("请先选择目标设备")
@@ -882,7 +886,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         retireConnection()
         ascrcpyPreview.stop(); tvInput.cancel(); quickRoutines.cancel(); releaseHardwareKeys()
         runtime.disconnect(); adb?.close(); adb = null
-        mutable.update { it.copy(status = "已断开", runtimeUid = null, busy = false, reconnecting = false, qr = null) }
+        mutable.update { it.copy(status = "已断开", runtimeUid = null, busy = false, reconnecting = false, connectingDevice = null, qr = null) }
     }
 
     override fun onCleared() {

@@ -22,7 +22,7 @@ internal fun ScheduleDropdown(label: String, value: String, choices: List<Pair<S
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val width = maxWidth
             OutlinedButton({ expanded = true }, shape = MaterialTheme.shapes.small, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag(tag)) {
-                Text(choices.first { it.first == value }.second, Modifier.weight(1f))
+                Text(choices.firstOrNull { it.first == value }?.second ?: "请选择$label", Modifier.weight(1f))
                 Icon(LibraryIcons.Down, null, Modifier.size(20.dp))
             }
             DropdownMenu(expanded, { expanded = false }, Modifier.width(width).testTag("$tag-menu")) {
