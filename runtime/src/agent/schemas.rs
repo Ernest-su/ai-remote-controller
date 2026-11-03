@@ -10,6 +10,7 @@ mod screen;
 pub fn tool_schemas() -> Value {
     let mut schemas = Vec::new();
     schemas.extend(device::system());
+    schemas.extend(screen::power());
     schemas.extend(screen::mirror());
     schemas.extend(apps::cache());
     schemas.extend(input::gamepad());

@@ -105,8 +105,11 @@ async def verify(port):
         result = json.loads(await socket.recv())
         assert result["id"] == "apps" and result["ok"], result
         assert json.loads(result["result"]) == {"apps": [
-            {"package": "com.android.settings", "label": None, "system": True},
-            {"package": "com.example.tv", "label": None, "system": False}], "source": "pm", "labelsAvailable": False}, result
+            {"package": "com.android.settings", "label": None, "system": True,
+             "firstInstallTime": None, "sizeBytes": None},
+            {"package": "com.example.tv", "label": None, "system": False,
+             "firstInstallTime": None, "sizeBytes": None}],
+            "source": "pm", "labelsAvailable": False, "sizesRequested": False}, result
         await socket.send(json.dumps({"id": "media", "protocol": 1, "type": "tool",
                                      "tool": "media.status", "arguments": {}}))
         result = json.loads(await socket.recv())

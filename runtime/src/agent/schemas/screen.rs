@@ -1,5 +1,11 @@
 use serde_json::{json, Value};
 
+pub(super) fn power() -> Vec<Value> {
+    vec![
+        json!({"type":"function","function":{"name":"screen_power","description":"Read the last successfully requested physical display mode, or set it with optional on. Does not sleep, lock, shut down or send a power key. Initial mode is on; changes made by other apps or hardware buttons are not detected. Platform failures leave the recorded mode unchanged.","parameters":{"type":"object","properties":{"on":{"type":"boolean"}},"additionalProperties":false}}}),
+    ]
+}
+
 pub(super) fn mirror() -> Vec<Value> {
     vec![
         json!({"type":"function","function":{"name":"screen_mirror_start","description":"Prepare a one-reader AVC/H.264 live screen stream for an explicit user request. Starts capture only when the client reads the separate binary HTTP path. No audio. Limits: even width/height 160..1280 / 90..1280, at most 921600 pixels, bitrate 250000..8000000, durationSeconds 10..120. Actual encoder/decoder support and FPS require observation; protected content can be black.","parameters":{"type":"object","properties":{"width":{"type":"integer"},"height":{"type":"integer"},"bitrate":{"type":"integer"},"durationSeconds":{"type":"integer"}},"additionalProperties":false}}}),
