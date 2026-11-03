@@ -1528,7 +1528,7 @@
 <p>应用标签与媒体操作分别由 AppsBridge / MediaBridge 实现；MediaCustomActions 单独处理动作声明边界与即时核对，共用 FrameworkContext 的当前用户上下文；Rust platform_bridge 负责验证和启动嵌入适配资产。scripts/build-platform-bridge.py 为 Android 构建编译所有适配类，主机 Rust 构建仍使用空桥接与可测的原命令回退。</p>
 <p>屏幕捕获复用 screen_capture 的单捕获锁与 PNG 限额；单张结果仍由 artifacts 保存，连续预览由 screen_preview 单会话 registry 和 HTTP Body 背压驱动，无驻留目标 APK、帧队列或 WebSocket 图像负载。客户端帧解析/HTTP 读取/控制器分别放在 client 的 transfer/state，共享 ScreenPreviewPanel 负责展示，平台层仅解码图像并在退出时停止。</p>
 <p>GamepadBridge 是随二进制嵌入的短时输入适配，标准 GAMEPAD 键与 JOYSTICK 轴通过系统输入管理器提交。Rust gamepad 模块校验并以单名额独立 task 运行有限事务；请求 future 被丢弃时不 abort task，服务关闭等待释放路径。client GamepadController 校验输入/响应及连接代次，共享 GamepadPanel 使用统一双摇杆和六键布局，非 root 通过串行有限事务驱动，root/uinput 使用虚拟设备快照；不引入目标常驻 APK 或 Java 服务。</p>
-<p>应用缓存处理在 app_actions/cache 独立管理提案、权限检查、身份核对和只带 cache-only 标志的包管理器任务。CachePermissionBridge 只读取当前 caller 的内部缓存权限，不授予权限或执行删除；模型只能准备/查询，approve_cache 由客户端人工确认。客户端 AppCacheController 与共享 AppCachePanel 独立于卸载流程。</p>
+<p>应用缓存处理在 app_actions/cache 独立管理提案、权限检查、身份核对和专用缓存删除包管理器任务。AppCacheBridge 探测当前 caller 的实际缓存权限，并通过 deleteApplicationCacheFilesAsUser 发起指定用户的缓存删除，核对异步回调包名与完成结果，不调用应用数据清除接口；模型只能准备/查询，approve_cache 由客户端人工确认。客户端 AppCacheController 与共享 AppCachePanel 独立于卸载流程。</p>
 <p>Android 动态预览使用 ascrcpy 的 ADB/scrcpy 与系统 MediaCodec。JVM 桌面只提供单张截图。</p>
 <p>Rust 的 H.264 工具协议由 <code>screen_mirror</code> 管理 screenrecord 会话、子进程组、捕获锁与 HTTP 背压流；传输归属、背压和取消通过不依赖客户端解码器的协议测试验证。此工具不提供 Android 或桌面页面入口。</p>
 <p>持续手柄控制基础位于 <code>shared/tools/VirtualGamepad.kt</code> 与

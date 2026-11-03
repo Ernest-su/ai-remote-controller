@@ -1253,6 +1253,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="媒体音量">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        物理屏幕电源
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#media-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        会话播放控制
+      
+    </span>
+  </a>
+  
 </li>
       
     </ul>
@@ -2041,6 +2069,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="媒体音量">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        物理屏幕电源
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#media-command" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        会话播放控制
+      
+    </span>
+  </a>
+  
 </li>
       
     </ul>
@@ -2239,7 +2295,7 @@
 <p>分配量取文件系统报告的文件块统计；稀疏文件、块共享、压缩、目录元数据与保留空间会影响其与实际可释放量的关系。遍历不跟随符号链接，不进入不同 dev 的文件系统，同一文件系统的 bind 别名可能进入并按已访问目录 inode 防止重复。扫描最多 100000 项、64 层和 120 秒，相对路径最多 2048 字节；到限、错误或目录修改产生不完整报告。complete=true 只表示限定范围内未发现限额/访问/目录变化问题，报告始终不是事务快照。只允许一项存储扫描，同时受两项活动任务与十六项记录的公共限额约束；任务不跨服务重启恢复。</p>
 <h2 id="media-seek">播放定位<a class="headerlink" href="#media-seek" title="Permanent link">&para;</a></h2>
 <p><code>media.status</code> 优先使用一次性标准 MediaController 桥接，返回 seekAvailable、source=media_controller、userId 和活动 sessions；会话增加 sessionTag，读取真实报告位置、更新时钟、时长、ACTION_SEEK_TO 支持与标题。位置是播放器报告值，不在控制端外推。桥接不可用时回退原 dumpsys 解析，seekAvailable=false 并附有限长度 bridgeError。</p>
-<p><code>media.seek</code> / <code>media_seek</code> 接收 package、非负整数 positionMs 和可选 sessionTag。选择当前 Android 用户活动会话，检查 ACTION_SEEK_TO 和已知正时长边界；多个匹配会话时拒绝猜测。通过标准 TransportControls.seekTo 提交，不用方向/快进键模拟。返回 packageName、requestedMs、submitted=true、playbackVerified=false 和提交时 session 快照。提交不证明执行：控制端随后读取位置核对，播放器拒绝或未及时更新时如实显示未观察到目标位置。接口依据 <a href="https://developer.android.com/reference/android/media/session/MediaSessionManager#getActiveSessions(android.content.ComponentName)">MediaSessionManager</a> 与 <a href="https://developer.android.com/reference/android/media/session/MediaController.TransportControls#seekTo(long)">TransportControls.seekTo</a>。</p>
+<p><code>media.seek</code> / <code>media_seek</code> 接收 package、非负整数 positionMs 和可选 sessionTag。选择当前 Android 用户活动会话，检查 ACTION_SEEK_TO 和已知正时长边界；多个匹配会话时拒绝猜测。通过标准 TransportControls.seekTo 提交，不用方向/快进键模拟。返回 packageName、requestedMs、submitted=true、playbackVerified=false 和提交时 session 快照。提交不证明执行：适配在提交后最多等待200ms读取真实状态，响应的 session 为实际会话快照。控制端优先使用它核对位置，不追加多轮状态读取；尚未观察到目标位置时如实提示待更新，后续由常规读取更新。接口依据 <a href="https://developer.android.com/reference/android/media/session/MediaSessionManager#getActiveSessions(android.content.ComponentName)">MediaSessionManager</a> 与 <a href="https://developer.android.com/reference/android/media/session/MediaController.TransportControls#seekTo(long)">TransportControls.seekTo</a>。</p>
 <p>常驻服务仍为 Rust 原生二进制。Android 构建时编译并嵌入短时 Java/Dex 桥接，只经系统 app_process 为当前请求调用 framework，不安装服务 APK或后台 Java 服务。初始化到服务私有 platform 目录中的 SHA-256 命名只读资产，核对 owner、模式、长度和内容；子进程默认限时 10 秒、输出 256 KiB；应用列表框架查询限时 30 秒、输出 1 MiB。反射只用于获取系统/当前用户上下文与 Android 媒体模块初始化；厂商或权限阻止时返回不可用，不切换或提权。最多 64 会话，标题限 256 字符、tag 超过 128 字符返回 null。Root 身份、Android 版本与厂商权限差异需在对应目标验证。</p>
 <h2 id="app-labels">真实应用名称<a class="headerlink" href="#app-labels" title="Permanent link">&para;</a></h2>
 <p>apps.list / apps_list 优先通过短时框架桥接读取当前 Android 用户的 PackageManager 安装列表与 getApplicationLabel，返回 package、label 和 system；包名排序。标签按目标资源/配置解析，最多 256 个 UTF-16 单元。返回 source=package_manager、labelsAvailable=true、userId 和 labelErrors，单个标签读取失败时保留 null；这不表示标签完整读取成功。最多 4096 条、整体 1 MiB。桥接不可用或结果无效时回退原 pm 枚举，source=pm、labelsAvailable=false，未知 label 保持 null。它不会启动或修改应用。手机/桌面沿用名称与包名搜索、按准确包名启动。</p>
@@ -2257,9 +2313,9 @@
 <p>单事务经 GamepadBridge 提交 GAMEPAD KeyEvent 按下、JOYSTICK AXIS_X/Y/Z/RZ、持有时间、逆序抬起和回中，虚拟设备 ID=-1。操作在独立、单名额的 Rust task 中完成，请求断开不取消释放；错误另行重试释放，服务正常关闭等待在途事务。<code>gamepad.reset</code> / 模型 <code>gamepad_reset</code> 只接受空对象，等待在途事务释放名额（最多20秒）后提交白名单全部按键抬起与回中，不操作物理控制器 ID。响应 <code>submitted/released:true</code> 仅表示注入队列接受输入和释放，<code>gameVerified:false</code>，不宣称游戏实际消费。</p>
 <p>标准来源定义见 <a href="https://developer.android.com/reference/android/view/InputDevice">Android InputDevice</a>。合成输入未注册硬件轴范围，不保证连续低延迟输入，真实消费需另测。</p>
 <h2 id="app-cache">应用缓存清理<a class="headerlink" href="#app-cache" title="Permanent link">&para;</a></h2>
-<p><code>apps.cache_capabilities</code> / <code>apps_cache_capabilities {}</code> 查询系统帮助中明确的 <code>clear [--user USER_ID] [--cache-only] PACKAGE</code> 和选项说明，以及 runtime UID 是否 shell/root、短时框架探测的 INTERNAL_DELETE_CACHE_FILES 权限；三项均满足才声明 supported。<code>apps.clear_cache</code> / <code>apps_clear_cache {package}</code> 准备用户应用的 <code>app_cache_clear</code> 提案，不执行清理。<code>apps.cache_pending</code> / <code>apps_cache_pending {}</code> 查询待审核提案。32项、15分钟限额，与卸载/安装提案独立。</p>
-<p>直接人工 <code>type:approve_cache {id,accepted?}</code> 消耗一次性提案；拒绝不执行，确认重新核对当前用户/版本/代码路径/应用身份及能力，创建不可取消的 <code>app_cache_clear</code> 长任务。任务再次核对，然后只执行 <code>pm clear --cache-only --user &lt;approved-user&gt; &lt;package&gt;</code>，没有删除数据的 fallback。结果含 <code>cacheOnly:true,completed:true,verifiedBy:package_manager,reclaimedBytes:null,appDataVerified:false</code>，不把系统成功当作任意数据完整性或释放字节证明。</p>
-<p><a href="https://android.googlesource.com/platform/frameworks/base/%2B/5b361c07f928fd8c02a347b074a50b977e044f97/services/core/java/com/android/server/pm/PackageManagerShellCommand.java">AOSP PackageManagerShellCommand</a> 中缓存标志走 deleteApplicationCacheFilesAsUser，普通数据清除走不同分支；本项目始终保留缓存标志并按目标声明探测，不按 Android 版本猜测。</p>
+<p><code>apps.cache_capabilities</code> / <code>apps_cache_capabilities {}</code> 查询专用 PackageManager 缓存接口是否存在（<code>cacheOnlyApiAvailable</code>）、当前系统要求的缓存删除权限（<code>cacheDeletePermission</code>、<code>cacheDeleteGranted</code>）以及 <code>runtimeUid</code>；接口存在、权限允许且 UID 为 shell/root 时才声明 supported。Android 7–8 探测 DELETE_CACHE_FILES，Android 9 起探测 INTERNAL_DELETE_CACHE_FILES。<code>apps.clear_cache</code> / <code>apps_clear_cache {package}</code> 准备用户应用的 <code>app_cache_clear</code> 提案，不执行清理。<code>apps.cache_pending</code> / <code>apps_cache_pending {}</code> 查询待审核提案。32项、15分钟限额，与卸载/安装提案独立。</p>
+<p>直接人工 <code>type:approve_cache {id,accepted?}</code> 消耗一次性提案；拒绝不执行，确认重新核对当前用户/版本/代码路径/应用身份及能力，创建不可取消的 <code>app_cache_clear</code> 长任务。任务再次核对，然后只调用 <code>deleteApplicationCacheFilesAsUser(package,userId,observer)</code>。匹配包名且成功的系统异步回调才确认完成；20秒未回调报告未确认，但操作可能继续完成，不自动重试。不会调用应用数据清除接口或直接递归删除应用目录。结果含 <code>cacheOnly:true,completed:true,verifiedBy:package_manager,reclaimedBytes:null,appDataVerified:false</code>，不把系统成功当作任意数据完整性或释放字节证明。</p>
+<p><a href="https://android.googlesource.com/platform/frameworks/base/+/android-7.0.0_r1/services/core/java/com/android/server/pm/PackageManagerService.java">AOSP Android 7.0 PackageManagerService</a> 的 deleteApplicationCacheFilesAsUser 只清理缓存与代码缓存，并通过 observer 回调完成；与 clearApplicationUserData 是不同接口。本项目探测专用方法和实际 caller 权限，执行时等待系统回调。</p>
 <h2 id="screen-mirror">H.264 镜像工具<a class="headerlink" href="#screen-mirror" title="Permanent link">&para;</a></h2>
 <p><code>screen.mirror_start</code> / <code>screen_mirror_start</code> 准备独立流，默认640×360/2Mbps/60秒；<code>screen.mirror_stop</code> / <code>screen_mirror_stop</code> 释放准确id。捕获只在读取二进制路径时进行，不输出文本图像或目标视频文件；模型工具注册与直接工具共用校验，客户端手动开始。</p>
 <p>这是服务端 H.264 工具接口，不提供 App 或桌面页面入口。Android 动态预览使用 ascrcpy/MediaCodec，见<a href="../../guide/screenshots/#screen-mirror">设备截图</a>。流记录、限额与连接归属见<a href="../../protocol/#screen-mirror-stream">设备协议</a>。</p>
@@ -2330,6 +2386,13 @@
 <p>断线释放所属连接的按键。桥接线程独立于 RPC 计时，1500ms无保活或按住120秒即取消释放；服务退出时关闭桥接并释放剩余按键。出错后仅尝试抬起，不自动重放 DOWN。边沿响应包含 <code>operation</code>、<code>pressId</code>、<code>keyCode</code>、<code>submitted</code>、<code>released</code> 和 <code>source</code>；<code>down</code>/<code>keep</code> 的 <code>released</code> 为false，<code>up</code>/<code>cancel</code> 为true，提交成功不代表目标应用已经消费事件。</p>
 <h2 id="media-volume">媒体音量<a class="headerlink" href="#media-volume" title="Permanent link">&para;</a></h2>
 <p><code>media.volume</code> / <code>media_volume</code> 使用原生 AudioManager 读取媒体流音量。空参数对象只读取；<code>{"percent":57}</code> 设置 0–100 的整数百分比，映射到设备最小/最大音量档位，回读确认后返回 <code>verified=true</code>。结果包含 <code>volumeIndex</code>、<code>minVolumeIndex</code>、<code>maxVolumeIndex</code>、<code>muted</code>、<code>fixed</code>、<code>stream=media</code> 与 <code>operation</code>（<code>status</code> 或 <code>set_volume</code>）；设置还包含 <code>requestedPercent</code>。固定音量设备拒绝设置，权限不足或设置未生效返回错误，不把命令成功当成音量已改变。</p>
+<h3 id="_12">物理屏幕电源<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
+<p><code>screen.power</code> 接受 <code>{}</code> 读取服务最后成功提交的模式，或 <code>{"on":false}</code> / <code>{"on":true}</code> 关闭/打开物理显示，返回 <code>{"on":布尔值}</code>。不发送电源按键、不休眠、不锁屏；平台失败返回错误并保留上次模式。服务初始模式为打开，不探测其他应用或实体按键改变的显示状态。</p>
+<h2 id="media-command">会话播放控制<a class="headerlink" href="#media-command" title="Permanent link">&para;</a></h2>
+<p><code>media.command</code> / <code>media_command</code> 接受 <code>package</code>、可选 <code>sessionTag</code> 和枚举 <code>command</code>（<code>play</code>、<code>pause</code>、<code>previous</code>、<code>next</code>），拒绝额外字段。对当前 Android 用户重新查询活动会话，要求匹配唯一。声明独立标准 PlaybackState 动作位时通过该会话的 TransportControls 提交；仅声明 ACTION_PLAY_PAUSE 的播放/暂停请求，根据当前明确状态向该会话发送成对的播放暂停按键，同方向已满足时不再切换，状态不明确时拒绝。不会向系统分发全局媒体按键。返回 <code>packageName</code>、实际 <code>sessionTag</code>、<code>command</code>、<code>submitted:true</code>、<code>playbackVerified:false</code>，提交后应读取 <code>media.status</code> 核对实际状态。</p>
+<p>标准 <code>media.status</code> 会话补充可选的 <code>appName</code>、<code>artist</code>、<code>album</code> 与 <code>actions</code>；顶层 <code>transportAvailable</code> 表示会话播放命令接口是否可用。无法取得的字段保留未知，不伪造应用名、封面或播放能力；平台桥不可用时不宣称 transport 可用。</p>
+<p>播放与媒体音量工具共用 runtime 所有的常驻 Android 桥接进程，通过有界、带请求关联的逐行 JSON 交换结果，复用 framework 上下文并在当前 Android 用户变化时切换上下文，避免每次启动 am/app_process。等待中的取消不会提交迟到操作；已经开始的帧读完后再交给下一请求，超时或响应丢失会丢弃进程且不自动重放写操作。独立 AudioBridge CLI 仍用于显式用户的定时操作与验证工具。</p>
+<p><code>apps.list</code> 支持可选布尔 <code>includeSizes</code>，默认 false。条目增加 <code>firstInstallTime</code>（首次安装的 epoch 毫秒）及 <code>sizeBytes</code>（系统报告的应用总占用字节）；未知为 null。响应 <code>sizesRequested</code> 标记是否已尝试读取大小。普通列表不读取空间；大小读取通过 <code>sizeTask</code> 返回的 <code>app_sizes</code> 后台任务执行（root=apps，name=app-sizes，unit=items），使用 task.progress 查询；列表先返回基础信息，统计过程中逐条发布结果，客户端约每300毫秒合并已返回的同版本应用大小；统计结束后补齐最终快照。同一用户的并发请求复用进行中的任务；单次统计最多5分钟，可返回部分已读值，刷新后重新测量，不持久缓存动态大小。Android 8 起使用 StorageStats 的 appBytes + dataBytes（dataBytes 已含缓存），Android 7 使用当前用户的 PackageStats 统计；不遍历应用私有目录。</p>
 
 
 

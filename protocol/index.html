@@ -1221,6 +1221,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#voice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实时虚拟麦克风 /voice
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        清除目标模型配置
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2031,6 +2053,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#voice" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实时虚拟麦克风 /voice
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        清除目标模型配置
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2191,7 +2235,7 @@ airc-runtime<span class="w"> </span>service<span class="w"> </span>stop<span cla
 <p>流首部为 ASCII <code>AIRCPRV1</code>，后续每条记录是大端 <code>sequence:u32,width:u32,height:u32,length:u32,elapsedMs:u64</code>（24 字节），紧跟 length 字节的 PNG。序号从 1 开始递增；elapsedMs 是服务端本次流的单调经过时间，每帧尺寸以当前截图为准。宽高为零时，length=0 表示正常结束，length&gt;0 是最多 1024 字节的 UTF-8 错误。结束记录序号为已经生成的帧数，截断不算正常结束。HTTP 无整流 Content-Length，带 no-store/nosniff；不通过 WebSocket 传帧或 Base64。</p>
 <p>单帧最多 16 MiB、32M 像素，边长最多 16384；间隔 500..5000 毫秒、时长 10..120 秒。无历史帧队列，不追赶补帧；实际间隔包含捕获和消费耗时。捕获失败终止流；停止/断开取消命令进程组并释放读取资源。恶意或停滞的读取者可能延迟资源释放，需关闭旧读取连接再开始；服务重启清空所有会话，无自动续流。</p>
 <p><code>gamepad.pulse {buttons?,x?,y?,rightX?,rightY?,holdMs?}</code> 是 10..2000 毫秒的有限输入事务，默认100，按钮最多六个、轴值 -1..1。<code>gamepad.reset {}</code> 提交全部受控合成按键抬起与零轴。工具响应包含 <code>operation:pulse|reset,submitted,released,sourceGamepad:1025,sourceJoystick:16777232,elapsedMs,gameVerified:false</code>；released 只确认系统队列接受释放。请求中止不取消已接受的在途事务，按钮/轴状态不落盘。输入拒绝或释放失败返回错误；服务强制终止不保证释放。详见<a href="../reference/tools/#gamepad">手柄工具</a>。</p>
-<p>应用缓存清理为独立提案/确认流程：<code>apps.clear_cache {package}</code> 返回 <code>{id,kind:app_cache_clear,app,approvalRequired:true,cacheOnly:true,mode:package_manager_cache_only}</code>；模型只能准备或查询 <code>apps.cache_pending</code>。人工 <code>approve_cache</code> 拒绝或提交不可取消的缓存长任务。<code>apps.cache_capabilities</code> 只读探测；未明确声明 cache-only、缺少 INTERNAL_DELETE_CACHE_FILES 或 UID 不适用时拒绝，不执行数据清除 fallback。任务结果不提供回收字节，不宣称全面的数据保留验证。</p>
+<p>应用缓存清理为独立提案/确认流程：<code>apps.clear_cache {package}</code> 返回 <code>{id,kind:app_cache_clear,app,approvalRequired:true,cacheOnly:true,mode:package_manager_cache_only}</code>；模型只能准备或查询 <code>apps.cache_pending</code>。人工 <code>approve_cache</code> 拒绝或提交不可取消的缓存长任务。<code>apps.cache_capabilities</code> 只读探测；专用缓存删除接口不存在、缺少当前系统要求的缓存删除权限或 UID 不适用时拒绝，不执行数据清除 fallback。任务结果不提供回收字节，不宣称全面的数据保留验证。</p>
 <h2 id="screen-mirror-stream">AVC 镜像流 v1<a class="headerlink" href="#screen-mirror-stream" title="Permanent link">&para;</a></h2>
 <p><code>screen.mirror_start</code> 接受width/height/bitrate/durationSeconds，返回一次性id与<code>/mirror/{id}</code>，mimeType <code>application/x-airc-avc</code>、format <code>airc-avc-v1</code>、请求尺寸/码率/期限、claimWithinSeconds=30、maxChunkBytes=65536、maxStreamBytes=134217728、audio=false。单会话单读取者，与截图共用捕获锁。准备只保留名额，HTTP领取才启动固定screenrecord命令。宽/高160..1280/90..1280且为偶数，像素量≤921600；码率250000..8000000，期限10..120秒。</p>
 <p>流首部ASCII <code>AIRCMIR1</code>，记录是大端kind:u32,length:u32，再紧跟length字节。kind=1为1..65536字节的Annex-B H.264数据，kind=0/length=0为正常结束，kind=2为≤1024字节UTF-8错误。网络EOF不替代结束记录；错误/截断不报告正常完成。总编码数据≤128MiB，固定缓冲/backpressure，无帧历史队列或Base64/WebSocket图像。<code>screen.mirror_stop {id}</code>取消指定会话；HTTP关闭/超时释放编码进程组与捕获锁，不恢复旧流。</p>
@@ -2266,7 +2310,12 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 <tr>
 <td><code>schedule_save</code></td>
 <td>action、kind、confirmed=true，以及对应时间字段；应用动作带package</td>
-<td>明确用户确认后保存并启用任务</td>
+<td>明确用户确认后新建并启用任务；可选id原位编辑；运行中拒绝编辑，保留enabled状态，重置历史结果；delaySeconds随任务返回，编辑倒计时重新从保存时计算。支持screen_off，执行复用screen.power(on=false)。</td>
+</tr>
+<tr>
+<td><code>schedule_run_once</code></td>
+<td>id、confirmed=true</td>
+<td>持久保存执行中状态后异步执行一次；返回id、submitted，不改变未来计划；执行中拒绝重复提交，计划恰好到期时跳过该次以避免重复；不向模型暴露</td>
 </tr>
 <tr>
 <td><code>schedule_toggle</code></td>
@@ -2280,7 +2329,7 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 </tr>
 </tbody>
 </table>
-<p><code>action</code>允许<code>pause</code>、<code>shutdown</code>、<code>stop_app</code>、<code>open_app</code>、<code>set_volume</code>、<code>mute</code>、<code>unmute</code>。<code>stop_app</code>和<code>open_app</code>必须提供package，其余动作禁止携带package；不接受Shell或任意命令。<code>kind=delay</code>须带delaySeconds（60–604800秒），<code>once</code>须带localDateTime（<code>yyyy-MM-dd HH:mm</code>），<code>daily</code>须带dailyTime（<code>HH:mm</code>），禁止混用时间字段。日期时间按被控端本地时区解析。</p>
+<p><code>action</code>允许<code>screen_off</code>、<code>pause</code>、<code>shutdown</code>、<code>stop_app</code>、<code>open_app</code>、<code>set_volume</code>、<code>mute</code>、<code>unmute</code>。<code>stop_app</code>和<code>open_app</code>必须提供package，其余动作禁止携带package；不接受Shell或任意命令。<code>kind=delay</code>须带delaySeconds（60–604800秒），<code>once</code>须带localDateTime（<code>yyyy-MM-dd HH:mm</code>），<code>daily</code>须带dailyTime（<code>HH:mm</code>），禁止混用时间字段。日期时间按被控端本地时区解析。</p>
 <p><code>set_volume</code> 必须提供整数 <code>volumePercent</code>（0–100），其他动作禁止该字段，三者均禁止 <code>package</code>。列表与被控端持久记录保留 <code>volumePercent</code>。音量百分比映射为媒体流最接近的系统档位；静音与解除使用明确状态操作，执行后核对系统状态，失败记录原因。</p>
 <p>返回任务包含id、action、package、appIdentity、kind、dailyTime、nextAt（Unix秒）、enabled、lastAt、lastStatus、lastResult；列表额外给每项nextLocalTime。保存时绑定应用安装与用户身份，执行前重新检查。lastStatus区分pending、running、submitted、missed、interrupted、uncertain、failed；submitted只代表操作提交或工具返回，不能据断线认定关机成功。</p>
 <p>任务以0600权限原子保存于服务状态目录，调度不依赖创建请求的WebSocket存活。提交前先持久化running与下次时间，服务恢复不重试running任务，启动时跳过已过期单次执行并顺延每天任务；运行中错过超过60秒也跳过。服务停止、设备关机与休眠唤醒不在调度保证范围。</p>
@@ -2301,6 +2350,14 @@ lockNow/reboot/shutdown框架接口是否存在与permissionProbeAvailable。
 <h2 id="file-editing">文件重命名与文本覆盖<a class="headerlink" href="#file-editing" title="Permanent link">&para;</a></h2>
 <p><code>files.rename</code> / <code>files_rename</code> 接收 <code>root</code>、相对 <code>path</code> 和同目录单个新名称 <code>name</code>，返回 <code>{root,path,destination,renamed:true}</code>。支持普通文件、文件夹和链接本身，不跟随父目录链接，不跨目录移动，不覆盖已有目标；优先原子不覆盖重命名；Android共享存储不支持时，使用独占创建的副本，完整复制并复查源身份后移除原项。兼容复制最多128 MiB、2000项、64层，不跨挂载点；复制未完成时原项保留，新名称下可能保留部分副本，删除原项期间出现变动时新名称下保留完整副本并明确报错。</p>
 <p><code>files.prepare_overwrite</code> 可附带 <code>expectedSha256</code>（64位小写十六进制），用于不超过2 MiB的文本编辑保存。文件必须仍存在、内容摘要一致且读取期间身份未变化；不一致时不创建覆盖提案。后续仍需用户确认，并在上传提交时复查文件身份。</p>
+<h2 id="voice">实时虚拟麦克风 <code>/voice</code><a class="headerlink" href="#voice" title="Permanent link">&para;</a></h2>
+<p>独立WebSocket，与 <code>/ws</code> 使用同一端口，单路互斥，不接受模型工具调用或持久化任务。控制端固定当前连接代际，按下立即连续采音，按20ms帧缓存最多400帧（约8秒），不丢弃/覆盖开头。换设备、后台、滑出或模式切换取消，正常松手停止采音后仍排空缓存。</p>
+<p>首帧JSON <code>{"packageName":"com.konka.bestlauncher","keyCode":1017}</code> 仅允许这两个字段，包名点分标识符最多255字符，keyCode为0..65535（0不发送按键）。建立UID/MIC RECORDERS/LOOP_BACK策略与AudioTrack后返回 <code>{"prepared":true,"windowBytes":128000}</code>；此时尚未按录音键。客户端明确发送文本 <code>start</code>，桥接发送可选DOWN，并查询活动录音配置；仅当接收UID的MIC录音未被静音且设备地址等于本次remote submix时，返回 <code>{"ready":true,"sampleRate":16000,"channels":1,"receiverSession":123}</code>。准备中只注入静音，不消耗用户录音；无接收端时5秒失败，不用固定等待伪造就绪。客户端首次完整采音帧产生后才连接，空的快速点按不启动目标录音。</p>
+<p>ready后二进制为16kHz、单声道、有符号16位小端PCM，每帧2..3200字节且为偶数，建议640字节/20ms。网络可突发传输已缓存音频，受累计消费信用控制：<code>sentBytes-consumedBytes &lt;= windowBytes</code>。桥接维护最多128000字节接收队列（4秒），按正常32000字节/秒速率注入，返回累计 <code>{"consumedBytes":640}</code> 释放信用；没有信用时客户端等待而不丢弃音频。每次累计用户PCM最多1920000字节（60秒），越界/坏帧立即失败清理。网络队列和手机缓存均有硬上限，缓存满明确失败。</p>
+<p>正常松手停止采音、保留最后不足20ms的帧，按顺序发完缓存后发送文本 <code>end</code>。桥接排空队列、注入200ms尾部静音并等待播放头追上已写帧，随后释放UP、音轨和策略，返回 <code>{"stopped":true,"cancelled":false,"receivedBytes":32000,"injectedBytes":32000}</code>；计数只包括用户PCM，客户端要求两者等于实际发送字节，防止尾部静默截断。正常结束使用WebSocket关闭码1000。文本 <code>cancel</code>、断连或父进程EOF丢弃待注入帧并释放UP，返回取消回执；取消不等待排空，也不重放DOWN。未就绪阶段同样可cancel。</p>
+<p>首条设置/桥接初始化各最多5秒，旧会话清理等待最多4秒；接收端启动最多5秒，客户端总准备等待最多15秒且持续采音，缓存上限仍生效。ready后未end的音频断流1500ms失败；end排空最多6秒，客户端等待结束回执最多8秒。桥接独立看门狗限制75秒总时长，排空期间允许等待缓存播放，其他阶段就绪后2秒断流取消。音频不写文件。Android 14+、音频路由权限和remote submix为前提；UID匹配不提供共享UID应用隔离。</p>
+<h2 id="_21">清除目标模型配置<a class="headerlink" href="#_21" title="Permanent link">&para;</a></h2>
+<p><code>{"id":"uuid","protocol":1,"type":"clear_model","arguments":{}}</code> 只接受空arguments；与configure和文字任务按会话串行处理。删除目标状态目录中的model.json并清空内存配置及当前连接的模型历史，随后 <code>/status.modelConfigured</code> 为false，重启仍为未配置。重复清除成功；磁盘操作失败返回错误且不将内存状态标记为已清除。此请求不接收API Key，也不修改控制端本地配置。客户端发送与响应均校验原连接代际，换设备或重新连接后拒绝旧操作。</p>
 
 
 

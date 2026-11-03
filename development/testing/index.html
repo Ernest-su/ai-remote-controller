@@ -1325,6 +1325,51 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="结果判定">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实时语音输入
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ADB 上传对照实验
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ADB 上传对照实验">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adb_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ADB 握手诊断
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -1731,6 +1776,51 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="结果判定">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        实时语音输入
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ADB 上传对照实验
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ADB 上传对照实验">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#adb_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ADB 握手诊断
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -1814,6 +1904,7 @@ python3<span class="w"> </span>scripts/verify-local.py<span class="w"> </span>--
 ./gradlew<span class="w"> </span>:desktopApp:jvmTest<span class="w"> </span>--tests<span class="w"> </span>ernest.airc.desktop.AppearanceTest<span class="w"> </span>--no-daemon
 ./gradlew<span class="w"> </span>:androidApp:testDebugUnitTest<span class="w"> </span>--tests<span class="w"> </span>ernest.airc.RemoteNavigationTest<span class="w"> </span>--no-daemon
 </code></pre></div>
+<p>连接部署计时可运行 <code>:androidApp:testDebugUnitTest --tests ernest.airc.ConnectionDeadlineTest</code>，覆盖持续进展超过旧90秒限制、无进展超时、阶段预算重置、总时长上限及输入流计数。<code>AdbAttemptTest</code> 使用可关闭的阻塞读验证握手超时与主动取消都关闭候选 Socket，正常成功保留会话；部署脚本测试拒绝内容损坏并核对取消清理。Android 7 试用需在明确指定的 API 24 目标验证 App 推送、版本检查、服务对齐与桥接；<code>inputFixture</code> 最低 API 24，可用只读事件日志证明按键实收，不以 RPC 成功替代接收验证。</p>
 <h2 id="emulator-controller">Android 模拟器<a class="headerlink" href="#emulator-controller" title="Permanent link">&para;</a></h2>
 <p>使用独立 AVD，先构建 App 与测试 APK：</p>
 <div class="highlight"><pre><span></span><code>./gradlew<span class="w"> </span>:androidApp:assembleDebug<span class="w"> </span>:androidApp:assembleDebugAndroidTest<span class="w"> </span>--no-daemon
@@ -1853,12 +1944,20 @@ python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </sp
 <td>标准遥控器下键快速短按、真实按下/松开与滑出取消；请求仅发往控制端本地模拟服务，不操作外部目标。真实振动器的停止与厂商日志需在指定手机补查</td>
 </tr>
 <tr>
+<td><code>screen-power-ui</code></td>
+<td>本地协议 fixture 验证屏幕键在电源键左侧、关屏/开屏切换、旋转保留与离线禁用；不证明物理显示电源效果</td>
+</tr>
+<tr>
 <td><code>remote-haptics-ui</code></td>
 <td>遥控震动开关的切换、旋转与重新加载持久化；实际震感需有振动器的设备核对</td>
 </tr>
 <tr>
 <td><code>lan-connection-ui</code></td>
-<td>仅访问控制端回环地址，验证服务连接失败后尝试 ADB 5555、失败展开并填入目标地址、草稿重建恢复</td>
+<td>仅访问控制端回环地址，验证服务连接失败后尝试 ADB 5555、失败展开并填入目标地址、草稿重建恢复；设备行 fixture 检查型号、IP 回退、已保存显示名及 320dp / 1.5 倍字号亮暗布局，不连接外部设备</td>
+</tr>
+<tr>
+<td><code>device-recovery-ui</code></td>
+<td>回环服务验证取消、自动重试显示简短进度且不busy/不弹反馈、前后台暂停恢复、手动切换与迟到回调、超时切换、失效ADB按需重建且不重启遥控；界面验证其他设备可选、扫描旋转、精简文字/绿红状态点、无动态预览状态行、ADB等待与实际退避重试提示及标题栏名称轮播（共12项）</td>
 </tr>
 <tr>
 <td><code>appearance</code></td>
@@ -1960,8 +2059,14 @@ uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </sp
 <p>专项只安装原先不存在的接收 fixture，并创建 UUID runtime 目录与临时 ADB 转发；校验方向、菜单、确认、返回、数字及删除的 downTime、重复次数、长按标记、取消与断线释放。短暂暂停经路径验证的自建 runtime，核对 Java 桥接的独立超时释放，随后恢复并清理。接收 fixture 通过只读、要求 shell DUMP 权限的 provider 暴露自身日志，不依赖目标支持 run-as。测试不操作电源/音量，也不证明厂商系统键或第三方应用的最终长按动作。</p>
 <p>标准遥控器顶栏菜单回归使用 <code>python3 scripts/test-phone-target.py --phone &lt;模拟器序列号&gt; --suite remote-menu-ui</code>：验证三项带图标竖排菜单、离线可浏览、点击后关闭菜单、旋转不自动打开菜单、设备和类型入口可用，并复用窄屏、大字体及真实软键盘布局回归。<code>mobile-convenience-ui</code> 从该菜单进入收藏、电视输入与快捷操作。</p>
 <p>标准遥控音量使用 <code>RemoteVolumeControllerTest</code> 验证连接发布时序、按比例设置与断线清理，<code>RemoteVolumeSliderUiTest</code> 验证触摸拖动、实时百分比及等待目标回复期间的位置和数值保持。构建 App 和测试 APK 后，<code>python3 scripts/test-phone-target.py --phone &lt;自有模拟器&gt; --suite remote-volume-ui</code> 从真实标准遥控界面验证 57% 读数、拖动时百分比更新、松手后数值保留、触摸拖动提交、目标音量变化后的滑块跟随、旋转与断线禁用；使用控制端回环服务，不改变电视音量。</p>
-<p>标准遥控器的真实电视音量验证使用 <code>python3 scripts/test-phone-target.py --phone &lt;控制端ADB&gt; --target &lt;电视ADB&gt; --host &lt;电视IP&gt; --suite remote-volume-target</code>。该专项在电视创建 UUID 配套 runtime，核对初始读数、左右触摸拖动后的实际系统音量、音量加减后的滑块跟随、外部修改与旋转恢复，并保存截图；退出恢复原媒体音量、静音状态及控制端历史，清理自建服务和测试包。控制端使用模拟器时明确报告。</p>
+<p>标准遥控器的真实电视音量验证使用 <code>python3 scripts/test-phone-target.py --phone &lt;控制端ADB&gt; --target &lt;电视ADB&gt; --host &lt;电视IP&gt; --suite remote-volume-target</code>。该专项在电视创建 UUID 配套 runtime，核对初始读数、左右触摸拖动后的实际系统音量、音量加减后的滑块跟随、长按重复与释放停止、静音长按只切换一次、铃声/闹钟音量不变、外部修改与旋转恢复，并保存截图；真实拖动从滑块中心开始，避免扩展语义触控边界造成手势偏移。状态读取与恢复直接使用配套音频桥，不依赖平台的<code>cmd media_session</code>命令；退出恢复原媒体音量、静音状态及控制端历史，清理自建服务和测试包。控制端使用模拟器时明确报告。</p>
 <h3 id="_9">电视输入与快捷操作<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
+<p>物理屏幕电源的厂商专项直接调用短时 Java 桥接，验证两轮关屏/开屏的退出码、SurfaceFlinger 物理显示模式及非法参数的非零退出码，并在结束后恢复原显示模式、清理 UUID 临时目录；它会实际切换所选设备屏幕，不安装测试应用，不改动已有 runtime 服务：</p>
+<div class="highlight"><pre><span></span><code>python3<span class="w"> </span>scripts/build-platform-bridge.py<span class="w"> </span>build/screen-power-bridge
+python3<span class="w"> </span>scripts/test-screen-power.py<span class="w"> </span>--serial<span class="w"> </span>&lt;明确选择的目标ADB&gt;<span class="w"> </span>--dex<span class="w"> </span>build/screen-power-bridge/classes.dex
+<span class="c1"># 目标 runtime 为 root 时，追加 --root，以相同身份验证</span>
+</code></pre></div>
+<p>专项要求 SurfaceFlinger 可读且物理显示初始模式统一为 On 或 Off，其他情况拒绝执行。厂商 <code>android_servers</code> 退出析构问题须在对应设备验证，普通 UI fixture 不证明物理显示控制效果。</p>
 <p>手机快捷功能回归：先构建 App 与测试 APK，执行 <code>python3 scripts/test-phone-target.py --phone &lt;模拟器序列号&gt; --suite mobile-convenience-ui</code>。覆盖独立电视输入的离线禁用与旋转草稿、系统分享不自动执行、内容 URI 元数据与拒绝文件 URI、收藏切换与恢复、音量键页面范围、组合分步编辑与排序、等待秒数编辑、旋转恢复、列表直接执行、暂停/继续不重放、最后一次详情及旋转恢复、未保存修改及删除确认。<code>--suite library-layout-ui</code> 检查 320dp / 1.5 倍字号下的收藏筛选与星标、步骤类型图标和菜单、按键选择和等待输入，并保存亮暗主题截图；桌面 <code>ApplicationLibraryUiTest</code> 覆盖收藏优先、筛选、上限与离线管理，<code>LibraryEditingTest</code> 覆盖排序及秒数解析边界。<code>QuickRoutineControllerTest</code> 覆盖组合顺序、暂停与剩余等待、按键释放校验、按电视保存执行记录、失败/取消中断与重连隔离；<code>ClipboardPasteMessageTest</code> 覆盖 UTF-8 包格式与长度边界。</p>
 <p>中文粘贴专项使用 <code>ScrcpyTextInputTargetTest</code>，需显式传入 <code>textTargetHost</code> / <code>textTargetPort</code>，在自有目标预先安装原本不存在的 mediaFixture，并在测试后卸载。专项打开 TextActivity 的 paste 模式，核对中文、表情和 Shell 字符按字面写入，以及临时 server 文件被清理；不证明厂商播放器或密码输入框允许粘贴。</p>
 <p>文字接收 fixture 通过仅允许 shell DUMP 权限读取的 <code>content://ernest.airc.mediafixture.text/text</code> 返回合成测试文字，不依赖目标 <code>run-as</code> 能力，不暴露其他应用文件。</p>
@@ -1996,7 +2101,7 @@ uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </sp
 <div class="highlight"><pre><span></span><code>./gradlew<span class="w"> </span>:desktopApp:jvmTest<span class="w"> </span>--tests<span class="w"> </span>ernest.airc.desktop.FilePreviewTargetTest<span class="w"> </span>-PaircTargetSerial<span class="o">=</span>&lt;自有模拟器序列号&gt;<span class="w"> </span>--no-daemon
 </code></pre></div>
 <p>该测试使用 UUID 服务目录，读取未安装 APK 的图标并核对 App 包内的原色图标，验证文本范围读取、释放及路径边界；不安装目标 APK。显式指定目标的桌面测试先构建配套 App/runtime 与 fixture，避免使用过期二进制。不会修改已有目标服务。</p>
-<p>文件页布局回归使用 <code>python3 scripts/test-phone-target.py --phone &lt;模拟器序列号&gt; --suite file-page-ui</code>，检查无重复标题、320dp / 1.5 倍字号的底栏溢出菜单及亮暗截图、按操作打开弹窗、自动识别信息的显示与文件名编辑。<code>FileWorkflowUiTest</code> 验证上传表单与下载/删除状态隔离；<code>UrlDownloadControllerTest</code> 验证自动探测不启动下载、手动名称保护、快速换址及迟到响应隔离；<code>UrlMetadataProtocolTest</code> 使用主机 runtime 和本地 HTTP fixture 验证重定向、响应头识别及识别后下载，<code>UrlDownloadTargetTest</code> 在隔离 Android 目录验证相同协议。</p>
+<p>文件页布局回归使用 <code>python3 scripts/test-phone-target.py --phone &lt;模拟器序列号&gt; --suite file-page-ui</code>，检查无重复标题、320dp / 1.5 倍字号的底栏溢出菜单及亮暗截图，以及文件传输、APK 安装与媒体副本的 KB/MB/GB 显示和删除项数、按操作打开弹窗、自动识别信息的显示与文件名编辑。<code>FileWorkflowUiTest</code> 验证上传表单与下载/删除状态隔离；<code>UrlDownloadControllerTest</code> 验证自动探测不启动下载、手动名称保护、快速换址及迟到响应隔离；<code>UrlMetadataProtocolTest</code> 使用主机 runtime 和本地 HTTP fixture 验证重定向、响应头识别及识别后下载，<code>UrlDownloadTargetTest</code> 在隔离 Android 目录验证相同协议。</p>
 <p>符号链接专项：<code>FileBrowserControllerTest</code> 检查链接目录的逻辑路径、返回与只读创建拦截；<code>FileLinkUiTest</code>（桌面与 Android，Android 归入 <code>file-page-ui</code>）验证链接目标/错误、预览与下载入口、链接删除确认和只读禁用，适配亮暗、320dp 与1.5倍字号。Rust <code>tools::files</code> 检查范围内相对/绝对/多级链接、越界、失效、循环、无权限、特殊文件、procfs链接和并发替换后的读取隔离；文件动作及传输测试检查只删除链接、下载可读而写入父目录仍拒绝链接。</p>
 <p>Android 文件系统专项只操作明确选择的自有模拟器，在 UUID 目录启动匹配 ABI 的独立服务，验证真实 HTTP 范围预览、固定来源、流式下载摘要、写入/扫描拒绝及链接删除，结束清理自建服务、文件与转发：</p>
 <div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </span>websockets<span class="w"> </span>python<span class="w"> </span>runtime/file_links_target_test.py<span class="w"> </span>--serial<span class="w"> </span>&lt;自有模拟器序列号&gt;<span class="w"> </span>--binary<span class="w"> </span>androidApp/src/main/assets/runtime/airc-runtime-x86_64
@@ -2004,7 +2109,7 @@ uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </sp
 <p>按目标 ABI 替换二进制；此专项不安装 App、不修改已有文件或系统设置，也不代替厂商共享存储兼容性测试。</p>
 <p>Downloads 上传平台验证使用独立 Android 模拟器：<code>python3 runtime/upload_copy_target_test.py --serial &lt;模拟器序列号&gt; --binary androidApp/src/main/assets/runtime/airc-runtime-x86_64</code>（需要 Python websockets）。覆盖单文件、空文件、分块续传、摘要错误、同名冲突及临时文件清理；只创建 UUID 专属目录和服务，结束删除自有文件及 ADB 转发。可选 <code>--baseline-binary &lt;旧版匹配ABI二进制&gt;</code> 对照旧版的原子不覆盖报错。</p>
 <p>APK 安装文件选择使用 <code>python3 scripts/test-phone-target.py --phone &lt;自有模拟器&gt; --suite apk-file-selection-ui</code>，验证底部入口、APK/目录筛选、链接排除、目录导航、选择模式旋转恢复、取消/系统返回、换设备退出、离线及安装能力禁用，并使用本地安装面板fixture核对“选择→解析→准备→独立确认”的顺序；不执行真实目标安装。</p>
-<p>文本/重命名/任务标签的聚焦验证：<code>InstallationVerificationTest</code>覆盖安装完成与失败后的自动查询、有限重试与旧同版本误报拒绝；<code>FileTextProtocolTest</code>使用真实主机runtime验证编码/BOM往返、覆盖确认、外部修改冲突、断线拒绝及大文件前缀只读。<code>FileTextHighlightTest</code>覆盖长字符串、转义及未闭合文本，避免高亮导致栈溢出。<code>FileBrowserControllerTest</code>覆盖重命名回包校验与刷新，Rust <code>tools::file_rename</code> 和 <code>file_actions</code> 验证不覆盖、路径/链接边界及文本摘要前置检查。构建App/AndroidTest后执行 <code>python3 scripts/test-phone-target.py --phone &lt;自有模拟器&gt; --suite file-editing-ui</code>，验证重命名草稿/错误、未知文件显式文本打开、查看/编辑、保存入口、丢弃确认、大文件提示，以及有任务分类前置和选中恢复；此UI专项不实际修改外部目标文件。</p>
+<p>文本/重命名/任务标签的聚焦验证：<code>InstallationVerificationTest</code>覆盖安装完成与失败后的自动查询、有限重试与旧同版本误报拒绝；<code>FileTextProtocolTest</code>使用真实主机runtime验证编码/BOM往返、覆盖确认、外部修改冲突、断线拒绝及大文件前缀只读。<code>FileTextHighlightTest</code>覆盖长字符串、转义及未闭合文本，避免高亮导致栈溢出。<code>FileBrowserControllerTest</code>覆盖重命名回包校验与刷新，Rust <code>tools::file_rename</code> 和 <code>file_actions</code> 验证不覆盖、路径/链接边界及文本摘要前置检查。构建App/AndroidTest后执行 <code>python3 scripts/test-phone-target.py --phone &lt;自有模拟器&gt; --suite file-editing-ui</code>，验证重命名草稿/错误、未知文件显式文本打开、独立页面查看/编辑、保存入口、丢弃确认、大文件提示，以及57 KB原生编辑控件在滚动/亮暗切换时不重置文本、草稿与视口恢复，以及有任务分类前置和选中恢复；此UI专项不实际修改外部目标文件。</p>
 <p>Android真实文件协议可运行 <code>uv run --with websockets python runtime/file_editing_target_test.py --serial &lt;自有模拟器&gt; --binary androidApp/src/main/assets/runtime/airc-runtime-&lt;匹配ABI&gt;</code>，只创建UUID服务和文件，覆盖私有收件箱与Downloads的文件/目录重命名、同名保护、范围读取、覆盖前原摘要检查、显式覆盖和保存后摘要，退出清理自建目录/服务/转发；不修改已有应用、目标服务或用户文件。</p>
 <h3 id="_14">定时与条件操作<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h3>
 <p>定时与批量功能的聚焦主机回归使用<code>ScheduleControllerTest</code>、<code>BatchTransferProtocolTest</code>、<code>RoutineConditionsTest</code>和<code>RemoteLayoutTest</code>，分别验证重连确认失效与音量参数传输、真实主机协议的多文件摘要/ZIP、条件等待与输入边界。Rust schedules测试使用可注入动作验证独立调度、单次不重放、每天顺延、音量参数边界与持久化恢复；chunks测试使用独立任务实例验证分块回退、偏移拒绝、摘要提交与范围读取，不占用其他测试共享注册表的任务名额。</p>
@@ -2014,12 +2119,34 @@ uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </sp
 </code></pre></div>
 <p>专项构建并安装UUID包名的临时MediaSession/启动器接收应用，创建UUID服务目录，保存60/70/80秒后的暂停、打开应用与强停任务后断开WebSocket。同时保存90秒后的媒体音量40%，以及100/110秒静音和120/130秒解除静音任务。分别核对暂停回调、前台包、stopped标志、系统媒体音量与静音状态及被控端执行记录；重复静音和解除静音不会切换为相反状态。结束清理自己的APK、服务和ADB转发，并恢复原音量、静音状态和Activity。不会执行关机，也不证明厂商休眠或关机接口行为。</p>
 <h3 id="_15">媒体播放<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h3>
+<p>播放控制页使用 <code>:client:test --tests ernest.airc.MediaControlControllerTest</code> 验证静默更新不进入操作busy、命令抢占慢查询、迟到响应隔离、刷新超时与原快照保留、按请求完成后3秒间隔轮询及取消、切换播放器后拒绝旧界面回调。构建App与测试APK后，<code>python3 scripts/test-phone-target.py --phone &lt;自有模拟器&gt; --suite media-control-ui</code> 检查320dp/1.5倍字体亮暗布局、静默更新时按钮与位置稳定、精确跳转草稿恢复、播放键上方的媒体音量行与按钮回调/滑动提交/离线禁用，以及真实页面前后台暂停/恢复且不与标准遥控重复轮询。该回环fixture不改变外部播放器。定位控制器同时验证复用响应中的同会话快照、无附加确认请求、待确认不锁住控件与跨会话响应拒绝；Rust <code>playback_bridge::tests</code> 验证常驻进程复用、应用错误后的帧边界、已开始请求取消后读完响应、排队取消不迟到执行，以及超时丢弃进程不重放写操作。</p>
+<p>会话播放命令平台验证：<code>uv run --with websockets python runtime/media_transport_target_test.py --serial &lt;自有模拟器&gt; --binary androidApp/src/main/assets/runtime/airc-runtime-&lt;匹配ABI&gt;</code>。专项安装UUID静音状态fixture并创建独立runtime，验证两个真实MediaSession之间的选定会话播放/暂停/上下首/定位、友好元数据、歧义/消失会话与未声明能力拒绝；结束卸载自建包、清理服务和转发、恢复原Activity。同时输出定位响应及暖播放/音量查询耗时。此专项不证明实体扬声器或第三方播放器实际消费结果。</p>
+<p>音量按键的 MUSIC 路由可在自有模拟器运行 <code>python3 scripts/build-platform-bridge.py androidApp/build/volume-bridge</code> 后，执行 <code>python3 runtime/media_volume_keys_target_test.py --serial &lt;自有模拟器&gt; --dex androidApp/build/volume-bridge/classes.dex</code>。专项启动独立输入桥，检查音量加减的单次/长按、释放停止及静音长按只切换一次，同时核对铃声与闹钟音量不变；结束恢复原媒体音量/静音并清理自建目录。此测试直接验证平台桥，不替代控制端完整链路或厂商电视音频策略验证。</p>
 <p>AAC 被控端播放验证使用独立模拟器：先构建 <code>:mediaFixture:assembleDebug</code>，再运行 <code>uv run --with av --with websockets python runtime/aac_media_target_test.py --serial &lt;模拟器序列号&gt; --binary androidApp/src/main/assets/runtime/airc-runtime-x86_64 --fixture-apk mediaFixture/build/outputs/apk/debug/mediaFixture-debug.apk</code>。临时生成静音 AAC，验证大小写扩展名、audio/aac、播放副本与实际 MediaPlayer 播放状态；不代表真实设备或其他 AAC 编码配置的兼容性。脚本拒绝替换已有 fixture App，结束移除自有应用、文件、服务和转发。</p>
 <h3 id="_16">关于与在线帮助<a class="headerlink" href="#_16" title="Permanent link">&para;</a></h3>
 <p>关于与在线帮助使用 <code>python3 scripts/test-phone-target.py --phone &lt;自有模拟器&gt; --suite project-information-ui</code>，验证版本、仓库入口、来源页返回与旋转，以及真实 Pages 的应用内加载、网页历史恢复和加载失败重试。此专项需要控制端可访问公开文档站点，不连接电视；<code>product-pages</code> 同时覆盖关于页的320dp、1.5倍字号与亮暗截图。</p>
 <h2 id="_17">结果判定<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h2>
 <p>回复或提交说明写明命令、环境、实际执行或缓存复用、失败/跳过及未执行范围。相同输入的 Gradle 缓存可用于纯代码检查；依赖外部设备状态的专项不能拿缓存代替当前执行。</p>
 <p>JVM fixture、模拟器和真实设备分别说明。UI fixture 不证明目标实际输入、文件/应用操作或游戏消费；主机工具不证明 Android 系统效果；模拟器不能替代厂商系统、摄像头和自然 WLAN 故障。保留失败证据与有效断言，不扩大通过结论。</p>
+<h3 id="_18">实时语音输入<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h3>
+<p><code>VoiceSettingsTest</code> 在JVM检查设置边界、准备与接收端就绪区分、真实WebSocket缓存突发/消费信用、排空字节确认、取消、部分帧首尾与缓冲溢出、路由错误和连接代际隔离；Rust <code>voice::tests</code> 检查严格字段与包名/键值边界。构建App和AndroidTest后执行 <code>python3 scripts/test-phone-target.py --phone &lt;模拟器&gt; --suite voice-input-ui</code>，检查离线禁用、配置恢复、Android 13/版本未知/读取失败在权限与采音前拦截、重连重新检查版本、合成采音fixture向回环服务发送PCM、松手排空和离页取消、不自动恢复，包含接收端未就绪时正常松手仍原样送出整段录音，以及共用输入区模式/草稿恢复、320dp/1.5倍字体亮暗布局、顶部电源音量一行和媒体/导航纯图标。该模拟器专项不证明实体麦克风采音。实体手机可用同一测试类附加 instrumentation 参数 <code>-e voiceCapture microphone</code> 验证真实 AudioRecord 到回环服务；不保存音频。</p>
+<p>厂商音频路由专项使用显式选定的目标：<code>uv run --with websockets python scripts/test-voice-target.py --serial &lt;康佳ADB地址&gt; --binary androidApp/src/main/assets/runtime/airc-runtime-armeabi-v7a --package com.konka.bestlauncher --key 1017</code>。脚本建立UUID独立服务，发送合成PCM，核对助手活跃录音与remote submix、互斥、准备阶段连续取消/重开不误报占用、正常结束、突然断线、断流、坏帧、接收缓存上限、无效配置、真实接收端就绪超时和策略清理，结束移除自建服务、目录与转发。会发送明确指定的语音键，不录制人声，不修改已有服务或系统音频配置；新增系统UID的临时AudioRecord探针只读取本次remote submix，用首/中/尾三个合成频率标记验证600ms延迟启动、约1秒缓存突发（含不足20ms末帧）的正常速率注入和排空。探针仅临时编译/推送并在结束清理，需目标可用 <code>su 1000</code>；此专项不证明自然语音识别准确率。</p>
+<p>同一目标专项追加 <code>--phone &lt;实体手机ADB&gt; --host &lt;电视IP&gt;</code> 可安装配套App/测试APK并运行 <code>LiveVoiceInputTargetTest</code>，实际按住手机麦克风，经局域网发送到隔离服务，同时核对助手的活跃submix录音帧计数与松手确认。测试不保存人声，恢复原麦克风授权状态；不验证自然语音识别准确率。</p>
+<p>共用输入区的文字提交/禁用、草稿导航与旋转、真实键盘安全区和窄屏大字体回归使用 <code>python3 scripts/test-phone-target.py --phone &lt;模拟器&gt; --suite remote-composer-ui</code>。</p>
+<h2 id="adb">ADB 上传对照实验<a class="headerlink" href="#adb" title="Permanent link">&para;</a></h2>
+<p>先以 <code>-PaircAdbSource=/path/to/adb</code> 构建 App 与测试 APK，确认使用包含同步头部/正文合并改动的库，再在控制手机运行 <code>ernest.airc.RuntimeUploadTargetTest</code>，明确传入 <code>uploadHost</code> 和可选 <code>uploadRoot=true</code>。实验使用目标 ABI 的完整 runtime，在 UUID 独立目录比较原分包、合并分包、压缩冷/热缓存；强制无解压工具的分支也可验证。<code>uploadCompressionOnly=true</code> 可只补测压缩，不重复已完成的原始推送对照。</p>
+<p>耗时包含压缩能力探测、所需的本地压缩、网络上传、目标解压及临时压缩包清理；读回校验和程序版本检查单独执行，不计入上传耗时。每个文件都读回核对 SHA-256，检查解压后程序可运行。可用 <code>python3 scripts/test-runtime-upload.py --phone SERIAL --host TARGET_IP --root --output OUTPUT_DIR</code> 运行；多目标重复 <code>--host</code>，只补测压缩时加 <code>--compression-only</code>。实验不替换现有服务，不安装解压工具，结束清理自建文件与压缩缓存；前后核对现有服务 PID、设备标识与就绪状态。单轮结果需注明链路和权限，不能把文件变小直接当作总耗时改善。测试的进度上报不计作通过终态，仍要求完整用例数量、零失败/跳过及正常结束。</p>
+<h3 id="adb_1">ADB 握手诊断<a class="headerlink" href="#adb_1" title="Permanent link">&para;</a></h3>
+<p><code>AdbConnectionDiagnosticTargetTest</code> 仅对显式传入的 <code>adbDiagnosticHost</code> 和 <code>adbDiagnosticPort</code> 发起握手及 <code>echo</code> 只读探测，使用当前 App 的既有身份；<code>AircAdbDiagnostic</code> 只记录报文头和阶段，不记录正文或密钥。构建并安装测试 APK 后，以 instrumentation <code>-e class ernest.airc.AdbConnectionDiagnosticTargetTest -e adbDiagnosticHost &lt;目标IP&gt; -e adbDiagnosticPort &lt;ADB端口&gt;</code> 运行。部分厂商旧版 adbd 的既有电脑连接会阻塞新手机握手；对照诊断应先记录超时，再仅断开电脑自己的目标连接重试，不重启 adbd 或清除授权。</p>
+<p>被控端专用缓存接口验证：构建并部署配套服务后，执行 <code>uv run --with websockets python runtime/app_cache_target_test.py --url ws://&lt;目标地址&gt;:9876/ws</code>。该专项需要显式选择 root 服务；只安装唯一包名的临时测试应用，在该应用写入缓存、代码缓存、普通文件、设置与数据库标记，验证取消不删除、确认后缓存删除且非缓存摘要不变、一次性确认及系统应用拒绝，最后卸载测试应用和移除自建目录。不会清理已有应用缓存。</p>
+<p>应用列表排序由 <code>InstalledAppsTest</code> 验证大小/首次安装时间解析、未知值末尾、0字节、同值稳定排序、收藏优先与显式排序，以及全量排序后分页。构建App与测试APK后，执行 <code>python3 scripts/test-phone-target.py --phone &lt;自有模拟器&gt; --suite app-sorting-ui</code>，由 Android <code>ApplicationSortingUiTest</code> 验证按需只读一次大小、刷新/旋转保留排序与方向及离线切换；使用本地列表，不改变被控应用。</p>
+<p><code>AppSizeSnapshotTest</code> 验证大小任务的原 ID/类型核对、无任务时不轮询、完成结果解析，以及同包更新后拒绝套用旧版本大小。空间统计后台执行，期间应用列表动作保持可用。</p>
+<p>配套服务部署后，可用 <code>uv run --with websockets python runtime/app_sort_target_test.py --url ws://&lt;目标&gt;:9876/ws</code> 只读验证首次安装时间、异步大小任务复用、统计期间普通列表可读及系统占用结果。该专项不安装、删除或修改应用；Android 7 使用系统逐应用统计，可能需要数分钟。</p>
+<p>应用与文件任务提示的同行布局和关闭行为：构建 App/测试 APK 后执行 <code>python3 scripts/test-phone-target.py --phone &lt;自有模拟器&gt; --suite app-task-notice-ui</code>，覆盖320dp/1.5倍字体亮暗布局、48dp查看/关闭触控、打开任务详情、隐藏后跨进度/完成/导航/旋转保持隐藏，以及新任务重新显示。</p>
+<p>增量大小统计：<code>AppSizeSnapshotTest</code> 覆盖完成前逐批回调、未返回条目保留和跨版本隔离；Rust <code>tools::stream_tests</code> 验证首帧不等待进程结束及截断 JSON 拒绝。<code>app_sort_target_test.py</code> 同时要求在任务完成前观察到递增的部分结果，并记录首批返回时间。</p>
+<p>定时操作回归覆盖10秒静默轮询时任务按钮位置稳定、执行一次确认与连接绑定、离线/运行中禁用；控制器验证轮询不占动作busy且可被手动操作取代；runtime通过注入执行器验证先落盘再执行、重复提交拒绝、原计划保留、与到期任务重叠时不重复执行及失败结果持久化，不对真实设备执行关机等动作。</p>
+<p>连接反馈回归覆盖顶栏连接中名称轮播、目标切换复位、列表仅目标行旋转及其他设备仍可选择；临时目标不标为已保存。定时编辑覆盖原位替换与启停状态保留、运行中拒绝、确认/取消、旋转及保存失败保留草稿；关屏复用screen.power，遥控器切换屏幕前重新读取目标模式，避免定时关屏后按旧状态切换，前台轮询更新模式、后台停止轮询且恢复时重新读取。</p>
+<p>定时关屏专项：仅在显式选择且已root的自有模拟器上，执行 <code>uv run --with websockets python runtime/schedule_screen_target_test.py --serial &lt;模拟器序列号&gt; --binary &lt;配套Android运行时二进制&gt;</code>。创建独立临时服务与任务，验证原位编辑、暂停任务执行一次、共享屏幕模式回读，以及控制端断开后到时关屏；通过SurfaceFlinger核对物理显示模式并确认Android保持唤醒。结束恢复屏幕、停止临时服务、移除转发与自建目录，不操作真实设备。</p>
 
 
 
