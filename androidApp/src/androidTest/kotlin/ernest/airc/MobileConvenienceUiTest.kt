@@ -141,18 +141,40 @@ class MobileConvenienceUiTest {
             compose.activityRule.scenario.recreate()
             compose.onNodeWithText("收藏测试").assertExists()
             compose.onNodeWithTag("quick-apps-dialog-close").performClick()
+            val audio = compose.activity.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+            val localVolume = audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+            compose.runOnUiThread {
+                model.setVolumeKeysEnabled(false)
+                assertFalse(model.hardwareVolume(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_VOLUME_UP)))
+                assertFalse(model.hardwareVolume(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_VOLUME_UP)))
+            }
+            assertTrue(requests.isEmpty())
             compose.runOnUiThread {
                 model.setVolumeKeysEnabled(true)
-                assertTrue(compose.activity.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_VOLUME_UP)))
-                assertTrue(compose.activity.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_VOLUME_UP)))
+                for (key in listOf(KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN)) {
+                    val now = android.os.SystemClock.uptimeMillis()
+                    assertTrue(compose.activity.dispatchKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, key, 0)))
+                    // Local Android repeat events must not create additional remote presses.
+                    assertTrue(compose.activity.dispatchKeyEvent(KeyEvent(now, now + 1, KeyEvent.ACTION_DOWN, key, 1)))
+                    assertTrue(compose.activity.dispatchKeyEvent(KeyEvent(now, now + 2, KeyEvent.ACTION_UP, key, 0)))
+                }
             }
-            compose.waitUntil(5000) { requests.isNotEmpty() }
+            compose.waitUntil(5000) {
+                listOf("volume_up", "volume_down").all { key -> requests.any {
+                    it["key"]?.jsonPrimitive?.content == key && it["action"]?.jsonPrimitive?.content in listOf(null, "up")
+                } }
+            }
+            for (key in listOf("volume_up", "volume_down")) {
+                assertEquals(1, requests.count { it["key"]?.jsonPrimitive?.content == key && it["action"]?.jsonPrimitive?.content in listOf(null, "down") })
+            }
+            assertEquals(localVolume, audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC))
+            val remoteVolumeRequests = requests.size
             compose.onNodeWithTag("open-menu").performClick()
             compose.onNodeWithTag("feature-menu").assertIsDisplayed()
             compose.runOnUiThread {
                 assertFalse(model.hardwareVolume(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_VOLUME_DOWN)))
             }
-            assertTrue(requests.none { it["key"]?.jsonPrimitive?.content == "volume_down" })
+            assertEquals(remoteVolumeRequests, requests.size)
             compose.onNodeWithTag("navigate-back").performClick()
             compose.onNodeWithTag("remote-more").performClick()
             compose.onNodeWithText("快捷操作").performClick()

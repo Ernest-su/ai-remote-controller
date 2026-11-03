@@ -51,7 +51,7 @@ data class RemoteUiState(
     val qr: PairingQr? = null,
     val preferRoot: Boolean = false,
     val keyHapticsEnabled: Boolean = true,
-    val volumeKeysEnabled: Boolean = false,
+    val volumeKeysEnabled: Boolean = true,
     val keepAwake: Boolean = false,
     val floatingRemoteTransparency: Int = RemoteDimensions.FloatingRemoteDefaultTransparency,
     val runtimeUid: Int? = null,
@@ -174,7 +174,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
     private val releasePreferences = application.getSharedPreferences("runtime-release", android.content.Context.MODE_PRIVATE)
     private val mutable = MutableStateFlow(RemoteUiState(history = store.read(), preferRoot = releasePreferences.getBoolean("prefer-root", false),
         keyHapticsEnabled = application.getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).getBoolean("key-haptics", true),
-        volumeKeysEnabled = application.getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).getBoolean("volume-keys", false),
+        volumeKeysEnabled = application.getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).getBoolean("volume-keys", true),
         keepAwake = application.getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE).getBoolean("keep-awake", false),
         floatingRemoteTransparency = application.getSharedPreferences("remote-controls", android.content.Context.MODE_PRIVATE)
             .getInt("floating-transparency", RemoteDimensions.FloatingRemoteDefaultTransparency).coerceIn(RemoteDimensions.FloatingRemoteMinTransparency, RemoteDimensions.FloatingRemoteMaxTransparency)))

@@ -16,14 +16,14 @@ import org.junit.Test
 class ProjectInformationUiTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun aboutShowsPackagedVersionAndOpensExactRepository() {
+    @Test fun aboutShowsPackagedVersionAndOpensPages() {
         val version = checkNotNull(javaClass.getResourceAsStream("/airc-version.txt")).bufferedReader().use { it.readText() }
         assertTrue(version.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+ \\([0-9]+\\)")))
         var opened = false
         compose.setContent { RemoteTheme { Box(Modifier.width(320.dp).height(600.dp)) { ProjectAbout(version) { opened = true } } } }
         compose.onNodeWithText(version).assertExists()
-        compose.onNodeWithText(ProjectLinks.REPOSITORY).assertExists()
-        compose.onNodeWithTag("about-repository").performScrollTo().performClick()
+        compose.onNodeWithText(ProjectLinks.DOCUMENTATION).assertExists()
+        compose.onNodeWithTag("about-pages").performScrollTo().performClick()
         assertTrue(opened)
         val navigation = DesktopNavigation()
         navigation.navigate(RemotePage.ABOUT); navigation.navigate(RemotePage.DEVICES); navigation.back()

@@ -107,7 +107,7 @@ fun DesktopApp(controller: DesktopController, navigation: DesktopNavigation = re
                             RemotePage.ABOUT -> {
                                 val version = remember { checkNotNull(DesktopNavigation::class.java.getResourceAsStream("/airc-version.txt")).bufferedReader().use { it.readText() } }
                                 val uri = androidx.compose.ui.platform.LocalUriHandler.current
-                                ProjectAbout(version) { uri.openUri(ProjectLinks.REPOSITORY) }
+                                ProjectAbout(version) { uri.openUri(ProjectLinks.DOCUMENTATION) }
                             }
                             RemotePage.SETTINGS -> AppearanceSettings(themeMode, onThemeChange)
                             RemotePage.TOUCHPAD -> DesktopTouchpad(state, controller)

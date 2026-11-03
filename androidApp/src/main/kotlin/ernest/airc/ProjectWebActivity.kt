@@ -29,9 +29,9 @@ class ProjectWebActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val url = intent.getStringExtra("url")?.takeIf {
-            it == ProjectLinks.DOCUMENTATION || it == ProjectLinks.REPOSITORY
+            it == ProjectLinks.DOCUMENTATION
         } ?: run { finish(); return }
-        val title = if (url == ProjectLinks.DOCUMENTATION) "项目文档" else "项目仓库"
+        val title = "项目文档"
         setContent {
             val stored = getSharedPreferences("appearance", MODE_PRIVATE).getString("theme", null)
             val dark = ThemeMode.fromStored(stored).isDark(isSystemInDarkTheme())

@@ -9,19 +9,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 
 object ProjectLinks {
-    const val REPOSITORY = "https://github.com/Ernest-su/ai-remote-controller"
     const val DOCUMENTATION = "https://suqishuo.cn/ai-remote-controller/"
 }
 
 @Composable
-fun ProjectAbout(version: String, onRepository: () -> Unit) = PageContent(Modifier.testTag("about-page")) {
+fun ProjectAbout(version: String, onDocumentation: () -> Unit) = PageContent(Modifier.testTag("about-page")) {
     Panel {
         SectionTitle("AI 遥控")
         InfoRow("版本", version)
         HorizontalDivider(color = RemoteColors.Divider)
-        SectionTitle("项目仓库")
-        SelectionContainer { Text(ProjectLinks.REPOSITORY, style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary) }
-        TextButton(onRepository, Modifier.heightIn(min = 48.dp).testTag("about-repository")) { Text("打开项目仓库") }
+        SectionTitle("项目文档（Pages）")
+        SelectionContainer { Text(ProjectLinks.DOCUMENTATION, style = MaterialTheme.typography.bodyMedium, color = RemoteColors.Secondary) }
+        TextButton(onDocumentation, Modifier.heightIn(min = 48.dp).testTag("about-pages")) { Text("打开 Pages 页面") }
     }
 }
 

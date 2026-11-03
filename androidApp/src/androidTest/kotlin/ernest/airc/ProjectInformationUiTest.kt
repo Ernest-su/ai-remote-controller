@@ -17,20 +17,20 @@ class ProjectInformationUiTest {
     @get:Rule val rules: org.junit.rules.TestRule = org.junit.rules.RuleChain.outerRule(DeviceHistoryIsolation()).around(compose)
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
 
-    @Test fun aboutShowsBuildVersionAndRepositoryAndReturnsThroughMenu() {
+    @Test fun aboutShowsBuildVersionAndPagesAndReturnsThroughMenu() {
         compose.onNodeWithTag("open-menu").performClick()
         compose.onNodeWithTag("feature-about").performScrollTo().performClick()
         compose.onNodeWithText("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})").assertExists()
-        compose.onNodeWithText(ProjectLinks.REPOSITORY).assertExists()
+        compose.onNodeWithText(ProjectLinks.DOCUMENTATION).assertExists()
         compose.activityRule.scenario.recreate()
         compose.onNodeWithTag("about-page").assertIsDisplayed()
         compose.onNodeWithTag("device-status").performClick()
         compose.onNodeWithTag("navigate-back").performClick()
         compose.onNodeWithTag("about-page").assertIsDisplayed()
-        compose.onNodeWithTag("about-repository").performScrollTo().performClick()
+        compose.onNodeWithTag("about-pages").performScrollTo().performClick()
         val web = resumedBrowser()
         instrumentation.runOnMainSync {
-            assertEquals(ProjectLinks.REPOSITORY, web.intent.getStringExtra("url"))
+            assertEquals(ProjectLinks.DOCUMENTATION, web.intent.getStringExtra("url"))
             web.onBackPressedDispatcher.onBackPressed()
         }
         compose.onNodeWithTag("about-page").assertIsDisplayed()

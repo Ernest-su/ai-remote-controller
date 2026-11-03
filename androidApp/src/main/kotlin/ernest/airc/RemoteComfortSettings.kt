@@ -14,13 +14,13 @@ import androidx.compose.ui.unit.dp
 @Composable
 internal fun RemoteComfortSettings(state: RemoteUiState, model: RemoteViewModel) {
     Panel {
-        listOf(Triple("手机音量键控制电视", state.volumeKeysEnabled, model::setVolumeKeysEnabled),
+        listOf(Triple("音量键控制被控端", state.volumeKeysEnabled, model::setVolumeKeysEnabled),
             Triple("遥控时保持亮屏", state.keepAwake, model::setKeepAwake)).forEach { (title, value, change) ->
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).toggleable(value, role = Role.Switch, onValueChange = change).padding(16.dp)) {
                 Text(title, Modifier.weight(1f)); Switch(value, onCheckedChange = null)
             }
         }
-        Text("仅在已连接的遥控或预览页面生效，离开页面或切后台后停止。", color = RemoteColors.Secondary)
+        Text("音量键默认调节被控端媒体音量，支持长按连续调节。仅在已连接的遥控或预览页面生效，离开页面或切后台后停止。", color = RemoteColors.Secondary)
     }
 }
 

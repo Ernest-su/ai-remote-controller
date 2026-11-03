@@ -8,7 +8,10 @@ Kotlin Multiplatform 遥控器，当前实现 Android 手机端（`ernest.airc`�
 - 管理设备端版本、状态、更新、重启与停止。
 - 功能 → 设置提供跟随系统、亮色和暗色外观，选择即时生效并保存在当前控制端。
 
-<img src="docs/assets/remote-screen.png" width="320" alt="连接目标设备后的 Android 遥控器">
+<p>
+  <img src="docs/assets/remote-screen.png" width="320" alt="连接目标设备后的 Android 遥控器">
+  <img src="docs/assets/menu-screen.png" width="320" alt="Android 功能菜单页">
+</p>
 
 ## 快速开始
 
@@ -91,4 +94,4 @@ Android 控制端与 JVM 桌面测试工具，共享协议与设备记录位于 
 - [定时操作](docs/guide/schedules.md)：由被控端保存与执行，支持倒计时、单次时间及每天重复，手机退出不影响已运行服务的调度。
 - [批量传输与断点续传](docs/guide/files.md#batch-transfers)：多文件上传、打包 ZIP 或逐个下载，原服务任务有效时可手动续传。
 
-文件管理支持同目录重命名、被控端 APK 选择，以及保留编码的[文本与代码编辑](docs/guide/files.md#text-editing)。文本保存需确认覆盖，并校验原文件未被外部修改。功能菜单的“关于”显示当前版本，Android 的帮助与仓库入口在应用内网页打开。
+文件管理支持同目录重命名、被控端 APK 选择，以及保留编码的[文本与代码编辑](docs/guide/files.md#text-editing)。文本保存需确认覆盖，并校验原文件未被外部修改。功能菜单的“关于”显示当前版本，Android 的关于与帮助入口在应用内网页打开项目文档（Pages）。

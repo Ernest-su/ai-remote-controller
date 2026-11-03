@@ -118,6 +118,6 @@ internal fun HelpScreen() {
 internal fun AboutScreen() {
     val context = androidx.compose.ui.platform.LocalContext.current
     ProjectAbout("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") {
-        ProjectWebActivity.open(context, ProjectLinks.REPOSITORY)
+        ProjectWebActivity.open(context, ProjectLinks.DOCUMENTATION)
     }
 }
