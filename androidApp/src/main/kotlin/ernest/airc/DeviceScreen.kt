@@ -164,6 +164,7 @@ internal fun UnifiedDeviceRow(
     var showManagement by remember { mutableStateOf(false) }
     val connected = state.connected && entry.history.any { it.id == state.selected }
     val connecting = entry.isConnecting(state)
+    val online = connected || entry.service != null || entry.adbDevice != null
     Column(Modifier.fillMaxWidth().testTag("device-row-${entry.key}")) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(painterResource(R.drawable.ic_device_tv), null, Modifier.size(RemoteDimensions.DeviceIcon), tint = if (connected) RemoteColors.Action else RemoteColors.Secondary)
@@ -175,6 +176,12 @@ internal fun UnifiedDeviceRow(
                     if (entry.service != null) DeviceSource(R.drawable.ic_service, "局域网服务")
                     if (entry.adbHost != null) DeviceSource(R.drawable.ic_adb, "ADB · ${entry.adbDevice?.port}")
                 }
+                Text(
+                    if (online) "在线" else if (state.adbScanning) "正在检测" else "未检测到在线",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (online) RemoteColors.Action else RemoteColors.Secondary,
+                    modifier = Modifier.testTag("device-online-${entry.key}"),
+                )
                 if (connected) Text("当前连接", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Action)
             }
             TextButton(onClick = onConnect, enabled = !connected && !connecting, modifier = Modifier.heightIn(min = 48.dp)) {
