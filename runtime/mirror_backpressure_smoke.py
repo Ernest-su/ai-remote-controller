@@ -41,7 +41,8 @@ async def verify_backpressure(port, pid_file, runtime_pid):
             assert int(fields[1]) == runtime_pid, 'observer must target the fixture child'
             for _ in range(100):
                 wait_channel = (proc / 'wchan').read_text().strip()
-                if wait_channel.endswith('pipe_write'):
+                # Linux kernels expose the blocked pipe writer under either symbol.
+                if wait_channel.endswith(('pipe_write', 'pipe_wait_writable')):
                     break
                 await asyncio.sleep(.02)
             else:
