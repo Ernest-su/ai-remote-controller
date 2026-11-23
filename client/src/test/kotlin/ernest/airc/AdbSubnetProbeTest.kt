@@ -44,6 +44,26 @@ class AdbSubnetProbeTest {
             .putInt(command).putInt(arg0).putInt(arg1).putInt(body.size)
             .putInt(body.sumOf { it.toInt() and 255 }).putInt(command.inv()).put(body).array()
 
+    @Test fun scanTriesAlternatePortAndPreservesEndpoint() = kotlinx.coroutines.runBlocking {
+        ServerSocket(0).use { server ->
+            val closedPort = ServerSocket(0).use { it.localPort }
+            val response = packet(0x4e584e43, 0x01000000, 4096, "device::ro.product.model=Box\u0000".toByteArray())
+            val request = CompletableFuture.runAsync {
+                server.accept().use { socket ->
+                    val input = java.io.DataInputStream(socket.getInputStream())
+                    val header = ByteArray(24).also { input.readFully(it) }
+                    input.readFully(ByteArray(ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN).getInt(12)))
+                    socket.getOutputStream().write(response)
+                }
+            }
+            val found = mutableListOf<DiscoveredAdbDevice>()
+            AdbSubnetProbe.scan(listOf("127.0.0.1"), listOf(closedPort, server.localPort)) { found += it }
+            request.get(2, TimeUnit.SECONDS)
+            assertEquals(1, found.size)
+            assertEquals(server.localPort, found.single().port)
+            assertEquals("Box", found.single().name)
+        }
+    }
     @Test fun acceptsAdbConnectionAndAuthorizationToken() {
         assertNotNull(probe(packet(0x4e584e43, 0x01000000, 4096, "device::ro.product.model=TV\u0000".toByteArray())))
         assertNotNull(probe(packet(0x48545541, 1, 0, ByteArray(20) { it.toByte() })))
@@ -52,6 +72,7 @@ class AdbSubnetProbeTest {
         val found = probe(packet(0x4e584e43, 0x01000001, 4096,
             "device::ro.product.name=tv_product;ro.product.model=Living Room TV;ro.product.device=tv_code;features=shell_v2;\u0000".toByteArray()))!!
         assertEquals("127.0.0.1", found.host)
+        assertTrue(found.port > 0)
         assertEquals("Living Room TV", found.name)
         assertEquals("tv_product", found.product)
         assertEquals("tv_code", found.device)

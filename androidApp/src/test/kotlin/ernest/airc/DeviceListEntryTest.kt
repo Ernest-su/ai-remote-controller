@@ -16,6 +16,14 @@ class DeviceListEntryTest {
         assertEquals(service, rows.first().service)
         assertNotNull(rows.first().adbHost)
     }
+    @Test fun discoveredPortOverridesStaleSavedPortAfterMerging() {
+        val saved = device("saved", "192.168.68.225", 1)
+        val found = DiscoveredAdbDevice(saved.host!!, model = "Box", port = 65533)
+        val state = RemoteUiState(history = listOf(saved), adbDevices = listOf(found))
+        val row = deviceListEntries(state).single()
+        assertEquals(65533, row.adbPort)
+        assertEquals(5555, deviceListEntries(state.copy(adbDevices = emptyList())).single().adbPort)
+    }
     @Test fun adbOnlyDevicesAppearBeforeSavedOfflineRows() {
         val rows = deviceListEntries(RemoteUiState(history = listOf(device("old", "192.168.68.59", 1)), adbDevices = listOf(DiscoveredAdbDevice("192.168.68.223"))))
         assertEquals("192.168.68.223", rows.first().host)

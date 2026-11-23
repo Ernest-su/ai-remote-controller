@@ -14,7 +14,7 @@ App 与 runtime 按同一版本配套分发。目标文件与待部署版本不�
 | version | 设备程序版本 |
 | path | `/ws` |
 
-当前 HTTP/WebSocket 监听 IPv4，因此广播仅发布可通过 IPv4 访问的地址。无线 ADB 的 `_adb-tls-pairing._tcp.`、`_adb-tls-connect._tcp.` 属于独立的安装通道，与遥控器设备发现无关。
+当前 HTTP/WebSocket 监听 IPv4，因此广播仅发布可通过 IPv4 访问的地址。设备页同时发现 `_adb._tcp.` 公告的普通 TCP ADB 端口，校验只发送 ADB 握手，不授权、不打开 shell。无线 ADB 的 `_adb-tls-pairing._tcp.`、`_adb-tls-connect._tcp.` 属于独立的安装通道，与遥控器设备发现无关。
 
 配对码连接默认按 GUID 发现 TLS 连接服务，也可指定无线调试首页的连接端口；指定时直接连接该端口。历史重连仍优先发现当前端口，找不到时才尝试保存的旧端点。
 

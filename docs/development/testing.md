@@ -140,6 +140,18 @@ uv run --with websockets python scripts/test-remote-input.py --phone <控制手�
 
 模型提供商测试显式启用，凭据只交给所需进程，不能写入源码、命令历史、测试日志或文档。确定性模型 fixture 验证工具调用协议与边界，不能证明真实提供商兼容。
 
+真实 Wi-Fi 切换与 ADB mDNS 专项需显式指定控制手机、公告地址和端口，并允许短暂关闭再开启 Wi-Fi：
+
+```sh
+adb -s <控制手机序列号> shell am instrument -w \
+  -e class ernest.airc.WifiScanTargetTest -e toggleWifi true \
+  -e expectedWifiPrefix <当前Wi-Fi的IPv4前缀> \
+  -e expectedAdbHost <目标IPv4> -e expectedAdbPort <公告端口> \
+  ernest.airc.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+该用例要求 Wi-Fi 初始已连接，检查断开/重连事件、物理 Wi-Fi 网段、`_adb._tcp` 公告的动态端口及只读 ADB 握手；最终恢复 Wi-Fi 开启，不配对、部署或发送遥控按键。先构建并安装 App 和测试 APK，结束移除自建测试包。
+
 ## 功能专项索引
 
 ### 标准遥控与音量

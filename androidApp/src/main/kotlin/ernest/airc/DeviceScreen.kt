@@ -68,9 +68,12 @@ internal fun Devices(state: RemoteUiState, model: RemoteViewModel) {
                     if (index > 0) HorizontalDivider(color = RemoteColors.Divider, thickness = 0.5.dp)
                     UnifiedDeviceRow(entry, state, onConnect = {
                         when {
-                            entry.service != null -> model.discovered(entry.service, entry.history.firstOrNull { it.adbPort != null }?.adbPort ?: if (entry.adbHost != null) 5555 else null)
-                            entry.history.isNotEmpty() -> model.reconnect(entry.history.first())
-                            entry.adbHost != null -> model.tcp(requireNotNull(entry.adbHost), 5555, 9876)
+                            entry.service != null -> model.discovered(entry.service, entry.adbPort)
+                            entry.history.isNotEmpty() -> {
+                                val saved = entry.history.first()
+                                model.reconnect(saved.copy(adbPort = entry.adbPort ?: saved.adbPort))
+                            }
+                            entry.adbHost != null -> model.tcp(requireNotNull(entry.adbHost), requireNotNull(entry.adbPort), 9876)
                         }
                     }, onRename = model::rename, onForget = model::forget)
                 }
@@ -170,7 +173,7 @@ internal fun UnifiedDeviceRow(
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (entry.history.isNotEmpty()) DeviceSource(R.drawable.ic_history, "已保存")
                     if (entry.service != null) DeviceSource(R.drawable.ic_service, "局域网服务")
-                    if (entry.adbHost != null) DeviceSource(R.drawable.ic_adb, "ADB · 5555")
+                    if (entry.adbHost != null) DeviceSource(R.drawable.ic_adb, "ADB · ${entry.adbDevice?.port}")
                 }
                 if (connected) Text("当前连接", style = MaterialTheme.typography.bodySmall, color = RemoteColors.Action)
             }

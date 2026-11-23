@@ -292,23 +292,51 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         feedback(FeedbackPhase.ERROR, message)
     }
     fun scanAdbDevices() {
-        if (adbScanJob?.isActive == true) return
-        val generation = ++adbScanGeneration
+        cancelAdbScan()
         adbScanJob = viewModelScope.launch {
-            val range = wifiScanRange(getApplication())
-            if (range == null) {
-                mutable.update { it.copy(adbDevices = emptyList(), adbScanning = false, adbScanStatus = "请连接 Wi-Fi 后扫描同网段 ADB") }
-                return@launch
-            }
-            mutable.update { it.copy(adbDevices = emptyList(), adbScanning = true, adbScanStatus = "正在扫描 ${range.label} · ADB 5555") }
-            try {
-                AdbSubnetProbe.scan(range.hosts) { device ->
-                    mutable.update { if (generation == adbScanGeneration) it.copy(adbDevices = (it.adbDevices + device).distinctBy { found -> found.host }.sortedBy { found -> found.host }) else it }
+            wifiScanRanges(getApplication()).collectLatest { range ->
+                val generation = ++adbScanGeneration
+                if (range == null) {
+                    mutable.update { it.copy(adbDevices = emptyList(), adbScanning = false, adbScanStatus = "请连接 Wi-Fi 后扫描同网段 ADB") }
+                    return@collectLatest
                 }
-                mutable.update { it.copy(adbScanStatus = "扫描完成 · ${range.label} · ${it.adbDevices.size} 台 ADB 设备") }
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { mutable.update { it.copy(adbScanStatus = "ADB 扫描失败：${e.message}") } }
-            finally { mutable.update { if (generation == adbScanGeneration) it.copy(adbScanning = false) else it } }
+                kotlinx.coroutines.coroutineScope {
+                    val ports = (listOf(5555) + state.value.history.mapNotNull { it.adbPort }).distinct()
+                    val scanned = java.util.concurrent.ConcurrentHashMap<String, DiscoveredAdbDevice>()
+                    val advertised = java.util.concurrent.ConcurrentHashMap<String, DiscoveredAdbDevice>()
+                    val resolving = mutableMapOf<String, Job>()
+                    fun publish() = mutable.update { state ->
+                        if (generation == adbScanGeneration) state.copy(adbDevices =
+                            (advertised.values + scanned.values).distinctBy { it.host }.sortedBy { it.host }) else state
+                    }
+                    val adbDiscovery = ServiceDiscovery(getApplication(), "_adb._tcp.", onFound = { service ->
+                        // Verify the advertised endpoint without authorization or opening a shell.
+                        if (service.host in range.hosts) {
+                            resolving.remove(service.name)?.cancel()
+                            resolving[service.name] = launch {
+                                val device = withContext(Dispatchers.IO) {
+                                    AdbSubnetProbe.probe(service.host, service.port, timeoutMs = 1500, socketFactory = range.network.socketFactory)
+                                }
+                                currentCoroutineContext().ensureActive()
+                                if (device != null) { advertised[service.name] = device; publish() }
+                            }
+                        }
+                    }, onLost = { name -> resolving.remove(name)?.cancel(); advertised.remove(name); publish() })
+                    mutable.update { it.copy(adbDevices = emptyList(), adbScanning = true, adbScanStatus = "正在扫描 ${range.label} · ADB ${ports.joinToString(" / ")} · mDNS") }
+                    adbDiscovery.start()
+                    try {
+                        try {
+                            AdbSubnetProbe.scan(range.hosts, ports, range.network.socketFactory) { device ->
+                                scanned[device.host] = device; publish()
+                            }
+                            mutable.update { if (generation == adbScanGeneration) it.copy(adbScanStatus = "扫描完成 · ${range.label} · 持续发现 mDNS 设备") else it }
+                        } catch (e: CancellationException) { throw e }
+                        catch (e: Exception) { mutable.update { if (generation == adbScanGeneration) it.copy(adbScanStatus = "ADB 扫描失败：${e.message}") else it } }
+                        finally { mutable.update { if (generation == adbScanGeneration) it.copy(adbScanning = false) else it } }
+                        kotlinx.coroutines.awaitCancellation()
+                    } finally { adbDiscovery.close() }
+                }
+            }
         }
     }
     fun cancelAdbScan() {

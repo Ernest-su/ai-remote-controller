@@ -29,7 +29,7 @@ class DeviceNamesUiTest {
             history = listOf(RememberedDevice("saved", "Original model", ConnectionMethod.TCP,
                 host = "192.0.2.3", lastConnectedAt = 1, displayName = "客厅电视")),
             adbDevices = listOf(DiscoveredAdbDevice("192.0.2.1", model = "Living Room Android TV"),
-                DiscoveredAdbDevice("192.0.2.2"), DiscoveredAdbDevice("192.0.2.3", model = "Hardware model")),
+                DiscoveredAdbDevice("192.0.2.2", port = 65533), DiscoveredAdbDevice("192.0.2.3", model = "Hardware model")),
         )
         var dark by mutableStateOf(false)
         val connections = mutableListOf<String>()
@@ -54,6 +54,7 @@ class DeviceNamesUiTest {
                 val connect = compose.onNode(hasText("连接") and hasAnyAncestor(hasTestTag("device-row-$host")))
                 connect.performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp).performClick()
             }
+            compose.onNodeWithText("ADB · 65533").performScrollTo().assertIsDisplayed()
             compose.onNodeWithText("Hardware model").assertDoesNotExist()
             compose.onNodeWithContentDescription("管理 客厅电视").performScrollTo().performClick()
             val rename = compose.onNodeWithText("修改显示名")

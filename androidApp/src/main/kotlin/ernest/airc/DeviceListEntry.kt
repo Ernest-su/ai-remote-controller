@@ -8,6 +8,7 @@ internal data class DeviceListEntry(
     val connectingName: String? = null,
 ) {
     val adbHost get() = adbDevice?.host
+    val adbPort get() = adbDevice?.port ?: history.firstOrNull { it.adbPort != null }?.adbPort
     val host get() = service?.host ?: adbHost ?: history.firstOrNull()?.host ?: key.takeUnless { it.startsWith("id:") }.orEmpty()
     val name get() = sequenceOf(history.firstOrNull()?.visibleName, connectingName, service?.attributes?.get("name"), service?.name,
         adbDevice?.name).firstOrNull { !it.isNullOrBlank() } ?: "Android 设备 · $host"

@@ -10,7 +10,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.net.InetSocketAddress
-import java.net.Socket
+import javax.net.SocketFactory
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -19,6 +19,7 @@ data class DiscoveredAdbDevice(
     val model: String? = null,
     val product: String? = null,
     val device: String? = null,
+    val port: Int = 5555,
 ) {
     val name: String get() = model ?: product ?: device ?: "Android 设备 · $host"
 }
@@ -39,8 +40,8 @@ object AdbSubnetProbe {
             .map { n -> listOf(24, 16, 8, 0).joinToString(".") { shift -> ((n shr shift) and 255).toString() } }
     }
 
-    fun probe(host: String, port: Int = 5555, timeoutMs: Int = 450): DiscoveredAdbDevice? = runCatching {
-        Socket().use { socket ->
+    fun probe(host: String, port: Int = 5555, timeoutMs: Int = 450, socketFactory: SocketFactory = SocketFactory.getDefault()): DiscoveredAdbDevice? = runCatching {
+        socketFactory.createSocket().use { socket ->
             socket.connect(InetSocketAddress(host, port), timeoutMs)
             socket.soTimeout = timeoutMs
             val payload = "host::\u0000".toByteArray()
@@ -66,21 +67,25 @@ object AdbSubnetProbe {
                     fun property(key: String): String? = properties[key]?.filter {
                         !it.isISOControl() && Character.getType(it) != Character.FORMAT.toInt()
                     }?.trim()?.take(80)?.takeIf { it.isNotBlank() && !it.equals("unknown", ignoreCase = true) }
-                    DiscoveredAdbDevice(host, property("ro.product.model"), property("ro.product.name"), property("ro.product.device"))
+                    DiscoveredAdbDevice(host, property("ro.product.model"), property("ro.product.name"), property("ro.product.device"), port)
                 }
-                0x48545541 -> if (arg0 == 1 && size == 20) DiscoveredAdbDevice(host) else null // No automatic authorization.
+                0x48545541 -> if (arg0 == 1 && size == 20) DiscoveredAdbDevice(host, port = port) else null // No automatic authorization.
                 else -> null
             }
         }
     }.getOrNull()
 
-    suspend fun scan(hosts: List<String>, onFound: (DiscoveredAdbDevice) -> Unit) = withContext(Dispatchers.IO) {
+    suspend fun scan(hosts: List<String>, ports: List<Int> = listOf(5555),
+                     socketFactory: SocketFactory = SocketFactory.getDefault(), onFound: (DiscoveredAdbDevice) -> Unit) = withContext(Dispatchers.IO) {
         val permits = Semaphore(24)
         coroutineScope {
             hosts.map { host -> async {
                 permits.withPermit {
                     currentCoroutineContext().ensureActive()
-                    val found = probe(host)
+                    val found = ports.firstNotNullOfOrNull { port ->
+                        currentCoroutineContext().ensureActive()
+                        probe(host, port, socketFactory = socketFactory)
+                    }
                     currentCoroutineContext().ensureActive()
                     if (found != null) onFound(found)
                 }
