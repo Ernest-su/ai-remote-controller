@@ -40,3 +40,23 @@ async fn rejected_app_proposal_is_consumed_without_package_commands() {
     );
     assert!(approve(&json!({"id":id})).await.is_err());
 }
+
+#[test]
+fn builtin_version_uses_hidden_package_section_not_version_order() {
+    let dump = "Packages:\n  Package [com.test.app] (a):\n    appId=10042\n    codePath=/data/app/current\n    versionCode=10000 minSdk=28\n    versionName=1.0\n    lastUpdateTime=now\nHidden system packages:\n  Package [com.other] (b):\n    versionCode=99999\n  Package [com.test.app] (c):\n    codePath=/system/app/Test\n    versionCode=1927 minSdk=19\n    versionName=5.1.1927\n";
+    let app = info::parse("com.test.app", 0, true, dump).unwrap();
+    assert_eq!(app.version_code, 10000);
+    let builtin = app.built_in_version.unwrap();
+    assert_eq!(builtin.version_code, 1927);
+    assert_eq!(builtin.code_path, "/system/app/Test");
+    assert!(info::parse("com.test.app", 0, false, dump).unwrap().built_in_version.is_none());
+    let reversed = dump.replace("versionCode=10000", "versionCode=1");
+    assert_eq!(info::parse("com.test.app", 0, true, &reversed).unwrap().built_in_version.unwrap().version_code, 1927);
+}
+#[test]
+fn builtin_version_for_unupdated_system_app_and_unavailable_updated_app() {
+    let dump = "Package [com.test.app] (a):\n appId=10042\n codePath=/product/app/Test\n versionCode=7\n versionName=null\n lastUpdateTime=now";
+    let app = info::parse("com.test.app", 0, true, dump).unwrap();
+    assert_eq!(app.built_in_version.unwrap().version_code, 7);
+    assert!(info::parse("com.test.app", 0, true, &dump.replace("/product/app/Test", "/data/app/Test")).unwrap().built_in_version.is_none());
+}

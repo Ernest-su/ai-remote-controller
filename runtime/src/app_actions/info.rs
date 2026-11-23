@@ -10,6 +10,30 @@ pub(super) struct AppInfo {
     pub(super) code_path: String,
     pub(super) last_update_time: String,
     pub(super) system: bool,
+    pub(super) built_in_version: Option<AppVersion>,
+}
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AppVersion {
+    pub(super) version_code: u64,
+    pub(super) version_name: Option<String>,
+    pub(super) code_path: String,
+}
+fn package_blocks<'a>(package: &str, dump: &'a str, hidden: bool) -> Vec<Vec<&'a str>> {
+    let mut in_hidden = false;
+    let mut blocks = Vec::new();
+    let mut active = false;
+    for line in dump.lines() {
+        let text = line.trim();
+        if text == "Hidden system packages:" { in_hidden = true; active = false; }
+        else if text == "Packages:" { in_hidden = false; active = false; }
+        else if !line.starts_with(char::is_whitespace) && !text.is_empty() { active = false; }
+        if text.starts_with("Package [") {
+            active = in_hidden == hidden && text.starts_with(&format!("Package [{package}]"));
+            if active { blocks.push(Vec::new()); }
+        } else if active { blocks.last_mut().unwrap().push(text); }
+    }
+    blocks
 }
 pub(super) fn valid_package(value: &str) -> bool {
     value.len() <= 255
@@ -19,16 +43,8 @@ pub(super) fn valid_package(value: &str) -> bool {
         })
 }
 pub(super) fn parse(package: &str, user_id: u32, system: bool, dump: &str) -> Result<AppInfo> {
-    let start = dump
-        .lines()
-        .position(|line| line.trim().starts_with(&format!("Package [{package}]")))
-        .context("package detail missing")?;
-    let lines: Vec<_> = dump
-        .lines()
-        .skip(start + 1)
-        .take_while(|line| !line.trim().starts_with("Package ["))
-        .map(str::trim)
-        .collect();
+    let blocks = package_blocks(package, dump, false);
+    let lines = blocks.first().context("package detail missing")?;
     let field = |key: &str| {
         lines
             .iter()
@@ -54,6 +70,20 @@ pub(super) fn parse(package: &str, user_id: u32, system: bool, dump: &str) -> Re
         code_path: field("codePath=").context("code path unavailable")?,
         last_update_time: field("lastUpdateTime=").context("update identity unavailable")?,
         system,
+        built_in_version: if system {
+            package_blocks(package, dump, true).first().and_then(|lines| {
+                let field = |key: &str| lines.iter().find_map(|line| line.strip_prefix(key));
+                Some(AppVersion {
+                    version_code: field("versionCode=")?.split_whitespace().next()?.parse().ok()?,
+                    version_name: field("versionName=").filter(|v| *v != "null").map(str::to_owned),
+                    code_path: field("codePath=")?.to_owned(),
+                })
+            }).or_else(|| {
+                let path = field("codePath=")?;
+                if path.starts_with("/data/") { return None; }
+                Some(AppVersion { version_code, version_name: field("versionName=").filter(|v| v != "null"), code_path: path })
+            })
+        } else { None },
     })
 }
 pub(super) async fn current_user() -> Result<u32> {

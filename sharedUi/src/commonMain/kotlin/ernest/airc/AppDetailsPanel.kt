@@ -37,7 +37,14 @@ fun AppDetailsPanel(packageName: String, state: AppControlState, connected: Bool
             Text("应用信息", style = MaterialTheme.typography.titleMedium)
             InfoRow("包名", packageName)
             details?.let { d ->
-                InfoRow("版本", d.app.versionName ?: d.app.versionCode.toString())
+                InfoRow("当前安装版本", "${d.app.versionName ?: "未提供版本名"} (${d.app.versionCode})")
+                InfoRow("安装路径", d.app.codePath)
+                if (d.app.system) {
+                    d.app.builtInVersion?.let { version ->
+                        InfoRow("系统内置版本", "${version.versionName ?: "未提供版本名"} (${version.versionCode})")
+                        InfoRow("内置路径", version.codePath)
+                    } ?: InfoRow("系统内置版本", "未能读取")
+                }
                 InfoRow("Android 用户", d.app.userId.toString())
                 InfoRow("类型", if (d.app.system) "系统应用" else "用户应用")
                 InfoRow("状态", if (d.state.enabled) "已启用" else "已停用")

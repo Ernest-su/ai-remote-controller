@@ -261,6 +261,7 @@ mod tests {
             app_id: 10001,
             version_code: 1,
             version_name: None,
+            built_in_version: None,
             code_path: "/data/app/fixture".into(),
             last_update_time: "now".into(),
             system: false,

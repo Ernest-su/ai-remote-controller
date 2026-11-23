@@ -21,6 +21,7 @@ class AppDetailsLayoutUiTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     @Test fun narrowLargeTextDetailsStayScrollableInBothThemes() {
         val app = TargetAppInfo("fixture.app", 10, 10001, 1, codePath = "/data/app/fixture", lastUpdateTime = "fixture", system = false)
+        val systemApp = app.copy(system = true, versionCode = 10000, versionName = "1.0", builtInVersion = TargetAppVersion(1927, "5.1.1927.ae9b7129f.20221107", "/system/app/fixture"))
         val snapshot = AppControlSnapshot("fixture.app", 10, true, 0, false, AppControlCapabilities(true, true, true), listOf(
             AppPermission("android.permission.CAMERA", "相机权限与较长的说明名称", false, true, true),
             AppPermission("android.permission.SYSTEM_ALERT_WINDOW", "悬浮窗", false, false, false, "特殊访问仅供查看，请在目标设备系统设置中管理")))
@@ -28,13 +29,18 @@ class AppDetailsLayoutUiTest {
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale = 1.5f)) {
                 Box(Modifier.width(320.dp).height(480.dp)) { RemoteTheme(darkTheme = dark) {
-                    AppDetailsPanel("fixture.app", AppControlState("fixture.app", details = AppControlDetails(app, snapshot)), true,
+                    AppDetailsPanel("fixture.app", AppControlState("fixture.app", details = AppControlDetails(systemApp, snapshot)), true,
                         listOf("apps.control_info", "apps.prepare_control", "apps.clear_cache", "apps.uninstall"), false, {}, { _, _ -> }, {}, {}, {}, {})
                 } }
             }
         }
         for (mode in listOf(false, true)) {
             compose.runOnIdle { dark = mode }
+            compose.onNodeWithText("当前安装版本").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("1.0 (10000)").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("系统内置版本").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("5.1.1927.ae9b7129f.20221107 (1927)").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("/system/app/fixture").performScrollTo().assertIsDisplayed()
             compose.onNodeWithText("清除全部数据").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
             compose.onNodeWithTag("app-permission-android.permission.CAMERA").performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(56.dp)
             val output = File(requireNotNull(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null)), "app-details-${if (mode) "dark" else "light"}.png")
