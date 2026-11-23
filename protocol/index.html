@@ -2129,7 +2129,7 @@
 </tr>
 </tbody>
 </table>
-<p>当前 HTTP/WebSocket 监听 IPv4，因此广播仅发布可通过 IPv4 访问的地址。无线 ADB 的 <code>_adb-tls-pairing._tcp.</code>、<code>_adb-tls-connect._tcp.</code> 属于独立的安装通道，与遥控器设备发现无关。</p>
+<p>当前 HTTP/WebSocket 监听 IPv4，因此广播仅发布可通过 IPv4 访问的地址。设备页同时发现 <code>_adb._tcp.</code> 公告的普通 TCP ADB 端口，校验只发送 ADB 握手，不授权、不打开 shell。无线 ADB 的 <code>_adb-tls-pairing._tcp.</code>、<code>_adb-tls-connect._tcp.</code> 属于独立的安装通道，与遥控器设备发现无关。</p>
 <p>配对码连接默认按 GUID 发现 TLS 连接服务，也可指定无线调试首页的连接端口；指定时直接连接该端口。历史重连仍优先发现当前端口，找不到时才尝试保存的旧端点。</p>
 <h2 id="http">HTTP<a class="headerlink" href="#http" title="Permanent link">&para;</a></h2>
 <p><code>GET /status</code> 返回 version、protocol、deviceId、name、tools、modelConfigured、uid（进程有效用户 ID，<code>0</code> 为 root，<code>2000</code> 为 Android shell）；不返回模型密钥。</p>

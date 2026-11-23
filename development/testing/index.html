@@ -1915,6 +1915,7 @@ python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </sp
 python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>appearance
 python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>controller-ui
 python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>gamepad-ui
+python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>mouse-ui
 python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>management-ui
 python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>file-preview-ui
 python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </span>--phone<span class="w"> </span>&lt;模拟器序列号&gt;<span class="w"> </span>--suite<span class="w"> </span>mirror-toolbar-ui
@@ -1962,6 +1963,10 @@ python3<span class="w"> </span>scripts/test-phone-target.py<span class="w"> </sp
 <tr>
 <td><code>appearance</code></td>
 <td>三种外观模式、本地持久化、重建、设置返回、草稿、系统栏与未知值回退</td>
+</tr>
+<tr>
+<td><code>mouse-ui</code></td>
+<td>鼠标类型导航/重建/返回、进入/前台/焦点/目标变化时自动启用与释放、底部固定三键、上方独立滚轮、禁用态与亮暗大字体；三键短震/长按弱震、双键独立释放、滑出/禁用/离页清理与震动开关；不连接目标</td>
 </tr>
 <tr>
 <td><code>gamepad-ui</code></td>
@@ -2050,6 +2055,14 @@ uv<span class="w"> </span>run<span class="w"> </span>--with<span class="w"> </sp
 <p>只有改动涉及真实目标或硬件行为时才选择对应专项，方法见<a href="../../device-validation/">设备验证</a>。不得不带类或专项选择运行整套 instrumentation，其中包含部署、配对和系统动作测试。</p>
 <p>真实目标测试须显式配置设备；使用 UUID 服务目录、临时端口和自建 fixture，核对目标服务身份及源文件/数据保留，结束清理自己的资源。需要目标时优先用独立模拟器，再按硬件兼容需求使用专用物理设备。</p>
 <p>模型提供商测试显式启用，凭据只交给所需进程，不能写入源码、命令历史、测试日志或文档。确定性模型 fixture 验证工具调用协议与边界，不能证明真实提供商兼容。</p>
+<p>真实 Wi-Fi 切换与 ADB mDNS 专项需显式指定控制手机、公告地址和端口，并允许短暂关闭再开启 Wi-Fi：</p>
+<div class="highlight"><pre><span></span><code>adb<span class="w"> </span>-s<span class="w"> </span>&lt;控制手机序列号&gt;<span class="w"> </span>shell<span class="w"> </span>am<span class="w"> </span>instrument<span class="w"> </span>-w<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-e<span class="w"> </span>class<span class="w"> </span>ernest.airc.WifiScanTargetTest<span class="w"> </span>-e<span class="w"> </span>toggleWifi<span class="w"> </span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-e<span class="w"> </span>expectedWifiPrefix<span class="w"> </span>&lt;当前Wi-Fi的IPv4前缀&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-e<span class="w"> </span>expectedAdbHost<span class="w"> </span>&lt;目标IPv4&gt;<span class="w"> </span>-e<span class="w"> </span>expectedAdbPort<span class="w"> </span>&lt;公告端口&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>ernest.airc.test/androidx.test.runner.AndroidJUnitRunner
+</code></pre></div>
+<p>该用例要求 Wi-Fi 初始已连接，检查断开/重连事件、物理 Wi-Fi 网段、<code>_adb._tcp</code> 公告的动态端口及只读 ADB 握手；最终恢复 Wi-Fi 开启，不配对、部署或发送遥控按键。先构建并安装 App 和测试 APK，结束移除自建测试包。</p>
 <h2 id="_7">功能专项索引<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h2>
 <h3 id="_8">标准遥控与音量<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
 <p>标准遥控长按使用 <code>RemoteKeyControllerTest</code> 与 Rust <code>remote_input::tests</code> 验证串行边沿、手势归属、快速短按、无自动重放、断线与超时释放。<code>remote-haptics-input-ui</code> 同时检查真实界面的按下先于松开、菜单保活、取消和后台释放，服务为控制端回环 fixture。独立 Android 接收端可验证实际 KeyEvent：</p>
@@ -2147,6 +2160,8 @@ python3<span class="w"> </span>scripts/test-screen-power.py<span class="w"> </sp
 <p>定时操作回归覆盖10秒静默轮询时任务按钮位置稳定、执行一次确认与连接绑定、离线/运行中禁用；控制器验证轮询不占动作busy且可被手动操作取代；runtime通过注入执行器验证先落盘再执行、重复提交拒绝、原计划保留、与到期任务重叠时不重复执行及失败结果持久化，不对真实设备执行关机等动作。</p>
 <p>连接反馈回归覆盖顶栏连接中名称轮播、目标切换复位、列表仅目标行旋转及其他设备仍可选择；临时目标不标为已保存。定时编辑覆盖原位替换与启停状态保留、运行中拒绝、确认/取消、旋转及保存失败保留草稿；关屏复用screen.power，遥控器切换屏幕前重新读取目标模式，避免定时关屏后按旧状态切换，前台轮询更新模式、后台停止轮询且恢复时重新读取。</p>
 <p>定时关屏专项：仅在显式选择且已root的自有模拟器上，执行 <code>uv run --with websockets python runtime/schedule_screen_target_test.py --serial &lt;模拟器序列号&gt; --binary &lt;配套Android运行时二进制&gt;</code>。创建独立临时服务与任务，验证原位编辑、暂停任务执行一次、共享屏幕模式回读，以及控制端断开后到时关屏；通过SurfaceFlinger核对物理显示模式并确认Android保持唤醒。结束恢复屏幕、停止临时服务、移除转发与自建目录，不操作真实设备。</p>
+<p>鼠标专项：<code>:client:test --tests ernest.airc.MouseControllerTest --tests ernest.airc.GyroMouseMapperTest</code> 覆盖合并位移、保留点击边沿、原连接清理、慢连接有界与失败不重放；<code>cargo test --locked --manifest-path runtime/Cargo.toml mouse::</code> 验证 uinput ABI、事件编码、参数边界、所有者/序号与过期会话释放。物理手机陀螺仪流检查只选 <code>MouseGyroTargetTest</code> 并显式传入 <code>checkGyroscope=true</code>；不能替代人工核对握姿、指向和手感。</p>
+<p>真实鼠标输入专项使用 <code>runtime/mouse_target_test.py --serial &lt;独立目标&gt; --binary &lt;匹配ABI资产&gt; --receiver-apk inputFixture/build/outputs/apk/debug/inputFixture-debug.apk</code>；通过唯一 runtime 目录与原生接收 fixture 验证真正鼠标来源、三键、拖动、滚轮、拒绝重复帧和其他连接、断线/心跳过期释放。目标需 root/uinput；若固件将鼠标右键映射为返回，显式加 <code>--right-button back</code>，该分支要求真实鼠标 BACK 按下/松开与按钮状态，而不是放宽为任意响应；默认仍要求原生 secondary 按钮边沿。拒绝覆盖现有 fixture，结束恢复原 Activity 并清理自建服务、转发与安装包。</p>
 
 
 
