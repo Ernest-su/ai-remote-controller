@@ -70,6 +70,7 @@ impl Language {
             || !matches!(
                 tool,
                 "gamepad.virtual_capabilities"
+                    | "mouse.capabilities"
                     | "device.system_capabilities"
                     | "device.system_state"
             )

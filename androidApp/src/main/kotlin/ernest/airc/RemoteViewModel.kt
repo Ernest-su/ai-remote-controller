@@ -99,6 +99,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
     val remoteVolume = RemoteVolumeController(viewModelScope, runtime, { feedback(FeedbackPhase.ERROR, it) })
     val mediaControl = MediaControlController(viewModelScope, runtime)
     val virtualGamepad = VirtualGamepadController(viewModelScope, runtime)
+    val mouse = MouseController(viewModelScope, runtime)
     val remoteKeys = RemoteKeyController(viewModelScope, runtime, ::showMessage)
     val gamepad = GamepadController(viewModelScope, runtime)
     val storageAnalysis = StorageAnalysisController(viewModelScope, runtime)
@@ -154,6 +155,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
         screenPower.setForeground(foreground)
         mediaForeground.value = foreground
         if (!foreground) {
+            mouse.stop()
             automaticConnection.stop()
             if (connectionAutomatic && !state.value.connected) {
                 retireConnection()
@@ -220,7 +222,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
     private val mediaMonitor = viewModelScope.launch {
         runtime.session.collectLatest { session ->
             if (session == null) {
-                quickRoutines.cancel(); schedules.clear(); tvInput.cancel(); appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll()
+                quickRoutines.cancel(); schedules.clear(); tvInput.cancel(); appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); mouse.stop(); remoteKeys.cancelAll()
                 mutable.update { it.copy(mediaStatus = "未连接设备") }
             } else combine(mediaForeground, mediaPageVisible) { foreground, player -> foreground && !player }.collectLatest monitor@ { observe ->
                 if (observe) while (true) {
@@ -349,6 +351,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
 
     /** Leave an in-flight atomic deployment its own ADB channel until it finishes or rolls back. */
     private fun retireConnection(detachAdb: Boolean = true) {
+        mouse.stop()
         connectionGeneration++
         val previous = connectionJob
         connectionJob = null
@@ -508,7 +511,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
     private suspend fun attachRuntime(host: String, port: Int, method: ConnectionMethod?, adbPort: Int?, guid: String?, model: String?, previousId: String? = null, expectedRelease: RuntimeRelease? = null) {
         currentCoroutineContext().ensureActive()
         connectionStage(ConnectionStage.RUNTIME)
-        quickRoutines.cancel(); schedules.clear(); tvInput.cancel(); appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); remoteKeys.cancelAll()
+        quickRoutines.cancel(); schedules.clear(); tvInput.cancel(); appIcons.clear(); screenshots.clear(); ascrcpyPreview.stop(); files.clear(); urlDownloads.clear(); downloadDirectories.clear(); transfers.clear(); fileMedia.clear(); appManagement.clear(); appControl.clear(); appCache.clear(); systemActions.clear(); systemObservation.clear(); apkInspection.clear(); appInstallation.clear(); storageAnalysis.clear(); mediaControl.clear(); gamepad.clear(); virtualGamepad.clear(); mouse.stop(); remoteKeys.cancelAll()
         val status = runtime.connect(host, port, expectedRelease ?: withContext(Dispatchers.IO) { installer.bundledRelease() })
         val previous = state.value.history.find { it.id == status.deviceId }
         val record = RememberedDevice(status.deviceId, model?.ifBlank { null } ?: previous?.name ?: status.name ?: "AI 设备",
@@ -919,6 +922,7 @@ class RemoteViewModel @JvmOverloads constructor(application: Application, privat
 
     override fun onCleared() {
         voice.stop()
+        mouse.stop()
         automaticConnection.stop()
         ascrcpyPreview.stop()
         discovery.close(); batchTransfers.close(); transfers.close(); filePreviews.close(); textFiles.close(); runtime.close(); profiles.close(); adb?.close()

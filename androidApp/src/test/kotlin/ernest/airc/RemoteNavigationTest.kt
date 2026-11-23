@@ -19,7 +19,7 @@ class RemoteNavigationTest {
         assertEquals(RemotePage.REMOTE, RemotePage.DEVICES.backDestination(RemotePage.DEVICES))
     }
     @Test fun remoteTypesAreSeparateFromFeaturesAndReturnThroughPicker() {
-        assertEquals(setOf(RemotePage.REMOTE, RemotePage.TOUCHPAD, RemotePage.KEYPAD, RemotePage.MEDIA_CONTROL, RemotePage.GAMEPAD), remoteTypes.map { it.page }.toSet())
+        assertEquals(setOf(RemotePage.REMOTE, RemotePage.TOUCHPAD, RemotePage.MOUSE, RemotePage.KEYPAD, RemotePage.MEDIA_CONTROL, RemotePage.GAMEPAD), remoteTypes.map { it.page }.toSet())
         assertTrue(remoteFeatures.none { feature -> remoteTypes.any { it.page == feature.page } })
         remoteTypes.filter { it.page != RemotePage.REMOTE }.forEach {
             assertEquals(RemotePage.REMOTE_TYPES, it.page.androidBackDestination(RemotePage.REMOTE))

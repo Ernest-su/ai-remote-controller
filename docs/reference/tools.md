@@ -290,3 +290,16 @@ remote.key 的 power 参数仅供直接手动控制；模型别名 remote_key �
 播放与媒体音量工具共用 runtime 所有的常驻 Android 桥接进程，通过有界、带请求关联的逐行 JSON 交换结果，复用 framework 上下文并在当前 Android 用户变化时切换上下文，避免每次启动 am/app_process。等待中的取消不会提交迟到操作；已经开始的帧读完后再交给下一请求，超时或响应丢失会丢弃进程且不自动重放写操作。独立 AudioBridge CLI 仍用于显式用户的定时操作与验证工具。
 
 `apps.list` 支持可选布尔 `includeSizes`，默认 false。条目增加 `firstInstallTime`（首次安装的 epoch 毫秒）及 `sizeBytes`（系统报告的应用总占用字节）；未知为 null。响应 `sizesRequested` 标记是否已尝试读取大小。普通列表不读取空间；大小读取通过 `sizeTask` 返回的 `app_sizes` 后台任务执行（root=apps，name=app-sizes，unit=items），使用 task.progress 查询；列表先返回基础信息，统计过程中逐条发布结果，客户端约每300毫秒合并已返回的同版本应用大小；统计结束后补齐最终快照。同一用户的并发请求复用进行中的任务；单次统计最多5分钟，可返回部分已读值，刷新后重新测量，不持久缓存动态大小。Android 8 起使用 StorageStats 的 appBytes + dataBytes（dataBytes 已含缓存），Android 7 使用当前用户的 PackageStats 统计；不遍历应用私有目录。
+
+## 系统鼠标
+
+目标需 root 与 uinput v5。该通道注册真实相对鼠标，由目标系统显示指针，左右中键产生原生按钮边沿，滚轮产生 REL_WHEEL。
+
+| 工具 | 参数 | 行为 |
+| --- | --- | --- |
+| `mouse.capabilities` | `{}` | 不创建设备，探测 root/uinput |
+| `mouse.open` | `{}` | 创建当前 WebSocket 连接独占的鼠标，返回 `id`、`deviceName`、`deadmanMs` |
+| `mouse.update` | `id, sequence, frame` | 严格递增序号；frame 必须包含整数 `dx,dy`（−2048…2048）、`wheel`（−32…32）及 `buttons`（0…7） |
+| `mouse.close` | `id` | 释放并移除本连接拥有的鼠标 |
+
+buttons 位掩码：左键1、右键2、中键4，可组合。每帧是完整按钮状态与一次相对位移/滚动，不可重发；重复序号拒绝。控制端每250ms保活；两秒无更新或连接关闭释放并销毁设备，失效会话不能由迟到更新重新激活。只允许一个连接拥有鼠标，同一连接重开释放旧会话；持续运行一小时后需重新启动。输入失败停止且不自动重放。内核输入确认不替代目标应用实际接收验证。

@@ -103,6 +103,13 @@ object RemoteColors {
 
 /** Dimensions from AIVoice phoneRemoteApp, with scrolling for short windows / large text. */
 object RemoteDimensions {
+    val MouseButtonHeight = 72.dp
+    val MouseWheelHeight = 160.dp
+    val MouseWheelStep = 24.dp
+    const val MouseMinSensitivity = 0.5f
+    const val MouseMaxSensitivity = 6f
+    const val MouseDefaultSensitivity = 2f
+    const val MouseSensitivitySteps = 54
     val PlaybackThumbSize = 16.dp
     val PlaybackTrackHeight = 4.dp
     val PlaybackMainButton = 72.dp

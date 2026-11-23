@@ -56,6 +56,7 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite lan-co
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite appearance
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite controller-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite gamepad-ui
+python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite mouse-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite management-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite file-preview-ui
 python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite mirror-toolbar-ui
@@ -76,6 +77,7 @@ python3 scripts/test-phone-target.py --phone <模拟器序列号> --suite profil
 | `lan-connection-ui` | 仅访问控制端回环地址，验证服务连接失败后尝试 ADB 5555、失败展开并填入目标地址、草稿重建恢复；设备行 fixture 检查型号、IP 回退、已保存显示名及 320dp / 1.5 倍字号亮暗布局，不连接外部设备 |
 | `device-recovery-ui` | 回环服务验证取消、自动重试显示简短进度且不busy/不弹反馈、前后台暂停恢复、手动切换与迟到回调、超时切换、失效ADB按需重建且不重启遥控；界面验证其他设备可选、扫描旋转、精简文字/绿红状态点、无动态预览状态行、ADB等待与实际退避重试提示及标题栏名称轮播（共12项） |
 | `appearance` | 三种外观模式、本地持久化、重建、设置返回、草稿、系统栏与未知值回退 |
+| `mouse-ui` | 鼠标类型导航/重建/返回、进入/前台/焦点/目标变化时自动启用与释放、底部固定三键、上方独立滚轮、禁用态与亮暗大字体；三键短震/长按弱震、双键独立释放、滑出/禁用/离页清理与震动开关；不连接目标 |
 | `gamepad-ui` | NES/双摇杆类型选择、方向与跳跃多指组合、类型旋转保留、标题启停/重连图标、重连可停止且游戏按键禁用、固定无滚动视口、多指操作与取消释放、横屏方向及离页恢复；只验证控制端界面 |
 | `controller-ui` | 页面导航、提交与执行反馈、键盘间距、离线、大字体、旋转与输入工具 |
 | `management-ui` | 文件/应用列表、搜索筛选、按需面板、离线与草稿恢复 |
@@ -342,3 +344,7 @@ JVM fixture、模拟器和真实设备分别说明。UI fixture 不证明目标�
 连接反馈回归覆盖顶栏连接中名称轮播、目标切换复位、列表仅目标行旋转及其他设备仍可选择；临时目标不标为已保存。定时编辑覆盖原位替换与启停状态保留、运行中拒绝、确认/取消、旋转及保存失败保留草稿；关屏复用screen.power，遥控器切换屏幕前重新读取目标模式，避免定时关屏后按旧状态切换，前台轮询更新模式、后台停止轮询且恢复时重新读取。
 
 定时关屏专项：仅在显式选择且已root的自有模拟器上，执行 `uv run --with websockets python runtime/schedule_screen_target_test.py --serial <模拟器序列号> --binary <配套Android运行时二进制>`。创建独立临时服务与任务，验证原位编辑、暂停任务执行一次、共享屏幕模式回读，以及控制端断开后到时关屏；通过SurfaceFlinger核对物理显示模式并确认Android保持唤醒。结束恢复屏幕、停止临时服务、移除转发与自建目录，不操作真实设备。
+
+鼠标专项：`:client:test --tests ernest.airc.MouseControllerTest --tests ernest.airc.GyroMouseMapperTest` 覆盖合并位移、保留点击边沿、原连接清理、慢连接有界与失败不重放；`cargo test --locked --manifest-path runtime/Cargo.toml mouse::` 验证 uinput ABI、事件编码、参数边界、所有者/序号与过期会话释放。物理手机陀螺仪流检查只选 `MouseGyroTargetTest` 并显式传入 `checkGyroscope=true`；不能替代人工核对握姿、指向和手感。
+
+真实鼠标输入专项使用 `runtime/mouse_target_test.py --serial <独立目标> --binary <匹配ABI资产> --receiver-apk inputFixture/build/outputs/apk/debug/inputFixture-debug.apk`；通过唯一 runtime 目录与原生接收 fixture 验证真正鼠标来源、三键、拖动、滚轮、拒绝重复帧和其他连接、断线/心跳过期释放。目标需 root/uinput；若固件将鼠标右键映射为返回，显式加 `--right-button back`，该分支要求真实鼠标 BACK 按下/松开与按钮状态，而不是放宽为任意响应；默认仍要求原生 secondary 按钮边沿。拒绝覆盖现有 fixture，结束恢复原 Activity 并清理自建服务、转发与安装包。

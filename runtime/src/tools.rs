@@ -24,6 +24,10 @@ mod ui_hierarchy;
 pub const TOOLS: &[&str] = &[
     "screen.power",
     "remote.key",
+    "mouse.capabilities",
+    "mouse.open",
+    "mouse.update",
+    "mouse.close",
     "remote.text",
     "gamepad.pulse",
     "gamepad.reset",
@@ -129,6 +133,9 @@ pub(crate) async fn pause_current_media() -> Result<String> {
 }
 
 pub async fn execute_owned(tool: &str, args: &Value, owner: &str) -> Result<String> {
+    if tool.starts_with("mouse.") {
+        return crate::mouse::execute(tool, args, owner);
+    }
     if tool == "remote.key" && args.get("action").is_some() {
         return crate::remote_input::edge(args, owner).await;
     }

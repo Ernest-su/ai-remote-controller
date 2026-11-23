@@ -21,6 +21,7 @@ internal val remoteFeatures = listOf(
 internal val remoteTypes = listOf(
     RemoteFeature(RemotePage.REMOTE, R.drawable.ic_remote_types),
     RemoteFeature(RemotePage.TOUCHPAD, R.drawable.ic_touchpad),
+    RemoteFeature(RemotePage.MOUSE, R.drawable.ic_mouse),
     RemoteFeature(RemotePage.KEYPAD, R.drawable.ic_keypad),
     RemoteFeature(RemotePage.MEDIA_CONTROL, R.drawable.ic_media),
     RemoteFeature(RemotePage.GAMEPAD, R.drawable.ic_gamepad),

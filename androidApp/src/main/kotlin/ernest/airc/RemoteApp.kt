@@ -182,6 +182,7 @@ internal fun RemoteApp(model: RemoteViewModel, themeMode: ThemeMode = ThemeMode.
             Box(Modifier.widthIn(max = if (mirrorFullscreen || page == RemotePage.FILES && textDocumentOpen) androidx.compose.ui.unit.Dp.Infinity else if (page == RemotePage.GAMEPAD) RemoteDimensions.GamepadContentWidth else 560.dp).fillMaxWidth()) {
                 pages.SaveableStateProvider(page.name) {
                     when (page) {
+                        RemotePage.MOUSE -> MouseScreen(state, model)
                         RemotePage.REMOTE_TYPES -> RemoteTypePicker(RemotePage.valueOf(selectedTypeName), ::navigate)
                         RemotePage.REMOTE -> RemoteControls(state, model) { navigate(RemotePage.RESULTS) }
                         RemotePage.DEVICES -> Devices(state, model)

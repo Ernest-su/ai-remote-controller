@@ -7,6 +7,7 @@ mod file_actions;
 mod i18n;
 mod media_publications;
 mod media_resources;
+mod mouse;
 mod platform_bridge;
 mod playback_bridge;
 mod remote_input;
@@ -126,7 +127,8 @@ async fn dispatch(
             }
             result
         }
-        "schedule_list" | "schedule_save" | "schedule_delete" | "schedule_toggle" | "schedule_run_once" => {
+        "schedule_list" | "schedule_save" | "schedule_delete" | "schedule_toggle"
+        | "schedule_run_once" => {
             state
                 .schedules
                 .request(&request.kind, &request.arguments)
@@ -139,7 +141,9 @@ async fn dispatch(
         "approve_app" => crate::app_actions::approve(&request.arguments).await,
         "approve" => crate::file_actions::approve(&request.arguments).await,
         "clear_model" => {
-            if request.arguments != json!({}) { bail!("clear_model requires empty arguments"); }
+            if request.arguments != json!({}) {
+                bail!("clear_model requires empty arguments");
+            }
             let mut history = history.lock().await;
             let mut config = state.config.write().await;
             ModelConfig::clear(&state.directory)?;
@@ -241,7 +245,7 @@ async fn connection(socket: WebSocket, state: Arc<AppState>, language: i18n::Lan
                             if writer.send(Message::Text(serde_json::to_string(&reply).unwrap().into())).await.is_err() { break; }
                             continue;
                         }
-                        let queue = if kind == "tool" && tool.as_deref() == Some("remote.key") { &keys }
+                        let queue = if kind == "tool" && tool.as_deref().is_some_and(|tool| tool == "remote.key" || tool.starts_with("mouse.")) { &keys }
                             else if kind == "tool" || kind == "approve" || kind == "approve_app" || kind == "approve_app_control" || kind == "approve_install" || kind == "approve_cache" || kind == "approve_system" || kind.starts_with("schedule_") { &controls } else { &requests };
                         match queue.try_send(frame) {
                             Ok(()) => {},
@@ -269,6 +273,7 @@ async fn connection(socket: WebSocket, state: Arc<AppState>, language: i18n::Lan
     let _ = key_worker.await;
     remote_input::disconnect(&owner).await;
     virtual_gamepad::disconnect(&owner);
+    mouse::disconnect(&owner);
     screen_mirror::disconnect(&owner);
     system_actions::disconnect(&owner);
 }
@@ -413,6 +418,7 @@ async fn serve(directory: PathBuf, port: u16, enable_mdns: bool) -> Result<()> {
     };
     service::Record::save(&directory, actual_port, id)?;
     virtual_gamepad::initialize();
+    mouse::initialize();
     let _state_guard = service::StateGuard::new(directory);
     println!("airc-runtime listening on {}", listener.local_addr()?);
     let app = Router::new()
@@ -447,6 +453,7 @@ async fn serve(directory: PathBuf, port: u16, enable_mdns: bool) -> Result<()> {
             let _ = schedule_stop.send(true);
             let _ = schedule_worker.await;
             virtual_gamepad::shutdown();
+            mouse::shutdown();
             remote_input::shutdown().await;
         })
         .await?;

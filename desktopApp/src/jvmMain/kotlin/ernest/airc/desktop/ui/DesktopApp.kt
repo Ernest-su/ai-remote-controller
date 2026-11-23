@@ -93,7 +93,7 @@ fun DesktopApp(controller: DesktopController, navigation: DesktopNavigation = re
                     pages.SaveableStateProvider(navigation.page.name) {
                         when (navigation.page) {
                             RemotePage.REMOTE -> DesktopRemoteScreen(state, controller) { navigation.navigate(RemotePage.RESULTS) }
-                            RemotePage.MENU, RemotePage.REMOTE_TYPES -> DesktopMenu(navigation)
+                            RemotePage.MENU, RemotePage.REMOTE_TYPES, RemotePage.MOUSE -> DesktopMenu(navigation)
                             RemotePage.DEVICES -> DesktopDevices(state, controller)
                             RemotePage.APPS -> DesktopApplications(state, controller) { name -> appDetailsPackage = name; navigation.navigate(RemotePage.APP_DETAILS) }
                             RemotePage.APP_DETAILS -> DesktopApplicationDetails(appDetailsPackage, state, controller) { navigation.navigate(RemotePage.APPS) }
